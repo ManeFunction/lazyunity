@@ -650,7 +650,8 @@ func (m *Model) filterRowView(t tab, w int, focused bool) string {
 	th := m.th
 	right := ""
 	if t == tab(m.releasesTab) {
-		right = th.Dim.Render(streamName(m.releases.stream))
+		label, _ := unitycli.StreamLabel(m.releases.stream)
+		right = th.Dim.Render(label)
 	}
 	label := " Filter: "
 	avail := max(w-width(label)-width(right)-1, 2)

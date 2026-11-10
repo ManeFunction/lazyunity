@@ -137,8 +137,10 @@ func (s *State) RemoveRoot(path string) bool {
 	return false
 }
 
-// Release streams, as `unity releases --stream` takes them. StreamAll lists
-// every stream; StreamTech is what Unity calls Supported releases.
+// Release streams are stored as the value `unity releases --stream` takes
+// (unitycli.ReleaseStreams lists them), except every stream, which is stored
+// as StreamAll because "" means nothing was chosen. StreamTech, what Unity
+// calls Supported releases, is the default.
 const (
 	StreamAll  = "all"
 	StreamTech = "tech"

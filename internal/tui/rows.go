@@ -350,28 +350,22 @@ func sortModules(mods []unitycli.Module) {
 
 // ---- releases --------------------------------------------------------------
 
-// streamLabel names a release stream for display and says how to colour it.
+// streamLabel names a release's stream for display and says how to colour it.
 func (th *Theme) streamLabel(r unitycli.Release) (string, lipgloss.Style) {
-	switch strings.ToUpper(r.Stream) {
+	label, known := "", false
+	if r.Stream != "" {
+		label, known = unitycli.StreamLabel(r.Stream)
+	}
+	if !known && r.LTS {
+		label = "LTS"
+	}
+	switch label {
 	case "LTS":
-		return "LTS", th.Success
-	case "BETA":
-		return "Beta", th.Warning
-	case "ALPHA":
-		return "Alpha", th.Warning
-	case "TECH":
-		return "Supported", th.Dim // the old name of the stream
-	case "SUPPORTED":
-		return "Supported", th.Dim
+		return label, th.Success
+	case "Beta", "Alpha":
+		return label, th.Warning
 	}
-	if r.LTS {
-		return "LTS", th.Success
-	}
-	name := strings.ToLower(r.Stream)
-	if name != "" {
-		name = strings.ToUpper(name[:1]) + name[1:]
-	}
-	return name, th.Dim
+	return label, th.Dim
 }
 
 func (m *Model) drawRelease(r unitycli.Release, w int, base lipgloss.Style) string {

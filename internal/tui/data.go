@@ -4,7 +4,6 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"strings"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -74,19 +73,6 @@ type releasesState struct {
 	// gen counts the times the list was started over, so that a page asked for
 	// before is not added to the new list.
 	gen int
-}
-
-// streamName is how a release stream is called on screen.
-func streamName(stream string) string {
-	switch stream {
-	case "":
-		return "All"
-	case "tech":
-		return "Supported"
-	case "lts":
-		return "LTS"
-	}
-	return strings.ToUpper(stream[:1]) + stream[1:]
 }
 
 const (

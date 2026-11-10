@@ -571,13 +571,11 @@ func (m *Model) streamMenu() {
 		}
 		return ""
 	}
-	menu := newMenu("Release stream", []menuItem{
-		{label: "Supported", right: mark("tech"), run: pick("tech"), desc: "Supported releases: the current Unity versions (the default)"},
-		{label: "LTS", right: mark("lts"), run: pick("lts"), desc: "Long-term support releases"},
-		{label: "Beta", right: mark("beta"), run: pick("beta"), desc: "Pre-releases of the next version"},
-		{label: "Alpha", right: mark("alpha"), run: pick("alpha"), desc: "Early previews"},
-		{label: "All", right: mark(""), run: pick(""), desc: "Every release stream"},
-	})
+	var items []menuItem
+	for _, s := range unitycli.ReleaseStreams {
+		items = append(items, menuItem{id: s.ID, label: s.Label, desc: s.Desc, right: mark(s.ID), run: pick(s.ID)})
+	}
+	menu := newMenu("Release stream", items)
 	menu.wanted = 36
 	m.push(menu)
 }
