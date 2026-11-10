@@ -130,21 +130,11 @@ func (m *Model) switchTab(delta int) tea.Cmd {
 	return m.afterTabSwitch()
 }
 
-func (m *Model) afterTabSwitch() tea.Cmd {
-	if m.focusedTab() == tab(m.releasesTab) && !m.releases.loaded {
-		return m.loadReleasesCmd(true)
-	}
-	return nil
-}
+// afterTabSwitch lets the tab now in view load what it shows.
+func (m *Model) afterTabSwitch() tea.Cmd { return m.focusedTab().shown(m) }
 
-// afterNav loads more releases when the cursor nears the end of the list.
-func (m *Model) afterNav() tea.Cmd {
-	if m.focusedTab() == tab(m.releasesTab) && m.releases.nextOffset > 0 &&
-		m.releasesTab.Cursor() >= m.releasesTab.Len()-3 {
-		return m.loadReleasesCmd(false)
-	}
-	return nil
-}
+// afterNav lets the focused tab load more once the cursor has moved.
+func (m *Model) afterNav() tea.Cmd { return m.focusedTab().moved(m) }
 
 // cycleMode moves to the next or previous screen mode, keeping the focus on a
 // panel that is still on screen.

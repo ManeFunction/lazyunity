@@ -11,7 +11,6 @@ import (
 	"github.com/ManeFunction/lazyunity/internal/unitycli"
 )
 
-
 func selectEditor(t *testing.T, m *Model, version string) editorRow {
 	t.Helper()
 	for _, e := range m.editorsTab.Items() {
@@ -381,8 +380,8 @@ func TestReleasesLoadFilterAndPage(t *testing.T) {
 		t.Error("the tab says it is loading")
 	}
 	drain(m, cmd)
-	if m.releasesTab.Len() != 3 || m.releases.nextOffset != 3 {
-		t.Fatalf("%d releases, next offset %d", m.releasesTab.Len(), m.releases.nextOffset)
+	if m.releasesTab.Len() != 3 || m.releasesTab.nextOffset != 3 {
+		t.Fatalf("%d releases, next offset %d", m.releasesTab.Len(), m.releasesTab.nextOffset)
 	}
 	if strings.Contains(screenText(m), "Loading releases…") {
 		t.Error("loaded")
@@ -390,8 +389,8 @@ func TestReleasesLoadFilterAndPage(t *testing.T) {
 	// moving to the end loads the next page
 	drain(m, m.keymap.lookup(ctxReleases, "j").run(m))
 	drain(m, m.keymap.lookup(ctxReleases, "j").run(m))
-	if m.releasesTab.Len() != 4 || m.releases.nextOffset != 0 {
-		t.Errorf("the next page should be appended: %d releases, next offset %d (calls %v)", m.releasesTab.Len(), m.releases.nextOffset, f.Calls())
+	if m.releasesTab.Len() != 4 || m.releasesTab.nextOffset != 0 {
+		t.Errorf("the next page should be appended: %d releases, next offset %d (calls %v)", m.releasesTab.Len(), m.releasesTab.nextOffset, f.Calls())
 	}
 	// the stream filter starts the list over
 	press(m, "ctrl+s")
@@ -401,8 +400,8 @@ func TestReleasesLoadFilterAndPage(t *testing.T) {
 	_, cmd = m.Update(keyMsg("j")) // LTS is the second item
 	_, cmd = m.Update(keyMsg("enter"))
 	drain(m, cmd)
-	if m.releasesTab.Len() != 1 || m.releases.stream != "lts" || m.st.ReleaseStream != "lts" {
-		t.Errorf("filtered: %d releases, stream %q, remembered %q (calls %v)", m.releasesTab.Len(), m.releases.stream, m.st.ReleaseStream, f.Calls())
+	if m.releasesTab.Len() != 1 || m.releasesTab.stream != "lts" || m.st.ReleaseStream != "lts" {
+		t.Errorf("filtered: %d releases, stream %q, remembered %q (calls %v)", m.releasesTab.Len(), m.releasesTab.stream, m.st.ReleaseStream, f.Calls())
 	}
 	if item, _ := m.releasesTab.Selected(); item.Version != "6000.0.85f2" {
 		t.Errorf("the list was replaced, got %q", item.Version)
@@ -411,8 +410,8 @@ func TestReleasesLoadFilterAndPage(t *testing.T) {
 
 func TestReleasesStartOnSupported(t *testing.T) {
 	m := newTestModel(t)
-	if m.releases.stream != "tech" {
-		t.Errorf("a fresh install lists Supported releases, stream = %q", m.releases.stream)
+	if m.releasesTab.stream != "tech" {
+		t.Errorf("a fresh install lists Supported releases, stream = %q", m.releasesTab.stream)
 	}
 	press(m, "2", "]", "ctrl+s")
 	out := screenText(m)
@@ -451,8 +450,8 @@ func TestReleasesFilterRowSearchesEveryPage(t *testing.T) {
 		_, cmd := m.Update(keyMsg(k))
 		drain(m, cmd)
 	}
-	if m.releasesTab.Len() != 1 || m.releases.nextOffset != 0 {
-		t.Fatalf("every page is searched: %d matches, next offset %d (calls %v)", m.releasesTab.Len(), m.releases.nextOffset, f.Calls())
+	if m.releasesTab.Len() != 1 || m.releasesTab.nextOffset != 0 {
+		t.Fatalf("every page is searched: %d matches, next offset %d (calls %v)", m.releasesTab.Len(), m.releasesTab.nextOffset, f.Calls())
 	}
 	if r, _ := m.releasesTab.Selected(); r.Version != "6000.4.1f1" {
 		t.Errorf("match = %q", r.Version)
@@ -466,11 +465,11 @@ func TestReleasesFilterRowSearchesEveryPage(t *testing.T) {
 func TestReleasesShowWhenMoreIsLoading(t *testing.T) {
 	m := newTestModel(t)
 	press(m, "2", "]")
-	m.releases.loading = true
+	m.releasesTab.busy = true
 	if !strings.Contains(screenText(m), "loading more") {
 		t.Errorf("a line under the list says more is loading:\n%s", screenText(m))
 	}
-	m.releases.loading = false
+	m.releasesTab.busy = false
 	if strings.Contains(screenText(m), "loading more") || !strings.Contains(screenText(m), "Supported") {
 		t.Errorf("then names the stream:\n%s", screenText(m))
 	}
@@ -478,7 +477,7 @@ func TestReleasesShowWhenMoreIsLoading(t *testing.T) {
 
 func TestReleasesInstallAlreadyInstalled(t *testing.T) {
 	m := newTestModel(t)
-	m.onReleases(releasesMsg{stream: m.releases.stream, page: unitycli.ReleasePage{Items: []unitycli.Release{
+	m.releasesTab.onPage(m, releasesMsg{stream: m.releasesTab.stream, page: unitycli.ReleasePage{Items: []unitycli.Release{
 		{Version: "6000.6.8f1", Architecture: "x86_64", Stream: "SUPPORTED", Installed: true},
 	}}})
 	press(m, "2", "]")
@@ -592,11 +591,48 @@ func TestMergeEditorsTakesTheVersionFromTheCLI(t *testing.T) {
 func TestStreamMenuStartsOnTheCurrentStream(t *testing.T) {
 	for stream, label := range map[string]string{"lts": "LTS", "": "All", "tech": "Supported"} {
 		m := newTestModel(t)
-		m.releases.stream = stream
+		m.releasesTab.stream = stream
 		m.streamMenu()
 		menu := m.popups[len(m.popups)-1].(*menuPopup)
 		if it, _ := menu.list.Selected(); it.label != label || it.right != "current" {
 			t.Errorf("stream %q: the cursor starts on %q (%q), want %q marked current", stream, it.label, it.right, label)
 		}
+	}
+}
+
+func TestRefreshReloadsTheReleases(t *testing.T) {
+	m := newTestModel(t)
+	f := useFakeCLI(t, m)
+	f.releases = map[string]unitycli.ReleasePage{
+		releasesKey("tech", 0, 25): {Items: fixture[unitycli.Release](t, "releases.json"), NextOffset: 3},
+	}
+	if cmd := m.releasesTab.refresh(m); cmd != nil {
+		t.Error("releases never looked at are not loaded by a refresh")
+	}
+	press(m, "2")
+	drain(m, m.switchTab(1))
+	drain(m, m.refreshAllCmd())
+	if n := f.count("Releases", "tech", 0, 25); n != 2 {
+		t.Errorf("R loads the first page again: %d loads (%v)", n, f.Calls())
+	}
+	if m.releasesTab.Len() != 3 || m.releasesTab.nextOffset != 3 {
+		t.Errorf("the list starts over: %d releases, next offset %d", m.releasesTab.Len(), m.releasesTab.nextOffset)
+	}
+}
+
+// A page asked for before the stream changed is dropped when it arrives.
+func TestReleasesDropAPageOfAnotherStream(t *testing.T) {
+	m := newTestModel(t)
+	f := useFakeCLI(t, m)
+	f.releases = map[string]unitycli.ReleasePage{
+		releasesKey("tech", 0, 25): {Items: fixture[unitycli.Release](t, "releases.json")},
+		releasesKey("lts", 0, 25):  {Items: []unitycli.Release{{Version: "6000.0.85f2", Stream: "LTS", LTS: true}}},
+	}
+	press(m, "2")
+	stale := m.switchTab(1) // the Supported page is on its way...
+	drain(m, m.releasesTab.restart(m, "lts"))
+	drain(m, stale) // ...and arrives after the switch to LTS
+	if m.releasesTab.Len() != 1 || m.releasesTab.stream != "lts" {
+		t.Errorf("only the LTS page is shown: %d releases of %q", m.releasesTab.Len(), m.releasesTab.stream)
 	}
 }

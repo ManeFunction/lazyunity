@@ -24,7 +24,6 @@ func selectProject(t *testing.T, m *Model, name string) projectRow {
 	return projectRow{}
 }
 
-
 func TestOpenProjectRunsTheCLI(t *testing.T) {
 	m := newTestModel(t)
 	space := selectProject(t, m, "Space Shooter")

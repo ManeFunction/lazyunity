@@ -3,6 +3,7 @@ package tui
 import (
 	"strings"
 
+	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 )
 
@@ -25,6 +26,17 @@ type tab interface {
 	// filterRow reports whether the tab keeps its filter on its own last row,
 	// as the keybindings menu does, rather than on the bottom line.
 	filterRow() bool
+
+	// A tab that loads its items lazily does it from these: shown runs when
+	// the tab comes into view, moved after the cursor moved, filtered after
+	// the filter changed.
+	shown(m *Model) tea.Cmd
+	moved(m *Model) tea.Cmd
+	filtered(m *Model) tea.Cmd
+	// loading reports that more items are on their way.
+	loading() bool
+	// status is shown at the right end of the filter row.
+	status() string
 }
 
 // listTab is a tab backed by a list of T.
@@ -53,6 +65,13 @@ func (t *listTab[T]) click(row int) bool   { return t.list.Click(row) }
 func (t *listTab[T]) scroll(d int)         { t.list.Scroll(d) }
 func (t *listTab[T]) emptyMsg() string     { return t.empty }
 
+// A plain list has all of its items from the start.
+func (t *listTab[T]) shown(*Model) tea.Cmd    { return nil }
+func (t *listTab[T]) moved(*Model) tea.Cmd    { return nil }
+func (t *listTab[T]) filtered(*Model) tea.Cmd { return nil }
+func (t *listTab[T]) loading() bool           { return false }
+func (t *listTab[T]) status() string          { return "" }
+
 func (t *listTab[T]) rows(m *Model, w int, focused bool) []string {
 	if t.prep != nil {
 		t.prep(m, w)
@@ -69,6 +88,18 @@ type drill struct {
 	tab   tab
 	// editor is the Editor whose modules the drill shows.
 	editor editorRow
+}
+
+// tabsLoading reports whether any tab is loading.
+func (m *Model) tabsLoading() bool {
+	for _, p := range m.panels {
+		for _, t := range p.tabs {
+			if t.loading() {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // panel is a frame with one or more tabs.

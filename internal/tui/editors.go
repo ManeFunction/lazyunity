@@ -489,46 +489,6 @@ func (m *Model) queueInstall(c unityCLI, opts unitycli.InstallOptions, names []s
 	})
 }
 
-// ---- releases ------------------------------------------------------------------------------
-
-func releaseActions() []*action {
-	on := onSelected(func(m *Model) (unitycli.Release, bool) { return m.releasesTab.Selected() })
-	return []*action{
-		on(&action{id: "releases.install", ctx: ctxReleases, keys: []string{"enter", "space"}, desc: "Install this version", hint: "Install"},
-			func(m *Model, r unitycli.Release) tea.Cmd {
-				if r.Installed {
-					m.toastf(toastInfo, "Unity %s is already installed", r.Version)
-					return nil
-				}
-				return m.installEditorFlow(r.Version, "")
-			}),
-		{id: "releases.stream", ctx: ctxReleases, keys: []string{"ctrl+s"}, desc: "Filter by release stream (Supported, LTS, Beta, Alpha)", hint: "Stream",
-			run: func(m *Model) tea.Cmd { m.streamMenu(); return nil }},
-		on(&action{id: "releases.notes", ctx: ctxReleases, keys: []string{"o"}, desc: "Open the release notes in the browser"},
-			func(m *Model, r unitycli.Release) tea.Cmd { return m.openURL(releaseNotesURL(r.Version)) }),
-	}
-}
-
-// releaseNotesURL is the page of a release's notes.
-func releaseNotesURL(version string) string {
-	return "https://unity.com/releases/editor/whats-new/" + version
-}
-
-func (m *Model) streamMenu() {
-	var choices []choice
-	for _, s := range unitycli.ReleaseStreams {
-		choices = append(choices, choice{s.ID, s.Label, s.Desc})
-	}
-	m.choiceMenu("Release stream", choices, m.releases.stream, func(m *Model, stream string) tea.Cmd {
-		m.releases = releasesState{stream: stream, gen: m.releases.gen + 1}
-		m.st.SetStream(stream)
-		m.saveState()
-		m.releasesTab.SetItems(nil)
-		m.releasesTab.empty = "Loading releases…"
-		return m.loadReleasesCmd(true)
-	})
-}
-
 // ---- the download cache ----------------------------------------------------------
 
 type cacheInfoMsg struct {

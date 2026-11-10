@@ -90,7 +90,7 @@ func TestReleasesLoadOnFirstVisit(t *testing.T) {
 	if cmd := m.switchTab(1); cmd != nil {
 		t.Error("without a CLI there is nothing to load")
 	}
-	m.releases.loaded = true
+	m.releasesTab.loaded = true
 	m.releasesTab.SetItems(nil)
 	if cmd := m.afterTabSwitch(); cmd != nil {
 		t.Error("an already loaded tab must not reload")

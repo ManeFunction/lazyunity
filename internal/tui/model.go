@@ -82,7 +82,7 @@ type Model struct {
 
 	projectsTab *listTab[projectRow]
 	editorsTab  *listTab[editorRow]
-	releasesTab *listTab[unitycli.Release]
+	releasesTab *releasesTab
 	rootsTab    *listTab[rootRow]
 	toolsTab    *listTab[toolRow]
 
@@ -97,8 +97,6 @@ type Model struct {
 	auth        unitycli.AuthInfo
 	authKnown   bool
 	openupm     openupmState
-
-	releases releasesState
 
 	popups []popup
 	toast  toast
@@ -144,8 +142,6 @@ func New(o Options) (*Model, error) {
 	if m.st == nil {
 		m.st = state.Load("")
 	}
-	m.releases.stream = m.st.Stream()
-
 	km, warnings := newKeymap(buildActions(), o.Config.Keybinding)
 	m.keymap = km
 	m.buildTabs()
@@ -197,16 +193,7 @@ func (m *Model) buildTabs() {
 		return m.drawEditor(r, w, base, ecols)
 	}
 
-	m.releasesTab = &listTab[unitycli.Release]{
-		list:       newList(func(r unitycli.Release) string { return r.Version + " " + r.Stream }, func(r unitycli.Release) string { return r.Version + "/" + r.Architecture }),
-		name:       "Releases",
-		context:    ctxReleases,
-		empty:      "Loading releases…",
-		filterLine: true,
-	}
-	m.releasesTab.draw = func(m *Model, r unitycli.Release, w int, base lipgloss.Style) string {
-		return m.drawRelease(r, w, base)
-	}
+	m.releasesTab = newReleasesTab(m.st.Stream())
 
 	m.rootsTab = &listTab[rootRow]{
 		list:    newList(func(r rootRow) string { return r.Path }, func(r rootRow) string { return r.Path }),
@@ -376,9 +363,7 @@ func (m *Model) handlePaste(msg tea.PasteMsg) tea.Cmd {
 	if m.filter.active {
 		m.filter.in.Paste(msg.Content)
 		m.focusedTab().setFilter(m.filter.in.String())
-		if m.focusedTab() == tab(m.releasesTab) {
-			return m.searchReleasesCmd()
-		}
+		return m.focusedTab().filtered(m)
 	}
 	return nil
 }
@@ -422,9 +407,7 @@ func (m *Model) updateFilter(msg tea.KeyPressMsg) tea.Cmd {
 	default:
 		if m.filter.in.Key(msg) {
 			t.setFilter(m.filter.in.String())
-			if t == tab(m.releasesTab) {
-				return m.searchReleasesCmd()
-			}
+			return t.filtered(m)
 		}
 	}
 	return nil
@@ -606,7 +589,7 @@ func (m *Model) renderPanel(i int, r rect) string {
 		msg := t.emptyMsg()
 		if f := t.filter(); f != "" {
 			msg = fmt.Sprintf("No matches for '%s'", f)
-			if t == tab(m.releasesTab) && m.releases.loading {
+			if t.loading() {
 				msg += " yet. Still looking…"
 			}
 		}
@@ -619,8 +602,8 @@ func (m *Model) renderPanel(i int, r rect) string {
 	if t.filterRow() && r.h > 3 {
 		rows := r.h - 3
 		lines = lines[:min(len(lines), rows)]
-		if t == tab(m.releasesTab) && m.releases.loading && rows > 0 {
-			// "loading more" sits right under the last release
+		if t.loading() && rows > 0 {
+			// "loading more" sits right under the last item
 			more := " " + m.th.ActiveBorder.Render(m.spinnerFrame()) + m.th.Dim.Render(" loading more")
 			if len(lines) < rows {
 				lines = append(lines, more)
@@ -653,9 +636,8 @@ func (m *Model) renderPanel(i int, r rect) string {
 func (m *Model) filterRowView(t tab, w int, focused bool) string {
 	th := m.th
 	right := ""
-	if t == tab(m.releasesTab) {
-		label, _ := unitycli.StreamLabel(m.releases.stream)
-		right = th.Dim.Render(label)
+	if s := t.status(); s != "" {
+		right = th.Dim.Render(s)
 	}
 	label := " Filter: "
 	avail := max(w-width(label)-width(right)-1, 2)

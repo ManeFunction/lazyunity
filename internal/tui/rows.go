@@ -345,39 +345,6 @@ func sortModules(mods []unitycli.Module) {
 	})
 }
 
-// ---- releases --------------------------------------------------------------
-
-// streamLabel names a release's stream for display and says how to colour it.
-func (th *Theme) streamLabel(r unitycli.Release) (string, lipgloss.Style) {
-	label, known := "", false
-	if r.Stream != "" {
-		label, known = unitycli.StreamLabel(r.Stream)
-	}
-	if !known && r.LTS {
-		label = "LTS"
-	}
-	switch label {
-	case "LTS":
-		return label, th.Success
-	case "Beta", "Alpha":
-		return label, th.Warning
-	}
-	return label, th.Dim
-}
-
-func (m *Model) drawRelease(r unitycli.Release, w int, base lipgloss.Style) string {
-	th := m.th
-	row := newRow(base)
-	row.add(r.Version, th.Text, 14).gap(1)
-	label, st := th.streamLabel(r)
-	row.add(label, st, 9).gap(1)
-	row.add(r.Architecture, th.Dim, 6)
-	if r.Installed {
-		row.gap(1).text("✓ installed", th.Success)
-	}
-	return row.done(w)
-}
-
 // ---- roots and tools -------------------------------------------------------
 
 // rootRow is a folder Editors are looked for in.

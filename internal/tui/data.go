@@ -43,14 +43,6 @@ type modulesMsg struct {
 	err     error
 }
 
-type releasesMsg struct {
-	stream string
-	gen    int
-	offset int
-	page   unitycli.ReleasePage
-	err    error
-}
-
 // errorMsg reports a failed background command.
 type errorMsg struct {
 	what string
@@ -62,26 +54,6 @@ type toastMsg struct {
 	kind toastKind
 	text string
 }
-
-// ---- state of lazily loaded data -------------------------------------------------
-
-// releasesState tracks the Releases tab, which is loaded when first looked at.
-type releasesState struct {
-	stream     string // "" (every stream), lts, tech, beta, alpha
-	nextOffset int    // 0 when there is no more
-	loaded     bool
-	loading    bool
-	// gen counts the times the list was started over, so that a page asked for
-	// before is not added to the new list.
-	gen int
-}
-
-const (
-	releasesPerPage = 25
-	// releasesPerSearch is the page size while a filter is typed: every page is
-	// then loaded, so that the filter sees every release, in fewer calls.
-	releasesPerSearch = 200
-)
 
 // ---- commands -----------------------------------------------------------------
 
@@ -124,50 +96,13 @@ func (m *Model) loadInstallPathCmd() tea.Cmd {
 	})
 }
 
-// loadReleasesCmd loads a page of releases. With reset the list starts over.
-func (m *Model) loadReleasesCmd(reset bool) tea.Cmd {
-	if m.releases.loading {
-		return nil
-	}
-	offset := m.releases.nextOffset
-	if reset {
-		offset = 0
-	}
-	stream, gen := m.releases.stream, m.releases.gen
-	limit := releasesPerPage
-	if m.releasesTab.filter() != "" {
-		limit = releasesPerSearch
-	}
-	load := m.cliCmd(func(ctx context.Context, c unityCLI) tea.Msg {
-		page, err := c.Releases(ctx, stream, offset, limit)
-		return releasesMsg{stream: stream, gen: gen, offset: offset, page: page, err: err}
-	})
-	if load == nil {
-		return nil
-	}
-	m.releases.loading = true
-	return tea.Batch(load, m.startSpinner())
-}
-
-// searchReleasesCmd loads the next page of releases while a filter is set, so
-// that the filter looks through every release and not only the pages loaded.
-func (m *Model) searchReleasesCmd() tea.Cmd {
-	if m.releasesTab.filter() == "" || !m.releases.loaded || m.releases.nextOffset == 0 {
-		return nil
-	}
-	return m.loadReleasesCmd(false)
-}
-
 // refreshAllCmd reloads everything.
 func (m *Model) refreshAllCmd() tea.Cmd {
 	cmds := []tea.Cmd{
 		m.scanEditorsCmd(), probeOpenUPMCmd(),
 		m.loadProjectsCmd(), m.loadEditorsCmd(), m.loadAuthCmd(), m.loadInstallPathCmd(),
 	}
-	if m.releases.loaded {
-		m.releases = releasesState{stream: m.releases.stream, gen: m.releases.gen + 1}
-		cmds = append(cmds, m.loadReleasesCmd(true))
-	}
+	cmds = append(cmds, m.releasesTab.refresh(m))
 	return tea.Batch(cmds...)
 }
 
@@ -213,7 +148,7 @@ func (m *Model) handleData(msg tea.Msg) tea.Cmd {
 			return m.scanEditorsCmd()
 		}
 	case releasesMsg:
-		return m.onReleases(msg)
+		return m.releasesTab.onPage(m, msg)
 	case openedMsg:
 		return m.onOpened(msg)
 	case projectInfoMsg:
@@ -250,27 +185,6 @@ func (m *Model) handleData(msg tea.Msg) tea.Cmd {
 		m.toastf(toastError, "%s: %v", msg.what, msg.err)
 	}
 	return nil
-}
-
-func (m *Model) onReleases(msg releasesMsg) tea.Cmd {
-	if msg.stream != m.releases.stream || msg.gen != m.releases.gen {
-		return nil // the list started over while this was loading
-	}
-	m.releases.loading = false
-	if msg.err != nil {
-		m.toastf(toastError, "Could not list releases: %v", msg.err)
-		m.releasesTab.empty = "Could not load releases. Press R to retry."
-		return nil
-	}
-	items := msg.page.Items
-	if msg.offset > 0 {
-		items = append(append([]unitycli.Release(nil), m.releasesTab.Items()...), items...)
-	}
-	m.releases.loaded = true
-	m.releases.nextOffset = msg.page.NextOffset
-	m.releasesTab.empty = "No releases."
-	m.releasesTab.SetItems(items)
-	return m.searchReleasesCmd()
 }
 
 // ---- rebuilding the lists --------------------------------------------------------------
