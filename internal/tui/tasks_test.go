@@ -152,6 +152,28 @@ func TestCancelledTaskIsNotAnError(t *testing.T) {
 	}
 }
 
+// A stopped process does not always say it was interrupted: on Windows it is
+// killed (exit code 1), and a program run with exec.CommandContext reports
+// "signal: killed". Whatever the error, a task the user cancelled is cancelled.
+func TestCancelledTaskFailingAnyWayIsNotAnError(t *testing.T) {
+	for _, err := range []error{&unitycli.Error{ExitCode: 1}, errors.New("openupm add x: signal: killed")} {
+		m := newTestModel(t)
+		started := make(chan struct{})
+		tk := &task{title: "Long job", do: func(ctx context.Context) error { close(started); <-ctx.Done(); return err }}
+		msgs := background(m.enqueue(tk))
+		<-started
+		press(m, "X")
+		_, next := m.Update(<-msgs)
+		drain(m, next)
+		if len(m.popups) != 0 {
+			t.Errorf("%v: a cancelled task opened a popup:\n%s", err, screenText(m))
+		}
+		if !strings.Contains(screenText(m), "Cancelled: Long job") {
+			t.Errorf("%v: the user should be told it was cancelled", err)
+		}
+	}
+}
+
 func TestCancelKeyKeepsTheQueue(t *testing.T) {
 	m := newTestModel(t)
 	started := make(chan struct{})

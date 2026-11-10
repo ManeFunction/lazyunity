@@ -49,7 +49,11 @@ type task struct {
 	after func(m *Model, err error) tea.Cmd
 
 	cancel context.CancelFunc
-	doneAt time.Time
+	// cancelled is set when the user stopped the task. How a stopped process
+	// fails depends on the program and the platform (an exit code, a signal,
+	// a killed process on Windows), so the error cannot tell.
+	cancelled bool
+	doneAt    time.Time
 }
 
 // ---- messages ------------------------------------------------------------------
@@ -292,7 +296,7 @@ func (m *Model) onTaskEnd(msg taskEndMsg) tea.Cmd {
 	case msg.err == nil:
 		t.status = taskDone
 		t.pct = 100
-	case isCancelled(msg.err):
+	case t.cancelled || isCancelled(msg.err):
 		m.removeTask(t)
 		m.toastf(toastInfo, "Cancelled: %s", t.title)
 	default:
@@ -341,7 +345,15 @@ func (m *Model) pruneTasks() {
 // cancelRunning stops the running task. The queued ones stay: the next starts
 // once the running one has ended.
 func (m *Model) cancelRunning() {
-	if t := m.running(); t != nil && t.cancel != nil {
+	if t := m.running(); t != nil {
+		t.stop()
+	}
+}
+
+// stop cancels a running task.
+func (t *task) stop() {
+	if t.cancel != nil {
+		t.cancelled = true
 		t.cancel()
 	}
 }
@@ -353,9 +365,7 @@ func (m *Model) cancelTasks() {
 		case taskQueued:
 			m.removeTask(t)
 		case taskRunning:
-			if t.cancel != nil {
-				t.cancel()
-			}
+			t.stop()
 		}
 	}
 	m.relayout()
