@@ -757,17 +757,24 @@ func yesNo(b bool) string {
 }
 
 func (m *Model) copyMenu(r projectRow) {
-	copyItem := func(label, value string) menuItem {
-		return menuItem{label: label, right: truncate(value, 40), run: func(m *Model) tea.Cmd {
+	m.copyChoices(56, [][2]string{
+		{"Path", r.Path}, {"Name", r.name()}, {"Unity version", r.effVersion()}, {"Folder name", filepath.Base(r.Path)},
+	})
+}
+
+// copyChoices opens a Copy menu of label and value pairs; picking one puts its
+// value on the clipboard.
+func (m *Model) copyChoices(wanted int, choices [][2]string) {
+	var items []menuItem
+	for _, c := range choices {
+		label, value := c[0], c[1]
+		items = append(items, menuItem{label: label, right: truncate(value, wanted-16), run: func(m *Model) tea.Cmd {
 			m.toastf(toastOK, "Copied the %s", strings.ToLower(label))
 			return tea.SetClipboard(value)
-		}}
+		}})
 	}
-	menu := newMenu("Copy", []menuItem{
-		copyItem("Path", r.Path), copyItem("Name", r.name()), copyItem("Unity version", r.effVersion()),
-		copyItem("Folder name", filepath.Base(r.Path)),
-	})
-	menu.wanted = 56
+	menu := newMenu("Copy", items)
+	menu.wanted = wanted
 	m.push(menu)
 }
 

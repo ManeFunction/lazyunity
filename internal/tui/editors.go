@@ -58,15 +58,7 @@ func (m *Model) setDefaultEditor(e editorRow) tea.Cmd {
 }
 
 func (m *Model) copyEditorMenu(e editorRow) {
-	item := func(label, value string) menuItem {
-		return menuItem{label: label, right: truncate(value, 44), run: func(m *Model) tea.Cmd {
-			m.toastf(toastOK, "Copied the %s", strings.ToLower(label))
-			return tea.SetClipboard(value)
-		}}
-	}
-	menu := newMenu("Copy", []menuItem{item("Version", e.Version), item("Editor path", e.Location), item("Folder", editorDir(e))})
-	menu.wanted = 60
-	m.push(menu)
+	m.copyChoices(60, [][2]string{{"Version", e.Version}, {"Editor path", e.Location}, {"Folder", editorDir(e)}})
 }
 
 // projectsUsing lists the projects that open with an Editor version.
