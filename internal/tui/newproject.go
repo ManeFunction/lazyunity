@@ -94,12 +94,12 @@ func (m *Model) newProjectLocation(w newProject) {
 
 func (m *Model) newProjectEditor(w newProject) {
 	var items []menuItem
-	pick := 0
-	for i, e := range m.editors {
+	pick := ""
+	for _, e := range m.editors {
 		tags := []string{}
 		if e.Default {
 			tags = append(tags, "default")
-			pick = i
+			pick = e.Version
 		}
 		if e.LTS {
 			tags = append(tags, "LTS")
@@ -114,9 +114,7 @@ func (m *Model) newProjectEditor(w newProject) {
 	}
 	menu := newMenu("New project (3/5): Unity version", items)
 	menu.wanted = 44
-	for i := 0; i < pick; i++ {
-		menu.list.Move(1)
-	}
+	menu.list.SelectKey(pick) // start on the default Editor
 	m.push(menu)
 }
 

@@ -814,3 +814,13 @@ func TestAddPackageNeedsOpenUPM(t *testing.T) {
 		t.Errorf("an empty name is refused:\n%s", screenText(m))
 	}
 }
+
+func TestNewProjectStartsOnTheDefaultEditor(t *testing.T) {
+	m := newTestModel(t)
+	m.editors[1].Default = true // 2022.3.62f1, second in the list
+	m.newProjectEditor(newProject{name: "G", parent: t.TempDir()})
+	menu := m.popups[len(m.popups)-1].(*menuPopup)
+	if it, _ := menu.list.Selected(); it.label != m.editors[1].Version {
+		t.Errorf("the cursor starts on the default Editor, got %q", it.label)
+	}
+}
