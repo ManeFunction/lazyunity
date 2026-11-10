@@ -591,3 +591,15 @@ func TestMergeEditorsTakesTheVersionFromTheCLI(t *testing.T) {
 		t.Errorf("the CLI knows the real version of an Editor in a folder not named after it: %+v", e)
 	}
 }
+
+func TestStreamMenuStartsOnTheCurrentStream(t *testing.T) {
+	for stream, label := range map[string]string{"lts": "LTS", "": "All", "tech": "Supported"} {
+		m := newTestModel(t)
+		m.releases.stream = stream
+		m.streamMenu()
+		menu := m.popups[len(m.popups)-1].(*menuPopup)
+		if it, _ := menu.list.Selected(); it.label != label || it.right != "current" {
+			t.Errorf("stream %q: the cursor starts on %q (%q), want %q marked current", stream, it.label, it.right, label)
+		}
+	}
+}

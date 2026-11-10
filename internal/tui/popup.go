@@ -431,6 +431,27 @@ func (p *menuPopup) drawItem(th *Theme, it menuItem, w int, base lipgloss.Style,
 	return sb.String()
 }
 
+// choice is one option of a choiceMenu.
+type choice struct{ id, label, desc string }
+
+// choiceMenu offers one of several choices, with the current one marked and
+// selected. Picking one calls onPick with its id.
+func (m *Model) choiceMenu(title string, choices []choice, cur string, onPick func(m *Model, id string) tea.Cmd) {
+	items := make([]menuItem, len(choices))
+	at := 0
+	for i, c := range choices {
+		items[i] = menuItem{id: c.id, label: c.label, desc: c.desc, run: func(m *Model) tea.Cmd { return onPick(m, c.id) }}
+		if c.id == cur {
+			items[i].right, at = "current", i
+		}
+	}
+	menu := newMenu(title, items)
+	menu.wanted = 36
+	// by position: newMenu names an item with an empty id after its label
+	menu.list.SelectKey(menu.list.Items()[at].id)
+	m.push(menu)
+}
+
 // ---- confirm -------------------------------------------------------------
 
 // confirmPopup asks a yes-or-no question.

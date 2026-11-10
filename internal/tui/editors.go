@@ -527,30 +527,18 @@ func releaseNotesURL(version string) string {
 }
 
 func (m *Model) streamMenu() {
-	cur := m.releases.stream
-	pick := func(stream string) func(*Model) tea.Cmd {
-		return func(m *Model) tea.Cmd {
-			m.releases = releasesState{stream: stream, gen: m.releases.gen + 1}
-			m.st.SetStream(stream)
-			m.saveState()
-			m.releasesTab.SetItems(nil)
-			m.releasesTab.empty = "Loading releases…"
-			return m.loadReleasesCmd(true)
-		}
-	}
-	mark := func(s string) string {
-		if s == cur {
-			return "current"
-		}
-		return ""
-	}
-	var items []menuItem
+	var choices []choice
 	for _, s := range unitycli.ReleaseStreams {
-		items = append(items, menuItem{id: s.ID, label: s.Label, desc: s.Desc, right: mark(s.ID), run: pick(s.ID)})
+		choices = append(choices, choice{s.ID, s.Label, s.Desc})
 	}
-	menu := newMenu("Release stream", items)
-	menu.wanted = 36
-	m.push(menu)
+	m.choiceMenu("Release stream", choices, m.releases.stream, func(m *Model, stream string) tea.Cmd {
+		m.releases = releasesState{stream: stream, gen: m.releases.gen + 1}
+		m.st.SetStream(stream)
+		m.saveState()
+		m.releasesTab.SetItems(nil)
+		m.releasesTab.empty = "Loading releases…"
+		return m.loadReleasesCmd(true)
+	})
 }
 
 // ---- the download cache ----------------------------------------------------------

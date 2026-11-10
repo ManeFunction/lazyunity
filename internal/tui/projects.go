@@ -376,31 +376,19 @@ func (m *Model) togglePin(r projectRow) tea.Cmd {
 }
 
 func (m *Model) sortMenu() {
-	cur := m.st.SortOrder()
-	pick := func(order string) func(*Model) tea.Cmd {
-		return func(m *Model) tea.Cmd {
-			m.st.Sort = order
-			m.saveState()
-			sel, _ := m.projectsTab.Selected()
-			m.refreshProjects()
-			m.projectsTab.SelectKey(sel.Path)
-			return nil
-		}
+	choices := []choice{
+		{id: state.SortLastOpened, label: "Last opened"},
+		{id: state.SortName, label: "Name"},
+		{id: state.SortVersion, label: "Unity version"},
 	}
-	mark := func(order string) string {
-		if order == cur {
-			return "current"
-		}
-		return ""
-	}
-	menu := newMenu("Sort projects", []menuItem{
-		{id: state.SortLastOpened, label: "Last opened", right: mark(state.SortLastOpened), run: pick(state.SortLastOpened)},
-		{id: state.SortName, label: "Name", right: mark(state.SortName), run: pick(state.SortName)},
-		{id: state.SortVersion, label: "Unity version", right: mark(state.SortVersion), run: pick(state.SortVersion)},
+	m.choiceMenu("Sort projects", choices, m.st.SortOrder(), func(m *Model, order string) tea.Cmd {
+		m.st.Sort = order
+		m.saveState()
+		sel, _ := m.projectsTab.Selected()
+		m.refreshProjects()
+		m.projectsTab.SelectKey(sel.Path)
+		return nil
 	})
-	menu.wanted = 36
-	menu.list.SelectKey(cur)
-	m.push(menu)
 }
 
 func (m *Model) removeMenu(r projectRow) {
