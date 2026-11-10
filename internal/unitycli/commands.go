@@ -107,7 +107,6 @@ func (c *Client) CleanDownloadCache(ctx context.Context) error {
 type OpenOptions struct {
 	Project       string // path
 	EditorVersion string // empty: the project's own version
-	EditorPath    string // empty: the registered Editor for the version
 	BuildTarget   string // value for -buildTarget, empty to leave it alone
 }
 
@@ -122,9 +121,6 @@ func (c *Client) Open(ctx context.Context, o OpenOptions) (OpenResult, error) {
 	args := []string{"open", o.Project}
 	if o.EditorVersion != "" {
 		args = append(args, "--editor-version", o.EditorVersion)
-	}
-	if o.EditorPath != "" {
-		args = append(args, "--editor-path", o.EditorPath)
 	}
 	if o.BuildTarget != "" {
 		args = append(args, "--build-target", o.BuildTarget)
@@ -213,21 +209,6 @@ func (c *Client) Editors(ctx context.Context) ([]Editor, error) {
 func (c *Client) AddEditors(ctx context.Context, paths ...string) error {
 	_, err := c.Run(ctx, append([]string{"editors", "add"}, paths...)...)
 	return err
-}
-
-// DefaultEditor returns the default Editor version, or "" if none is set.
-func (c *Client) DefaultEditor(ctx context.Context) (string, error) {
-	env, err := c.Run(ctx, "editors", "default")
-	if err != nil {
-		return "", err
-	}
-	var d struct {
-		Default *string `json:"default"`
-	}
-	if err := env.decodeData(&d); err != nil || d.Default == nil {
-		return "", err
-	}
-	return *d.Default, nil
 }
 
 // SetDefaultEditor makes version the default Editor.

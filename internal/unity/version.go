@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
 	"strconv"
 	"strings"
 )
@@ -81,9 +80,6 @@ func (v Version) Compare(o Version) int {
 	return 0
 }
 
-// Less is Compare(o) < 0.
-func (v Version) Less(o Version) bool { return v.Compare(o) < 0 }
-
 // CompareStrings orders two version strings. A string that is not a version
 // sorts before every version, and such strings compare as text.
 func CompareStrings(a, b string) int {
@@ -100,11 +96,6 @@ func CompareStrings(a, b string) int {
 	return strings.Compare(a, b)
 }
 
-// SortNewestFirst sorts version strings, newest first.
-func SortNewestFirst(versions []string) {
-	sort.SliceStable(versions, func(i, j int) bool { return CompareStrings(versions[i], versions[j]) > 0 })
-}
-
 // AtLeast reports whether version s is the same as or newer than major.minor
 // (for example AtLeast("6000.7.0f1", 6000, 7)). Unparseable versions are not.
 func AtLeast(s string, major, minor int) bool {
@@ -117,9 +108,6 @@ func AtLeast(s string, major, minor int) bool {
 
 // Line is the release line, such as "2022.3" or "6000.6".
 func (v Version) Line() string { return fmt.Sprintf("%d.%d", v.Major, v.Minor) }
-
-// IsPrerelease is true for alphas and betas.
-func (v Version) IsPrerelease() bool { return v.Type == 'a' || v.Type == 'b' }
 
 // ProjectVersionFile is where a project records its Editor version.
 var ProjectVersionFile = filepath.Join("ProjectSettings", "ProjectVersion.txt")

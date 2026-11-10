@@ -64,16 +64,6 @@ func PlatformByBuildTarget(target string) (Platform, bool) {
 	return Platform{}, false
 }
 
-// PlatformByID finds a platform from its ID.
-func PlatformByID(id string) (Platform, bool) {
-	for _, p := range Platforms {
-		if p.ID == id {
-			return p, true
-		}
-	}
-	return Platform{}, false
-}
-
 // PlatformLabel names a BuildTarget for display. Targets lazyunity does not
 // know (consoles, new platforms) are shown as Unity spells them.
 func PlatformLabel(buildTarget string) string {

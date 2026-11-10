@@ -45,9 +45,6 @@ func TestRealCLI(t *testing.T) {
 	if _, err := c.InstallPath(ctx); err != nil {
 		t.Errorf("InstallPath: %v", err)
 	}
-	if _, err := c.DefaultEditor(ctx); err != nil {
-		t.Errorf("DefaultEditor: %v", err)
-	}
 	if info, err := c.AuthStatus(ctx); err != nil {
 		t.Errorf("AuthStatus: %v", err)
 	} else {

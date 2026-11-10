@@ -54,13 +54,6 @@ func TestPlatformLookups(t *testing.T) {
 		t.Error("a console target is not known")
 	}
 
-	if p, ok := PlatformByID("android"); !ok || p.CLITarget != "android" {
-		t.Errorf("PlatformByID: %+v %v", p, ok)
-	}
-	if _, ok := PlatformByID("nope"); ok {
-		t.Error("unknown id found")
-	}
-
 	for mod, id := range map[string]string{
 		"android": "android", "windows-mono": "windows", "windows-server": "windows", "mac-il2cpp": "macos",
 		"linux-il2cpp": "linux", "webgl": "webgl", "ios": "ios", "visionos": "visionos", "appletv": "tvos",

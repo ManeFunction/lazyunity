@@ -45,9 +45,8 @@ type Client struct {
 	// newCmd builds the process to run; tests replace it.
 	newCmd func(ctx context.Context, name string, args ...string) *exec.Cmd
 
-	mu   sync.Mutex
-	log  []LogEntry
-	hook func(LogEntry)
+	mu  sync.Mutex
+	log []LogEntry
 }
 
 // New returns a Client for the CLI at path.
@@ -62,14 +61,6 @@ func NewWithCommand(path string, newCmd func(ctx context.Context, name string, a
 	return &Client{Path: path, newCmd: newCmd}
 }
 
-// OnLog registers fn to be called, from any goroutine, for every finished
-// invocation.
-func (c *Client) OnLog(fn func(LogEntry)) {
-	c.mu.Lock()
-	c.hook = fn
-	c.mu.Unlock()
-}
-
 // Log returns a copy of the command log, oldest first.
 func (c *Client) Log() []LogEntry {
 	c.mu.Lock()
@@ -79,14 +70,10 @@ func (c *Client) Log() []LogEntry {
 
 func (c *Client) record(e LogEntry) {
 	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.log = append(c.log, e)
 	if len(c.log) > maxLogEntries {
 		c.log = c.log[len(c.log)-maxLogEntries:]
-	}
-	hook := c.hook
-	c.mu.Unlock()
-	if hook != nil {
-		hook(e)
 	}
 }
 

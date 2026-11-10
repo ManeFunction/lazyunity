@@ -226,11 +226,10 @@ func TestArguments(t *testing.T) {
 		"license return --yes":                      ok,
 		"self-update --yes --channel beta":          ok,
 		"open /p":                                   {Stdout: `{"success":true,"command":"open","data":{"alreadyOpen":true}}`},
-		"open /p --editor-version 6000.6.8f1 --editor-path /e/Unity --build-target StandaloneLinux64":                                      ok,
+		"open /p --editor-version 6000.6.8f1 --build-target StandaloneLinux64":                                                             ok,
 		"projects create My Game --path /par --editor-version 6000.6.8f1 --template com.unity.template.urp-blank --no-cloud --bare --open": ok,
 		"projects create G2 --path /par --editor-version 6000.6.8f1 --cloud":                                                               ok,
 		"install 6000.5.1f1 --changeset abc --architecture arm64 --module webgl --module android --dry-run":                                {File: "install-dryrun.ndjson"},
-		"editors default":         {Stdout: `{"success":true,"data":{"default":"6000.6.8f1"}}`},
 		"editors info 6000.5.1f1": {File: "editors-info.json"},
 	}
 	c := fakeClient(t, table)
@@ -265,7 +264,7 @@ func TestArguments(t *testing.T) {
 	if !res.AlreadyOpen {
 		t.Error("Open should report alreadyOpen")
 	}
-	_, err = c.Open(ctx, OpenOptions{Project: "/p", EditorVersion: "6000.6.8f1", EditorPath: "/e/Unity", BuildTarget: "StandaloneLinux64"})
+	_, err = c.Open(ctx, OpenOptions{Project: "/p", EditorVersion: "6000.6.8f1", BuildTarget: "StandaloneLinux64"})
 	check("Open with options", err)
 
 	check("CreateProject", c.CreateProject(ctx, CreateOptions{
@@ -285,10 +284,6 @@ func TestArguments(t *testing.T) {
 		t.Errorf("plan: %+v", plan)
 	}
 
-	def, err := c.DefaultEditor(ctx)
-	if err != nil || def != "6000.6.8f1" {
-		t.Errorf("DefaultEditor = %q, %v", def, err)
-	}
 	mods, err := c.ReleaseModules(ctx, "6000.5.1f1")
 	if err != nil || len(mods) == 0 {
 		t.Errorf("ReleaseModules: %d %v", len(mods), err)
@@ -310,25 +305,15 @@ func TestArguments(t *testing.T) {
 	}
 }
 
-func TestDefaultEditorNone(t *testing.T) {
-	c := fakeClient(t, map[string]fakeResp{"editors default": {Stdout: `{"success":true,"data":{"default":null}}`}})
-	def, err := c.DefaultEditor(ctx5(t))
-	if err != nil || def != "" {
-		t.Errorf("DefaultEditor = %q, %v", def, err)
-	}
-}
-
-func TestLogHookAndLimit(t *testing.T) {
+func TestLogLimit(t *testing.T) {
 	c := fakeClient(t, map[string]fakeResp{"projects pin /a": {Stdout: `{"success":true,"data":{}}`}})
-	var seen int
-	c.OnLog(func(LogEntry) { seen++ })
 
-	// a real call is logged and reported to the hook
+	// a real call is logged
 	if err := c.SetPinned(ctx5(t), "/a", true); err != nil {
 		t.Fatal(err)
 	}
-	if seen != 1 || len(c.Log()) != 1 {
-		t.Fatalf("hook saw %d, log holds %d", seen, len(c.Log()))
+	if len(c.Log()) != 1 {
+		t.Fatalf("log holds %d", len(c.Log()))
 	}
 
 	// the log is bounded and keeps the newest entries
@@ -341,9 +326,6 @@ func TestLogHookAndLimit(t *testing.T) {
 	}
 	if last := log[len(log)-1]; last.ExitCode != maxLogEntries+4 {
 		t.Errorf("newest entry lost: %+v", last)
-	}
-	if seen != maxLogEntries+6 {
-		t.Errorf("hook saw %d entries, want %d", seen, maxLogEntries+6)
 	}
 }
 

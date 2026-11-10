@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"sort"
 	"testing"
 )
 
@@ -65,16 +66,13 @@ func TestCompare(t *testing.T) {
 			if got := va.Compare(vb); got != want {
 				t.Errorf("%s.Compare(%s) = %d, want %d", a, b, got, want)
 			}
-			if got := va.Less(vb); got != (want < 0) {
-				t.Errorf("%s.Less(%s) = %v", a, b, got)
-			}
 		}
 	}
 }
 
-func TestSortNewestFirst(t *testing.T) {
+func TestCompareStrings(t *testing.T) {
 	vs := []string{"2022.3.9f1", "garbage", "6000.6.8f1", "2022.3.10f1", "6000.7.0b8", "also-garbage"}
-	SortNewestFirst(vs)
+	sort.SliceStable(vs, func(i, j int) bool { return CompareStrings(vs[i], vs[j]) > 0 })
 	want := []string{"6000.7.0b8", "6000.6.8f1", "2022.3.10f1", "2022.3.9f1", "garbage", "also-garbage"}
 	if !reflect.DeepEqual(vs, want) {
 		t.Errorf("sorted = %v, want %v", vs, want)
@@ -103,14 +101,10 @@ func TestAtLeast(t *testing.T) {
 	}
 }
 
-func TestLineAndPrerelease(t *testing.T) {
+func TestLine(t *testing.T) {
 	v, _ := ParseVersion("2022.3.10f1")
-	if v.Line() != "2022.3" || v.IsPrerelease() {
+	if v.Line() != "2022.3" {
 		t.Errorf("%+v", v)
-	}
-	b, _ := ParseVersion("6000.7.0b8")
-	if !b.IsPrerelease() {
-		t.Error("a beta is a prerelease")
 	}
 }
 
