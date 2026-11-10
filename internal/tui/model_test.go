@@ -178,3 +178,21 @@ func TestListFooterCanBeTurnedOff(t *testing.T) {
 		t.Errorf("gui.showListFooter: false hides it:\n%s", screenText(m))
 	}
 }
+
+func TestNewScansTheEditorFoldersItself(t *testing.T) {
+	o := testOptions(t)
+	extra := t.TempDir()
+	o.State.ExtraRoots = []string{extra, extra + string(filepath.Separator)} // the same folder twice
+	o.Config.Editors.ExtraRoots = []string{extra}
+	o.Local = nil
+	m, err := New(o)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(m.editors) != 2 {
+		t.Errorf("both Editors of the install folder are found: %+v", m.editors)
+	}
+	if got := m.allRoots(); len(got) != 2 {
+		t.Errorf("each folder is looked in once: %q", got)
+	}
+}

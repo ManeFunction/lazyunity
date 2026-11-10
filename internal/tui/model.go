@@ -29,7 +29,9 @@ type Options struct {
 	GOOS   string
 	Now    func() time.Time
 
-	Projects    []unitycli.Project
+	Projects []unitycli.Project
+	// Local are the Editors found in the Editor folders. When nil, New looks
+	// for them itself.
 	Local       []unity.Installed
 	InstallRoot string
 	// Warnings are shown to the user once the interface is up.
@@ -150,6 +152,9 @@ func New(o Options) (*Model, error) {
 	}
 
 	m.local = o.Local
+	if m.local == nil {
+		m.local = unity.Scan(m.goos, m.allRoots())
+	}
 	m.rawProjects = o.Projects
 	m.refreshEditors()
 	m.refreshProjects()

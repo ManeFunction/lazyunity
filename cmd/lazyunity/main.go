@@ -7,7 +7,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"path/filepath"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -84,9 +83,9 @@ func run() error {
 	}
 	home, _ := os.UserHomeDir()
 	opts.InstallRoot = unity.DefaultInstallRoot(env.GOOS, home)
-	opts.Local = unity.Scan(env.GOOS, rootsFor(opts.InstallRoot, st, cfg))
 
-	model, err := tui.New(opts)
+	model, err := tui.New(opts) // scans the Editor folders, too
+
 	if err != nil {
 		return err
 	}
@@ -95,16 +94,4 @@ func run() error {
 		err = fmt.Errorf("saving state: %w", saveErr)
 	}
 	return err
-}
-
-// rootsFor lists the folders to look for Editors in before the CLI has said
-// where it installs them.
-func rootsFor(installRoot string, st *state.State, cfg config.Config) []string {
-	roots := []string{installRoot}
-	roots = append(roots, st.ExtraRoots...)
-	roots = append(roots, cfg.Editors.ExtraRoots...)
-	for i, r := range roots {
-		roots[i] = filepath.Clean(config.ExpandHome(r))
-	}
-	return roots
 }
