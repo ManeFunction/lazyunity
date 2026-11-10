@@ -54,7 +54,6 @@ type Theme struct {
 	Key     lipgloss.Style // keys in menus
 	Success lipgloss.Style
 	Warning lipgloss.Style
-	Donate  lipgloss.Style // the link on the bottom line, as lazygit draws it
 	BarEdge lipgloss.Style // the brackets of a progress bar
 }
 
@@ -144,6 +143,5 @@ func NewTheme(g config.GUI) (*Theme, error) {
 	t.Success = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
 	t.Warning = lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
 	t.BarEdge = lipgloss.NewStyle().Foreground(lipgloss.Color("4"))
-	t.Donate = lipgloss.NewStyle().Foreground(lipgloss.Color("5")).Underline(true)
 	return t, firstErr
 }

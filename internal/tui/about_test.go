@@ -8,8 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	tea "charm.land/bubbletea/v2"
-
 	"github.com/ManeFunction/lazyunity/internal/config"
 	"github.com/ManeFunction/lazyunity/internal/unitycli"
 )
@@ -35,25 +33,27 @@ func selectTool(t *testing.T, m *Model, id string) {
 	}
 }
 
-func TestDonateLinkOnTheBottomLine(t *testing.T) {
+func TestAppVersionEndsTheBottomLine(t *testing.T) {
+	m := newTestModel(t)
+	m.version = "1.2.3"
+	last := strings.TrimRight(screen(m)[len(screen(m))-1], " ")
+	if !strings.HasSuffix(last, " · 1.2.3") {
+		t.Fatalf("the bottom line ends with the app's version: %q", last)
+	}
+	if strings.Contains(last, "Donate") {
+		t.Errorf("no Donate link on the bottom line: %q", last)
+	}
+	if !strings.Contains(m.barView(m.w), m.th.Text.Render("1.2.3")) {
+		t.Errorf("the app's version is drawn in the text colour, not dimmed")
+	}
+}
+
+func TestDonateTool(t *testing.T) {
 	m := newTestModel(t)
 	opened := &recorder(m).urls
-	last := screen(m)[len(screen(m))-1]
-	if !strings.HasSuffix(strings.TrimRight(last, " "), donateLabel) {
-		t.Fatalf("the bottom line ends with %q: %q", donateLabel, last)
-	}
-	m.Update(tea.MouseClickMsg{X: m.w - 2, Y: m.h - 1, Button: tea.MouseLeft})
-	if len(*opened) != 1 || (*opened)[0] != sponsorURL {
-		t.Errorf("a click on Donate opens %s: %v", sponsorURL, *opened)
-	}
-	m.Update(tea.MouseClickMsg{X: 2, Y: m.h - 1, Button: tea.MouseLeft})
-	if len(*opened) != 1 {
-		t.Errorf("a click elsewhere on the line opens nothing: %v", *opened)
-	}
-	// and from the keyboard, in the Tools tab
 	selectTool(t, m, "donate")
 	press(m, "enter")
-	if len(*opened) != 2 || (*opened)[1] != sponsorURL {
+	if len(*opened) != 1 || (*opened)[0] != sponsorURL {
 		t.Errorf("the Donate tool opens the page: %v", *opened)
 	}
 }

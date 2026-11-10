@@ -21,7 +21,7 @@ lazyunity is a thin, fast front end for the official [Unity CLI](https://docs.un
 ╭─Tasks────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ ⠋ Installing 6000.7.0b8 + Web Build Support [#######---------]  42% download · Downloading Web Buil… │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────╯
-Open: <enter> | Version: v | Platform: p | Pin: f | New: n | Add: a | Remove: d       ● signed in Donate
+Open: <enter> | Version: v | Platform: p | Pin: f | New: n | Add: a | Remove: d      ● signed in · 0.1.0
 ```
 
 ## Requirements
@@ -100,7 +100,7 @@ Everything follows lazygit where lazygit has an equivalent. `?` shows the keys t
 **Releases**: `enter` or `space` install · `/` filter by version, in the filter row at the bottom of the tab (every page of releases is searched, not only the ones loaded) · `ctrl+s` release stream: Supported (the default), LTS, Beta, Alpha or All · `o` release notes.
 **Anywhere in the Editors panel**: `C` cleans the download cache, where installers and the partial downloads of interrupted installs are kept (asks first, with its size; not while a task runs).
 **Editor locations**: `a` add a folder · `d` remove · `space` install new Editors here · `o` open.
-**Tools**: `enter` runs the selected tool. **OpenUPM CLI** installs [openupm-cli](https://github.com/openupm/openupm-cli) with npm (Node.js is needed): the official release from the npm registry, unless `openupm.repo` is set in `config.yml`: then that repository (the official one or a fork) is cloned and built, and git is needed too. **Donate** opens the GitHub Sponsors page, as does the Donate link at the end of the bottom line.
+**Tools**: `enter` runs the selected tool. **OpenUPM CLI** installs [openupm-cli](https://github.com/openupm/openupm-cli) with npm (Node.js is needed): the official release from the npm registry, unless `openupm.repo` is set in `config.yml`: then that repository (the official one or a fork) is cloned and built, and git is needed too. **Donate** opens the GitHub Sponsors page. The bottom line ends with the lazyunity version.
 
 ## Configuration
 

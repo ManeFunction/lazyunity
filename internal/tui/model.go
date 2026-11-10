@@ -434,9 +434,6 @@ func (m *Model) handleClick(msg tea.MouseClickMsg) tea.Cmd {
 	if n := len(m.popups); n > 0 {
 		return m.popupClick(msg)
 	}
-	if m.onDonate(msg.X, msg.Y) {
-		return m.openURL(sponsorURL)
-	}
 	i := m.geo.panelAt(msg.X, msg.Y)
 	if i < 0 {
 		return nil
@@ -674,7 +671,10 @@ func (m *Model) barView(w int) string {
 	if m.filter.active { // typed in the tab's own filter row
 		return renderHints(m.th, []hintItem{{"Done", "<enter>"}, {"Clear", "<esc>"}, {"Move", "<up>/<down>"}}, w)
 	}
-	right := m.statusView() + " " + m.th.Donate.Render(donateLabel)
+	right := m.statusView()
+	if m.version != "" { // the app's own version ends the line
+		right += m.th.Dim.Render(" · ") + m.th.Text.Render(m.version)
+	}
 	rw := width(right)
 	left := ""
 	if avail := w - rw - 1; avail > 4 {
@@ -717,7 +717,6 @@ func (m *Model) statusView() string {
 		default:
 			parts = append(parts, th.Warning.Render("○ signed out"))
 		}
-		parts = append(parts, th.Dim.Render("CLI "+m.cliStatus.Version.String()))
 	}
 	return strings.Join(parts, th.Dim.Render(" · "))
 }

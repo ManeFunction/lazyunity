@@ -424,8 +424,8 @@ func TestEditorsShowPlatformsAndLTS(t *testing.T) {
 
 func TestStatusLine(t *testing.T) {
 	m := newTestModel(t)
-	if !strings.Contains(screenText(m), "CLI 1.0.0-beta.16") {
-		t.Error("the CLI version belongs on the bottom line")
+	if last := screen(m)[len(screen(m))-1]; strings.Contains(last, "1.0.0-beta.16") {
+		t.Errorf("the CLI version is not on the bottom line: %q", last)
 	}
 	m.Update(authMsg{info: authInfo(true)})
 	if !strings.Contains(screenText(m), "● signed in") {
