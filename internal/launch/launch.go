@@ -154,8 +154,9 @@ func Split(s string) ([]string, error) {
 	return words, nil
 }
 
-// start runs cmd on its own: no terminal, output thrown away, and not waited
-// for.
+// start runs cmd on its own: no terminal and output thrown away. lazyunity does
+// not wait for it, but a goroutine reaps it once it exits, so that it does not
+// stay a zombie until lazyunity quits.
 func start(cmd *exec.Cmd) error {
 	devnull, err := os.OpenFile(os.DevNull, os.O_RDWR, 0)
 	if err != nil {
@@ -167,5 +168,6 @@ func start(cmd *exec.Cmd) error {
 	if err := cmd.Start(); err != nil {
 		return err
 	}
-	return cmd.Process.Release()
+	go cmd.Wait() // how a detached program ends is not reported
+	return nil
 }

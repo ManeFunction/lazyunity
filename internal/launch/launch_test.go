@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 )
@@ -125,4 +127,47 @@ func TestEditorPassesProjectAndTarget(t *testing.T) {
 	if got := string(waitForFile(t, out)); got != want {
 		t.Errorf("arguments = %q, want %q", got, want)
 	}
+}
+
+// A program started on its own is reaped once it exits, so it does not stay a
+// zombie child of lazyunity.
+func TestStartedProgramsAreReaped(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("reads /proc")
+	}
+	for range 3 {
+		if err := Run("true", ""); err != nil {
+			t.Fatal(err)
+		}
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		n := zombieChildren(t)
+		if n == 0 {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("%d launched programs are still zombies", n)
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+}
+
+func zombieChildren(t *testing.T) int {
+	t.Helper()
+	me := strconv.Itoa(os.Getpid())
+	stats, _ := filepath.Glob("/proc/[0-9]*/stat")
+	n := 0
+	for _, s := range stats {
+		b, err := os.ReadFile(s)
+		if err != nil {
+			continue
+		}
+		f := string(b)
+		fields := strings.Fields(f[strings.LastIndexByte(f, ')')+2:])
+		if len(fields) > 1 && fields[0] == "Z" && fields[1] == me {
+			n++
+		}
+	}
+	return n
 }
