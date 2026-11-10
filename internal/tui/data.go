@@ -99,7 +99,7 @@ func (m *Model) loadInstallPathCmd() tea.Cmd {
 // refreshAllCmd reloads everything.
 func (m *Model) refreshAllCmd() tea.Cmd {
 	cmds := []tea.Cmd{
-		m.scanEditorsCmd(), probeOpenUPMCmd(),
+		m.scanEditorsCmd(), m.probeOpenUPMCmd(),
 		m.loadProjectsCmd(), m.loadEditorsCmd(), m.loadAuthCmd(), m.loadInstallPathCmd(),
 	}
 	cmds = append(cmds, m.releasesTab.refresh(m))

@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -135,18 +136,8 @@ func TestDirectLaunchStartsTheEditor(t *testing.T) {
 	m.cli = nil
 	r := selectProject(t, m, "Space Shooter")
 	ed := m.editorFor("6000.6.8f1")
-	marker := filepath.Join(t.TempDir(), "args")
-	script := ed.Location
-	os.WriteFile(script, []byte("#!/bin/sh\nprintf '%s ' \"$@\" > '"+marker+"'\n"), 0o755)
 	m.directLaunch(r, ed)
-	var got []byte
-	for i := 0; i < 200 && len(got) == 0; i++ {
-		got, _ = os.ReadFile(marker)
-		if len(got) == 0 {
-			sleepMs(10)
-		}
-	}
-	if !strings.HasPrefix(string(got), "-projectPath "+r.Path) {
+	if got := recorder(m).editors; len(got) != 1 || got[0] != ed.Location+" "+r.Path {
 		t.Errorf("the Editor was started with %q", got)
 	}
 	if !strings.Contains(screenText(m), "signed out") {
@@ -784,5 +775,35 @@ func TestEditProject(t *testing.T) {
 	m.env.Getenv = func(k string) string { return map[string]string{"EDITOR": "vim"}[k] }
 	if cmd := m.keymap.lookup(ctxProjects, "e").run(m); cmd == nil {
 		t.Error("with $EDITOR the terminal is handed to it")
+	}
+}
+
+func TestOpenTheProjectFolder(t *testing.T) {
+	m := newTestModel(t)
+	space := selectProject(t, m, "Space Shooter")
+	press(m, "o")
+	if got := recorder(m).folders; len(got) != 1 || got[0] != space.Path {
+		t.Errorf("o shows the project's folder: %v", got)
+	}
+	recorder(m).err = errors.New("no file manager")
+	press(m, "o")
+	if !strings.Contains(screenText(m), "Could not open the folder: no file manager") {
+		t.Errorf("a failure is said:\n%s", screenText(m))
+	}
+}
+
+func TestAddAPackage(t *testing.T) {
+	m := newTestModel(t)
+	selectProject(t, m, "Space Shooter")
+	m.openupm = openupmState{checked: true, path: "/usr/bin/openupm"}
+	press(m, "ctrl+a")
+	m.popups[len(m.popups)-1].(*promptPopup).in.Set("com.example.a com.example.b@1.2.0")
+	_, cmd := m.Update(keyMsg("enter"))
+	drain(m, cmd)
+	if got := recorder(m).added; len(got) != 1 || strings.Join(got[0], ",") != "com.example.a,com.example.b@1.2.0" {
+		t.Errorf("the packages are added with the OpenUPM CLI: %v", got)
+	}
+	if !strings.Contains(screenText(m), "Added com.example.a, com.example.b@1.2.0 to Space Shooter") {
+		t.Errorf("screen:\n%s", screenText(m))
 	}
 }

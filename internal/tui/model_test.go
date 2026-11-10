@@ -1,7 +1,9 @@
 package tui
 
 import (
+	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -11,6 +13,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/ManeFunction/lazyunity/internal/config"
+	"github.com/ManeFunction/lazyunity/internal/launch"
 	"github.com/ManeFunction/lazyunity/internal/state"
 	"github.com/ManeFunction/lazyunity/internal/unity"
 	"github.com/ManeFunction/lazyunity/internal/unitycli"
@@ -46,7 +49,12 @@ func testOptions(t *testing.T) Options {
 		ConfigDir: filepath.Join(dir, "cfg"),
 		Version:   "test",
 		CLI:       unitycli.Status{State: unitycli.Ready, Path: "/usr/bin/unity", Version: unitycli.MinVersion},
-		Env:       unitycli.Env{GOOS: "linux", Home: dir},
+		// nothing is looked up on, read from or started on the real machine
+		Env: unitycli.Env{GOOS: "linux", Home: dir,
+			Getenv:   func(string) string { return "" },
+			LookPath: func(string) (string, error) { return "", exec.ErrNotFound },
+		},
+		host: &hostRecorder{},
 		GOOS:      "linux",
 		Now:       func() time.Time { return testNow },
 		Projects: []unitycli.Project{
@@ -57,6 +65,53 @@ func testOptions(t *testing.T) Options {
 		Local:       []unity.Installed{e1, e2},
 		InstallRoot: root,
 	}
+}
+
+// hostRecorder is the machine in tests: it records what would have been
+// started instead of starting it.
+type hostRecorder struct {
+	urls, folders []string
+	editors       []string // exe, then the project, then the target, joined by spaces
+	added         [][]string
+	openupm       string // the OpenUPM CLI found, if any
+	err           error  // what every start answers
+}
+
+// recorder is the model's host recorder.
+func recorder(m *Model) *hostRecorder { return m.host.(*hostRecorder) }
+
+func (h *hostRecorder) OpenURL(url string) error { h.urls = append(h.urls, url); return h.err }
+
+func (h *hostRecorder) OpenFolder(tmpl, dir string) error {
+	h.folders = append(h.folders, dir)
+	return h.err
+}
+
+func (h *hostRecorder) StartEditor(exe, project, target string) error {
+	h.editors = append(h.editors, strings.TrimSpace(exe+" "+project+" "+target))
+	return h.err
+}
+
+// Edit builds the terminal editor's command, which starts nothing; an os.edit
+// template would start a program, so it is only recorded.
+func (h *hostRecorder) Edit(tmpl, path, dir string, getenv func(string) string) (*exec.Cmd, error) {
+	if tmpl != "" {
+		h.editors = append(h.editors, tmpl+" "+path)
+		return nil, h.err
+	}
+	return launch.Edit("", path, dir, getenv)
+}
+
+func (h *hostRecorder) FindOpenUPM(context.Context) (string, string) {
+	if h.openupm == "" {
+		return "", ""
+	}
+	return h.openupm, "4.5.3"
+}
+
+func (h *hostRecorder) AddPackages(_ context.Context, exe, dir string, packages []string) error {
+	h.added = append(h.added, packages)
+	return h.err
 }
 
 // newTestModel builds a Model at 120x36 with its first layout done.
@@ -166,7 +221,6 @@ func drain(m *Model, cmd tea.Cmd) {
 	drain(m, next)
 }
 
-func sleepMs(n int) { time.Sleep(time.Duration(n) * time.Millisecond) }
 
 func TestListFooterCanBeTurnedOff(t *testing.T) {
 	m := newTestModel(t)

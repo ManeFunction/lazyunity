@@ -2,7 +2,6 @@ package tui
 
 import (
 	"context"
-	"os/exec"
 	"strings"
 	"time"
 
@@ -25,19 +24,14 @@ type openupmMsg openupmState
 
 type openupmInstalledMsg struct{ err error }
 
-// lookPath finds programs; tests replace it.
-var lookPath = exec.LookPath
-
 // probeOpenUPMCmd looks for the OpenUPM CLI and asks it for its version.
-func probeOpenUPMCmd() tea.Cmd {
+func (m *Model) probeOpenUPMCmd() tea.Cmd {
+	h := m.host
 	return func() tea.Msg {
-		path, err := openupm.Find(lookPath, homeDir())
-		if err != nil {
-			return openupmMsg{checked: true}
-		}
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		return openupmMsg{checked: true, path: path, version: openupm.Version(ctx, path)}
+		path, version := h.FindOpenUPM(ctx)
+		return openupmMsg{checked: true, path: path, version: version}
 	}
 }
 
@@ -86,7 +80,7 @@ func (m *Model) openupmTool() tea.Cmd {
 	}
 	var missing []string
 	for _, p := range needs {
-		if _, err := lookPath(p); err != nil {
+		if _, err := m.env.LookPath(p); err != nil {
 			missing = append(missing, p)
 		}
 	}
@@ -135,5 +129,5 @@ func (m *Model) onOpenUPMInstalled(msg openupmInstalledMsg) tea.Cmd {
 	}
 	m.openupm.checked = false
 	m.refreshTools()
-	return probeOpenUPMCmd()
+	return m.probeOpenUPMCmd()
 }

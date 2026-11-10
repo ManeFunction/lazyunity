@@ -2,8 +2,6 @@ package tui
 
 import (
 	tea "charm.land/bubbletea/v2"
-
-	"github.com/ManeFunction/lazyunity/internal/launch"
 )
 
 const (
@@ -15,10 +13,8 @@ const (
 )
 
 // openURL opens a web page in the browser.
-var openInBrowser = launch.OpenURL
-
 func (m *Model) openURL(url string) tea.Cmd {
-	if err := openInBrowser(m.goos, url); err != nil {
+	if err := m.host.OpenURL(url); err != nil {
 		m.toastf(toastError, "Could not open the browser: %v", err)
 		return nil
 	}

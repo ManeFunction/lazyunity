@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -15,31 +14,14 @@ import (
 	"github.com/ManeFunction/lazyunity/internal/unitycli"
 )
 
-func init() {
-	// Tests never look at the real PATH or open a real browser.
-	lookPath = func(string) (string, error) { return "", exec.ErrNotFound }
-	openInBrowser = func(goos, url string) error { return errors.New("no browser in tests") }
-}
-
-// stubBrowser records the pages opened during a test.
-func stubBrowser(t *testing.T) *[]string {
-	var opened []string
-	prev := openInBrowser
-	openInBrowser = func(goos, url string) error { opened = append(opened, url); return nil }
-	t.Cleanup(func() { openInBrowser = prev })
-	return &opened
-}
-
-// stubPath makes these programs exist, and nothing else.
-func stubPath(t *testing.T, programs ...string) {
-	prev := lookPath
-	lookPath = func(name string) (string, error) {
+// stubPath makes these programs exist on the model's PATH, and nothing else.
+func stubPath(m *Model, programs ...string) {
+	m.env.LookPath = func(name string) (string, error) {
 		if slices.Contains(programs, name) {
 			return "/usr/bin/" + name, nil
 		}
 		return "", exec.ErrNotFound
 	}
-	t.Cleanup(func() { lookPath = prev })
 }
 
 func selectTool(t *testing.T, m *Model, id string) {
@@ -55,7 +37,7 @@ func selectTool(t *testing.T, m *Model, id string) {
 
 func TestDonateLinkOnTheBottomLine(t *testing.T) {
 	m := newTestModel(t)
-	opened := stubBrowser(t)
+	opened := &recorder(m).urls
 	last := screen(m)[len(screen(m))-1]
 	if !strings.HasSuffix(strings.TrimRight(last, " "), donateLabel) {
 		t.Fatalf("the bottom line ends with %q: %q", donateLabel, last)
@@ -125,7 +107,7 @@ func TestOpenUPMInstallNeedsNode(t *testing.T) {
 
 func TestOpenUPMInstallAsks(t *testing.T) {
 	m := newTestModel(t)
-	stubPath(t, "npm", "git")
+	stubPath(m, "npm", "git")
 	m.Update(openupmMsg{checked: true})
 	selectTool(t, m, "openupm")
 	press(m, "enter")
@@ -169,7 +151,7 @@ func TestConfigTemplateOffersTheForkCommentedOut(t *testing.T) {
 
 func TestReleaseNotesOpenInTheBrowser(t *testing.T) {
 	m := newTestModel(t)
-	opened := stubBrowser(t)
+	opened := &recorder(m).urls
 	m.releasesTab.SetItems([]unitycli.Release{{Version: "6000.5.1f1", Architecture: "x86_64"}})
 	press(m, "2", "]")
 	press(m, "o")

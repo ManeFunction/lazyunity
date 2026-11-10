@@ -13,7 +13,6 @@ import (
 
 	"github.com/ManeFunction/lazyunity/internal/config"
 	"github.com/ManeFunction/lazyunity/internal/launch"
-	"github.com/ManeFunction/lazyunity/internal/openupm"
 	"github.com/ManeFunction/lazyunity/internal/state"
 	"github.com/ManeFunction/lazyunity/internal/unity"
 	"github.com/ManeFunction/lazyunity/internal/unitycli"
@@ -161,7 +160,7 @@ func (m *Model) directLaunch(r projectRow, ed *editorRow) tea.Cmd {
 			target = p.CLITarget
 		}
 	}
-	if err := launch.Editor(ed.Location, r.Path, target); err != nil {
+	if err := m.host.StartEditor(ed.Location, r.Path, target); err != nil {
 		m.showError("Opening "+r.name(), err)
 		return nil
 	}
@@ -586,13 +585,13 @@ func (m *Model) addPackagePrompt(r projectRow) tea.Cmd {
 			return ""
 		},
 		onSubmit: func(m *Model, text string) tea.Cmd {
-			pkgs := strings.Fields(text)
+			pkgs, h := strings.Fields(text), m.host
 			return m.enqueue(&task{
 				title: "Adding " + strings.Join(pkgs, ", ") + " to " + r.name(),
 				label: "add " + strings.Join(pkgs, ", "),
 				works: []string{workProject(r.Path)},
 				msg:   "OpenUPM is adding the package",
-				do:    func(ctx context.Context) error { return openupm.Add(ctx, exe, r.Path, pkgs) },
+				do:    func(ctx context.Context) error { return h.AddPackages(ctx, exe, r.Path, pkgs) },
 				after: func(m *Model, err error) tea.Cmd {
 					if err == nil {
 						m.toastf(toastOK, "Added %s to %s", strings.Join(pkgs, ", "), r.name())
@@ -608,7 +607,7 @@ func (m *Model) addPackagePrompt(r projectRow) tea.Cmd {
 // ---- folders, editors, info, clipboard, clean -----------------------------------------
 
 func (m *Model) openFolder(dir string) tea.Cmd {
-	if err := launch.OpenFolder(m.goos, m.cfg.OS.OpenFolder, dir); err != nil {
+	if err := m.host.OpenFolder(m.cfg.OS.OpenFolder, dir); err != nil {
 		m.toastf(toastError, "Could not open the folder: %v", err)
 	}
 	return nil
@@ -626,7 +625,7 @@ func (m *Model) editProject(r projectRow) tea.Cmd {
 // noEditor runs when none is set; done, if not nil, is the message once a
 // terminal editor has quit.
 func (m *Model) edit(path, dir string, noEditor func(m *Model), done tea.Msg) tea.Cmd {
-	cmd, err := launch.Edit(m.cfg.OS.Edit, path, dir, m.getenv)
+	cmd, err := m.host.Edit(m.cfg.OS.Edit, path, dir, m.getenv)
 	switch {
 	case errors.Is(err, launch.ErrNoEditor):
 		noEditor(m)
@@ -646,12 +645,7 @@ func (m *Model) edit(path, dir string, noEditor func(m *Model), done tea.Msg) te
 }
 
 // getenv reads an environment variable of the machine lazyunity runs on.
-func (m *Model) getenv(key string) string {
-	if m.env.Getenv != nil {
-		return m.env.Getenv(key)
-	}
-	return os.Getenv(key)
-}
+func (m *Model) getenv(key string) string { return m.env.Getenv(key) }
 
 type projectInfoMsg struct {
 	row  projectRow

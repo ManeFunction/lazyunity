@@ -25,7 +25,11 @@ type Options struct {
 
 	Client *unitycli.Client // nil when there is no usable CLI
 	CLI    unitycli.Status
-	Env    unitycli.Env
+	// Env is the machine, for finding programs and reading the environment.
+	// What it leaves out is taken from the real one.
+	Env unitycli.Env
+	// host starts programs; nil means the real machine. Tests set it.
+	host host
 	GOOS   string
 	Now    func() time.Time
 
@@ -71,6 +75,7 @@ type Model struct {
 	cli       unityCLI // nil when there is no usable CLI
 	cliStatus unitycli.Status
 	env       unitycli.Env
+	host      host
 	goos      string
 	now       func() time.Time
 
@@ -138,6 +143,19 @@ func New(o Options) (*Model, error) {
 	}
 	if m.goos == "" {
 		m.goos = o.Env.GOOS
+	}
+	real := unitycli.DefaultEnv()
+	if m.env.GOOS == "" {
+		m.env.GOOS = m.goos
+	}
+	if m.env.Getenv == nil {
+		m.env.Getenv = real.Getenv
+	}
+	if m.env.LookPath == nil {
+		m.env.LookPath = real.LookPath
+	}
+	if m.host = o.host; m.host == nil {
+		m.host = machine{env: m.env}
 	}
 	if m.st == nil {
 		m.st = state.Load("")
@@ -282,7 +300,7 @@ func tick() tea.Cmd {
 
 // Init starts the slow loads; what was cheap to load is already in place.
 func (m *Model) Init() tea.Cmd {
-	return tea.Batch(tick(), probeOpenUPMCmd(), m.loadEditorsCmd(), m.loadAuthCmd(), m.loadInstallPathCmd())
+	return tea.Batch(tick(), m.probeOpenUPMCmd(), m.loadEditorsCmd(), m.loadAuthCmd(), m.loadInstallPathCmd())
 }
 
 // Update handles every message.

@@ -10,7 +10,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/ManeFunction/lazyunity/internal/config"
-	"github.com/ManeFunction/lazyunity/internal/openupm"
 	"github.com/ManeFunction/lazyunity/internal/unitycli"
 )
 
@@ -215,6 +214,7 @@ func (m *Model) createProject(w newProject, opts unitycli.CreateOptions, openupm
 }
 
 func (m *Model) queueCreate(c unityCLI, w newProject, opts unitycli.CreateOptions, openupmPath string, packages []string) tea.Cmd {
+	h := m.host
 	open := opts.Open
 	if len(packages) > 0 {
 		opts.Open = false
@@ -231,7 +231,7 @@ func (m *Model) queueCreate(c unityCLI, w newProject, opts unitycli.CreateOption
 			if len(packages) == 0 {
 				return nil
 			}
-			if err := openupm.Add(ctx, openupmPath, w.path(), packages); err != nil {
+			if err := h.AddPackages(ctx, openupmPath, w.path(), packages); err != nil {
 				return fmt.Errorf("the project was created, but ManeTools were not added: %w", err)
 			}
 			if open {
