@@ -250,7 +250,9 @@ func (m *Model) upgradeMenu(r projectRow, to string) {
 					if err != nil {
 						return nil
 					}
-					m.st.SetPending(r.Path, state.Pending{})
+					// the upgrade applies the version only: a platform choice
+					// waits for the next open
+					m.st.SetPending(r.Path, state.Pending{BuildTarget: r.Pending.BuildTarget})
 					m.saveState()
 					return m.loadProjectsCmd()
 				},

@@ -208,6 +208,26 @@ func TestUpgradeToUnity67GoesThroughUpgrade(t *testing.T) {
 	}
 }
 
+func TestUpgradeToUnity67KeepsThePendingPlatform(t *testing.T) {
+	m := newTestModel(t)
+	m.editors = append(m.editors, editorRow{Version: "6000.7.0b8", Location: "/x/Unity", Platforms: m.editors[0].Platforms})
+	m.installed["6000.7.0b8"] = true
+	old := selectProject(t, m, "Old Platformer")
+	m.st.SetPending(old.Path, state.Pending{Version: "6000.7.0b8", BuildTarget: "StandaloneLinux64"})
+	m.refreshProjects()
+	selectProject(t, m, "Old Platformer")
+	useFakeCLI(t, m, map[string]fakeResp{
+		"projects upgrade " + old.Path + " --to 6000.7.0b8 --yes --no-cloud": {Stdout: okJSON},
+		"projects --all": reloadProjectsResponse(),
+	})
+	m.keymap.lookup(ctxProjects, "enter").run(m)
+	_, cmd := m.Update(keyMsg("enter"))
+	drain(m, cmd)
+	if got := m.st.PendingFor(old.Path); got != (state.Pending{BuildTarget: "StandaloneLinux64"}) {
+		t.Errorf("the upgrade does not switch the platform, so the choice must stay for the next open: %+v", got)
+	}
+}
+
 func TestVersionMenuSetsAPendingVersion(t *testing.T) {
 	m := newTestModel(t)
 	space := selectProject(t, m, "Space Shooter") // 6000.6.8f1
