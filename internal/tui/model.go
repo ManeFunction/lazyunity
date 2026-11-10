@@ -663,7 +663,7 @@ func (m *Model) filterRowView(t tab, w int, focused bool) string {
 	var field string
 	switch {
 	case focused && m.filter.active:
-		field = m.filter.in.View(avail, true)
+		field = m.filter.in.View(avail)
 	case t.filter() != "":
 		field = th.Warning.Render(padRight(truncate(t.filter(), avail), avail))
 	default:
@@ -676,7 +676,7 @@ func (m *Model) filterRowView(t tab, w int, focused bool) string {
 func (m *Model) barView(w int) string {
 	if m.filter.active && !m.focusedTab().filterRow() {
 		label := "Filter: "
-		return label + m.filter.in.View(w-width(label), true)
+		return label + m.filter.in.View(w-width(label))
 	}
 	if m.filter.active { // typed in the tab's own filter row
 		return renderHints(m.th, []hintItem{{"Done", "<enter>"}, {"Clear", "<esc>"}, {"Move", "<up>/<down>"}}, w)

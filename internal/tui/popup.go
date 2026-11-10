@@ -394,7 +394,7 @@ func (p *menuPopup) withFilterRow(lines []string, rows, inner int) []string {
 		return lines
 	}
 	label := "Filter: "
-	return append(lines, label+p.filter.View(inner-width(label), true))
+	return append(lines, label+p.filter.View(inner-width(label)))
 }
 
 func (p *menuPopup) drawItem(th *Theme, it menuItem, w int, base lipgloss.Style, keyW, rightW int) string {
@@ -580,7 +580,7 @@ func (p *promptPopup) view(m *Model) string {
 			ghost = c[0][len(text):]
 		}
 	}
-	lines = append(lines, " "+p.in.ViewGhost(inner-2, true, ghost, th.Dim))
+	lines = append(lines, " "+p.in.ViewGhost(inner-2, ghost, th.Dim))
 	if p.err != "" {
 		lines = append(lines, " "+th.Missing.Render(truncate(p.err, inner-2)))
 	} else {

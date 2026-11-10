@@ -547,11 +547,8 @@ func TestInputEditing(t *testing.T) {
 	}
 	// the view is exactly as wide as asked, even when the text is longer
 	in.Set(strings.Repeat("x", 100))
-	if got := in.View(20, true); width(got) != 20 {
+	if got := in.View(20); width(got) != 20 {
 		t.Errorf("view width = %d", width(got))
-	}
-	if got := in.View(20, false); width(got) != 20 {
-		t.Errorf("plain view width = %d", width(got))
 	}
 }
 

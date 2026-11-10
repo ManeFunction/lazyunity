@@ -14,7 +14,6 @@ func TestRoundTrip(t *testing.T) {
 	s.SetPending("/p/game", Pending{Version: "6000.6.8f1", BuildTarget: "Android"})
 	s.Sort = SortName
 	s.DefaultProjectDir = "/games"
-	s.CLIPromptDismissed = true
 	if err := s.Save(); err != nil {
 		t.Fatal(err)
 	}
@@ -22,7 +21,7 @@ func TestRoundTrip(t *testing.T) {
 	got := Load(dir)
 	if !reflect.DeepEqual(got.ExtraRoots, []string{"/opt/unity"}) ||
 		got.PendingFor("/p/game") != (Pending{Version: "6000.6.8f1", BuildTarget: "Android"}) ||
-		got.Sort != SortName || got.DefaultProjectDir != "/games" || !got.CLIPromptDismissed {
+		got.Sort != SortName || got.DefaultProjectDir != "/games" {
 		t.Errorf("state did not survive a round trip: %+v", got)
 	}
 	if got.Path() != filepath.Join(dir, "state.yml") {

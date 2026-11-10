@@ -99,12 +99,12 @@ func (in *input) Key(msg tea.KeyPressMsg) bool {
 }
 
 // View draws the field in w cells, with the cursor as a reversed cell.
-func (in *input) View(w int, show bool) string { return in.ViewGhost(w, show, "", lipgloss.Style{}) }
+func (in *input) View(w int) string { return in.ViewGhost(w, "", lipgloss.Style{}) }
 
 // ViewGhost is View with a suggestion drawn in ghost style after the text, as
 // editors show a completion. The cursor sits on its first character. It is
 // shown only while the cursor is at the end of the text.
-func (in *input) ViewGhost(w int, show bool, ghost string, ghostStyle lipgloss.Style) string {
+func (in *input) ViewGhost(w int, ghost string, ghostStyle lipgloss.Style) string {
 	if w < 2 {
 		return ""
 	}
@@ -119,9 +119,6 @@ func (in *input) ViewGhost(w int, show bool, ghost string, ghostStyle lipgloss.S
 	if in.cur < len(in.value) {
 		cursor = string(in.value[in.cur])
 		after = string(in.value[in.cur+1 : end])
-	}
-	if !show {
-		return padRight(before+cursor+after, w)
 	}
 	if g := []rune(ghost); len(g) > 0 && in.cur == len(in.value) {
 		g = g[:min(len(g), w-1-len([]rune(before)))]

@@ -30,14 +30,6 @@ func (c ctxID) group() string {
 	return [...]string{"universal", "projects", "editors", "modules", "releases", "roots", "tools"}[c]
 }
 
-// section is the heading of a context in the ? menu.
-func (c ctxID) section() string {
-	if c == ctxGlobal {
-		return "Global"
-	}
-	return "Local"
-}
-
 // action is something the user can do with a key.
 type action struct {
 	// id is "<group>.<name>", which is also its name in config.yml.

@@ -42,8 +42,6 @@ type State struct {
 	Sort string `yaml:"sort,omitempty"`
 	// DefaultProjectDir is the folder new projects go in, when the user chose one.
 	DefaultProjectDir string `yaml:"defaultProjectDir,omitempty"`
-	// CLIPromptDismissed is set by "don't ask again" on the Unity CLI prompt.
-	CLIPromptDismissed bool `yaml:"cliPromptDismissed,omitempty"`
 	// ReleaseStream is the stream the Releases tab lists: all, lts, tech, beta
 	// or alpha. Empty means the default, tech (Unity's "Supported" releases).
 	ReleaseStream string `yaml:"releaseStream,omitempty"`

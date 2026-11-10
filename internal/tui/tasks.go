@@ -20,7 +20,6 @@ const (
 	taskQueued taskStatus = iota
 	taskRunning
 	taskDone
-	taskFailed
 )
 
 // task is a long-running job: an install, a download, a project being created.
@@ -142,12 +141,10 @@ func (t *task) shortLabel() string {
 }
 
 // taskOn returns the task that works on w, if one is queued, running, or has
-// just finished (its result may not be on screen yet).
+// just finished (its result may not be on screen yet). A task that failed or
+// was cancelled is gone from the list.
 func (m *Model) taskOn(w string) *task {
 	for _, t := range m.tasks {
-		if t.status == taskFailed {
-			continue
-		}
 		for _, x := range t.works {
 			if x == w {
 				return t
@@ -425,8 +422,6 @@ func (m *Model) taskLine(t *task, w int, labelW int) string {
 		icon = th.ActiveBorder.Render(m.spinnerFrame())
 	case taskDone:
 		icon = th.Success.Render("✓")
-	case taskFailed:
-		icon = th.Missing.Render("✗")
 	default:
 		icon = th.Dim.Render("○")
 	}
@@ -459,11 +454,7 @@ func (m *Model) taskLine(t *task, w int, labelW int) string {
 	if t.status == taskDone {
 		detail = "done"
 	}
-	detailStyle := th.Dim
-	if t.status == taskFailed {
-		detailStyle = th.Missing
-	}
-	parts = append(parts, detailStyle.Render(truncate(detail, max(w-used, 0))))
+	parts = append(parts, th.Dim.Render(truncate(detail, max(w-used, 0))))
 	return icon + " " + strings.Join(parts, " ")
 }
 

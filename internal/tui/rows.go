@@ -182,15 +182,13 @@ func (m *Model) drawProject(r projectRow, w int, base lipgloss.Style, cols proje
 
 // editorRow is an installed Editor as the list shows it.
 type editorRow struct {
-	Version     string
-	Arch        string
-	Location    string // the executable
-	Dir         string // the version folder, "" if unknown
-	Root        string
-	Default     bool
-	LTS         bool
-	Platforms   []unity.Platform
-	FromCLIOnly bool // known to the CLI but not found under any root
+	Version   string
+	Arch      string
+	Location  string // the executable
+	Dir       string // the version folder, "" if unknown
+	Default   bool
+	LTS       bool
+	Platforms []unity.Platform
 }
 
 func (r editorRow) key() string { return r.Location }
@@ -245,7 +243,7 @@ func mergeEditors(local []unity.Installed, cli []unitycli.Editor, goos string) [
 	var rows []*editorRow
 	for _, e := range local {
 		r := &editorRow{
-			Version: e.Version, Arch: e.Architecture, Location: e.Location, Dir: e.Dir, Root: e.Root, LTS: e.LTS,
+			Version: e.Version, Arch: e.Architecture, Location: e.Location, Dir: e.Dir, LTS: e.LTS,
 			Platforms: unity.InstalledPlatforms(e.Dir, goos),
 		}
 		byLoc[e.Location] = r
@@ -265,7 +263,6 @@ func mergeEditors(local []unity.Installed, cli []unitycli.Editor, goos string) [
 		dir := unity.VersionDir(e.Location, goos)
 		r := &editorRow{
 			Version: e.Version, Arch: e.Architecture, Location: e.Location, Dir: dir, Default: e.Default,
-			FromCLIOnly: true,
 		}
 		if dir != "" {
 			r.Platforms = unity.InstalledPlatforms(dir, goos)
