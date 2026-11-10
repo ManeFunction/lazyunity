@@ -167,7 +167,7 @@ func (m *Model) openKeybindings() {
 		}
 		it := menuItem{label: a.desc, key: m.keymap.allKeys(a)}
 		act := a
-		if a.enabled != nil && !a.enabled(m) {
+		if !a.available(m) {
 			it.disabled = "Not available right now"
 		}
 		it.run = func(m *Model) tea.Cmd { return act.run(m) }

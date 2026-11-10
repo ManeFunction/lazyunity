@@ -359,7 +359,7 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 		return m.updateFilter(msg)
 	}
 	a := m.keymap.lookup(m.focusCtx(), key)
-	if a == nil || (a.enabled != nil && !a.enabled(m)) {
+	if a == nil || !a.available(m) {
 		return nil
 	}
 	return a.run(m)

@@ -20,27 +20,17 @@ import (
 
 // ---- roots ------------------------------------------------------------------------
 
-func hasRoot(m *Model) bool { _, ok := m.rootsTab.Selected(); return ok }
-
 func rootActions() []*action {
-	on := func(f func(m *Model, r rootRow) tea.Cmd) func(*Model) tea.Cmd {
-		return func(m *Model) tea.Cmd {
-			r, ok := m.rootsTab.Selected()
-			if !ok {
-				return nil
-			}
-			return f(m, r)
-		}
-	}
+	on := onSelected(func(m *Model) (rootRow, bool) { return m.rootsTab.Selected() })
 	return []*action{
 		{id: "roots.add", ctx: ctxRoots, keys: []string{"a"}, desc: "Add a folder to look for Editors in", hint: "Add",
 			run: func(m *Model) tea.Cmd { m.addRootPrompt(); return nil }},
-		{id: "roots.remove", ctx: ctxRoots, keys: []string{"d"}, desc: "Stop looking for Editors in this folder", hint: "Remove",
-			enabled: hasRoot, run: on(func(m *Model, r rootRow) tea.Cmd { m.removeRoot(r); return nil })},
-		{id: "roots.setInstall", ctx: ctxRoots, keys: []string{"space"}, desc: "Install new Editors into this folder", hint: "Install here",
-			enabled: hasRoot, run: on(func(m *Model, r rootRow) tea.Cmd { return m.setInstallRoot(r) })},
-		{id: "roots.openFolder", ctx: ctxRoots, keys: []string{"o"}, desc: "Open the folder in the file manager",
-			enabled: hasRoot, run: on(func(m *Model, r rootRow) tea.Cmd { return m.openFolder(r.Path) })},
+		on(&action{id: "roots.remove", ctx: ctxRoots, keys: []string{"d"}, desc: "Stop looking for Editors in this folder", hint: "Remove"},
+			func(m *Model, r rootRow) tea.Cmd { m.removeRoot(r); return nil }),
+		on(&action{id: "roots.setInstall", ctx: ctxRoots, keys: []string{"space"}, desc: "Install new Editors into this folder", hint: "Install here"},
+			func(m *Model, r rootRow) tea.Cmd { return m.setInstallRoot(r) }),
+		on(&action{id: "roots.openFolder", ctx: ctxRoots, keys: []string{"o"}, desc: "Open the folder in the file manager"},
+			func(m *Model, r rootRow) tea.Cmd { return m.openFolder(r.Path) }),
 	}
 }
 
@@ -141,16 +131,10 @@ func (m *Model) registerStrays() tea.Cmd {
 // ---- tools --------------------------------------------------------------------------
 
 func toolActions() []*action {
+	on := onSelected(func(m *Model) (toolRow, bool) { return m.toolsTab.Selected() })
 	return []*action{
-		{id: "tools.run", ctx: ctxTools, keys: []string{"enter", "space"}, desc: "Run the selected tool", hint: "Run",
-			enabled: func(m *Model) bool { _, ok := m.toolsTab.Selected(); return ok },
-			run: func(m *Model) tea.Cmd {
-				r, ok := m.toolsTab.Selected()
-				if !ok || r.run == nil {
-					return nil
-				}
-				return r.run(m)
-			}},
+		on(&action{id: "tools.run", ctx: ctxTools, keys: []string{"enter", "space"}, desc: "Run the selected tool", hint: "Run"},
+			func(m *Model, r toolRow) tea.Cmd { return r.run(m) }),
 	}
 }
 

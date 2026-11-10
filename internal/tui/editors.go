@@ -14,35 +14,25 @@ import (
 	"github.com/ManeFunction/lazyunity/internal/unitycli"
 )
 
-func hasEditor(m *Model) bool { _, ok := m.editorsTab.Selected(); return ok }
-
 func editorActions() []*action {
-	on := func(f func(m *Model, e editorRow) tea.Cmd) func(*Model) tea.Cmd {
-		return func(m *Model) tea.Cmd {
-			e, ok := m.editorsTab.Selected()
-			if !ok {
-				return nil
-			}
-			return f(m, e)
-		}
-	}
+	on := onSelected(func(m *Model) (editorRow, bool) { return m.editorsTab.Selected() })
 	return []*action{
-		{id: "editors.modules", ctx: ctxEditors, keys: []string{"enter"}, desc: "Show the Editor's modules", hint: "Modules",
-			enabled: hasEditor, run: on(func(m *Model, e editorRow) tea.Cmd { return m.drillIntoModules(e) })},
-		{id: "editors.addModules", ctx: ctxEditors, keys: []string{"a"}, desc: "Add modules, such as a build platform", hint: "Add module",
-			enabled: hasEditor, run: on(func(m *Model, e editorRow) tea.Cmd { return m.addModulesFlow(e, false) })},
+		on(&action{id: "editors.modules", ctx: ctxEditors, keys: []string{"enter"}, desc: "Show the Editor's modules", hint: "Modules"},
+			func(m *Model, e editorRow) tea.Cmd { return m.drillIntoModules(e) }),
+		on(&action{id: "editors.addModules", ctx: ctxEditors, keys: []string{"a"}, desc: "Add modules, such as a build platform", hint: "Add module"},
+			func(m *Model, e editorRow) tea.Cmd { return m.addModulesFlow(e, false) }),
 		{id: "editors.install", ctx: ctxEditors, keys: []string{"n"}, desc: "Install a new Editor version", hint: "Install",
 			run: func(m *Model) tea.Cmd { return m.showReleases() }},
-		{id: "editors.uninstall", ctx: ctxEditors, keys: []string{"d"}, desc: "Uninstall the Editor", hint: "Uninstall",
-			enabled: hasEditor, run: on(func(m *Model, e editorRow) tea.Cmd { m.uninstallConfirm(e); return nil })},
-		{id: "editors.default", ctx: ctxEditors, keys: []string{"space"}, desc: "Make this the default Editor", hint: "Default",
-			enabled: hasEditor, run: on(func(m *Model, e editorRow) tea.Cmd { return m.setDefaultEditor(e) })},
-		{id: "editors.upgrade", ctx: ctxEditors, keys: []string{"u"}, desc: "Upgrade to the newest patch of this release line",
-			enabled: hasEditor, run: on(func(m *Model, e editorRow) tea.Cmd { m.upgradeConfirm(e); return nil })},
-		{id: "editors.openFolder", ctx: ctxEditors, keys: []string{"o"}, desc: "Open the Editor's folder",
-			enabled: hasEditor, run: on(func(m *Model, e editorRow) tea.Cmd { return m.openFolder(editorDir(e)) })},
-		{id: "editors.copy", ctx: ctxEditors, keys: []string{"y"}, desc: "Copy the version or path",
-			enabled: hasEditor, run: on(func(m *Model, e editorRow) tea.Cmd { m.copyEditorMenu(e); return nil })},
+		on(&action{id: "editors.uninstall", ctx: ctxEditors, keys: []string{"d"}, desc: "Uninstall the Editor", hint: "Uninstall"},
+			func(m *Model, e editorRow) tea.Cmd { m.uninstallConfirm(e); return nil }),
+		on(&action{id: "editors.default", ctx: ctxEditors, keys: []string{"space"}, desc: "Make this the default Editor", hint: "Default"},
+			func(m *Model, e editorRow) tea.Cmd { return m.setDefaultEditor(e) }),
+		on(&action{id: "editors.upgrade", ctx: ctxEditors, keys: []string{"u"}, desc: "Upgrade to the newest patch of this release line"},
+			func(m *Model, e editorRow) tea.Cmd { m.upgradeConfirm(e); return nil }),
+		on(&action{id: "editors.openFolder", ctx: ctxEditors, keys: []string{"o"}, desc: "Open the Editor's folder"},
+			func(m *Model, e editorRow) tea.Cmd { return m.openFolder(editorDir(e)) }),
+		on(&action{id: "editors.copy", ctx: ctxEditors, keys: []string{"y"}, desc: "Copy the version or path"},
+			func(m *Model, e editorRow) tea.Cmd { m.copyEditorMenu(e); return nil }),
 	}
 }
 
@@ -155,38 +145,39 @@ func (m *Model) refreshEditorsCmd() tea.Cmd {
 
 // ---- modules of one Editor ----------------------------------------------------------
 
+// selectedModule is a module selected in the Modules drill, with its Editor.
+type selectedModule struct {
+	editor editorRow
+	mod    unitycli.Module
+}
+
 func moduleActions() []*action {
-	on := func(f func(m *Model, e editorRow, mod unitycli.Module) tea.Cmd) func(*Model) tea.Cmd {
-		return func(m *Model) tea.Cmd {
-			mt, e, ok := m.modulesTab()
-			if !ok {
-				return nil
-			}
-			mod, ok := mt.Selected()
-			if !ok {
-				return nil
-			}
-			return f(m, e, mod)
+	on := onSelected(func(m *Model) (selectedModule, bool) {
+		mt, e, ok := m.modulesTab()
+		if !ok {
+			return selectedModule{}, false
 		}
-	}
+		mod, ok := mt.Selected()
+		return selectedModule{e, mod}, ok
+	})
 	return []*action{
-		{id: "modules.install", ctx: ctxModules, keys: []string{"space", "a", "enter"}, desc: "Install the module", hint: "Install",
-			run: on(func(m *Model, e editorRow, mod unitycli.Module) tea.Cmd {
-				if mod.IsInstalled {
-					m.toastf(toastInfo, "%s is already installed", mod.Name)
+		on(&action{id: "modules.install", ctx: ctxModules, keys: []string{"space", "a", "enter"}, desc: "Install the module", hint: "Install"},
+			func(m *Model, s selectedModule) tea.Cmd {
+				if s.mod.IsInstalled {
+					m.toastf(toastInfo, "%s is already installed", s.mod.Name)
 					return nil
 				}
-				return m.installModules(e, []unitycli.Module{mod})
-			})},
-		{id: "modules.remove", ctx: ctxModules, keys: []string{"d"}, desc: "Remove the module", hint: "Remove",
-			run: on(func(m *Model, e editorRow, mod unitycli.Module) tea.Cmd {
-				if !mod.IsInstalled {
-					m.toastf(toastInfo, "%s is not installed", mod.Name)
+				return m.installModules(s.editor, []unitycli.Module{s.mod})
+			}),
+		on(&action{id: "modules.remove", ctx: ctxModules, keys: []string{"d"}, desc: "Remove the module", hint: "Remove"},
+			func(m *Model, s selectedModule) tea.Cmd {
+				if !s.mod.IsInstalled {
+					m.toastf(toastInfo, "%s is not installed", s.mod.Name)
 					return nil
 				}
-				m.removeModuleConfirm(e, mod)
+				m.removeModuleConfirm(s.editor, s.mod)
 				return nil
-			})},
+			}),
 	}
 }
 
@@ -522,34 +513,25 @@ func (m *Model) onPlan(msg planMsg) {
 // ---- releases ------------------------------------------------------------------------------
 
 func releaseActions() []*action {
-	on := func(f func(m *Model, r unitycli.Release) tea.Cmd) func(*Model) tea.Cmd {
-		return func(m *Model) tea.Cmd {
-			r, ok := m.releasesTab.Selected()
-			if !ok {
-				return nil
-			}
-			return f(m, r)
-		}
-	}
-	has := func(m *Model) bool { _, ok := m.releasesTab.Selected(); return ok }
+	on := onSelected(func(m *Model) (unitycli.Release, bool) { return m.releasesTab.Selected() })
 	return []*action{
-		{id: "releases.install", ctx: ctxReleases, keys: []string{"enter", "space"}, desc: "Install this version", hint: "Install",
-			enabled: has, run: on(func(m *Model, r unitycli.Release) tea.Cmd {
+		on(&action{id: "releases.install", ctx: ctxReleases, keys: []string{"enter", "space"}, desc: "Install this version", hint: "Install"},
+			func(m *Model, r unitycli.Release) tea.Cmd {
 				if r.Installed {
 					m.toastf(toastInfo, "Unity %s is already installed", r.Version)
 					return nil
 				}
 				return m.installEditorFlow(r.Version, "")
-			})},
+			}),
 		{id: "releases.stream", ctx: ctxReleases, keys: []string{"ctrl+s"}, desc: "Filter by release stream (Supported, LTS, Beta, Alpha)", hint: "Stream",
 			run: func(m *Model) tea.Cmd { m.streamMenu(); return nil }},
-		{id: "releases.notes", ctx: ctxReleases, keys: []string{"o"}, desc: "Open the release notes in the browser",
-			enabled: has, run: on(func(m *Model, r unitycli.Release) tea.Cmd {
+		on(&action{id: "releases.notes", ctx: ctxReleases, keys: []string{"o"}, desc: "Open the release notes in the browser"},
+			func(m *Model, r unitycli.Release) tea.Cmd {
 				if err := launch.OpenURL(m.goos, "https://unity.com/releases/editor/whats-new/"+r.Version); err != nil {
 					m.toastf(toastError, "Could not open the browser: %v", err)
 				}
 				return nil
-			})},
+			}),
 	}
 }
 

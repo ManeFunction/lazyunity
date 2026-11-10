@@ -58,6 +58,30 @@ type action struct {
 
 func (a *action) name() string { return a.id[strings.IndexByte(a.id, '.')+1:] }
 
+// available reports whether the action can run right now.
+func (a *action) available(m *Model) bool { return a.enabled == nil || a.enabled(m) }
+
+// onSelected returns a function that completes an action working on the item
+// selected in a list: the action is enabled while there is one (and its own
+// enabled, if it has one, agrees), and it runs on that item.
+func onSelected[T any](sel func(*Model) (T, bool)) func(a *action, f func(*Model, T) tea.Cmd) *action {
+	return func(a *action, f func(*Model, T) tea.Cmd) *action {
+		also := a.enabled
+		a.enabled = func(m *Model) bool {
+			_, ok := sel(m)
+			return ok && (also == nil || also(m))
+		}
+		a.run = func(m *Model) tea.Cmd {
+			it, ok := sel(m)
+			if !ok {
+				return nil
+			}
+			return f(m, it)
+		}
+		return a
+	}
+}
+
 // keymap resolves key presses to actions.
 type keymap struct {
 	actions []*action
@@ -200,7 +224,7 @@ func (km *keymap) hints(m *Model, ctx ctxID) []hintItem {
 			if a.ctx != c || a.hint == "" {
 				continue
 			}
-			if a.enabled != nil && !a.enabled(m) {
+			if !a.available(m) {
 				continue
 			}
 			if k := km.primaryKey(a); k != "" {

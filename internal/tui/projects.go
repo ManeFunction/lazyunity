@@ -18,47 +18,38 @@ import (
 	"github.com/ManeFunction/lazyunity/internal/unitycli"
 )
 
-func hasProject(m *Model) bool { _, ok := m.projectsTab.Selected(); return ok }
-
 func projectActions() []*action {
-	on := func(f func(m *Model, r projectRow) tea.Cmd) func(*Model) tea.Cmd {
-		return func(m *Model) tea.Cmd {
-			r, ok := m.projectsTab.Selected()
-			if !ok {
-				return nil
-			}
-			return f(m, r)
-		}
-	}
+	on := onSelected(func(m *Model) (projectRow, bool) { return m.projectsTab.Selected() })
 	return []*action{
-		{id: "projects.open", ctx: ctxProjects, keys: []string{"enter", "space"}, desc: "Open in Unity, signed in", hint: "Open",
-			enabled: hasProject, run: on(func(m *Model, r projectRow) tea.Cmd { return m.openProject(r) })},
-		{id: "projects.version", ctx: ctxProjects, keys: []string{"v"}, desc: "Change the Unity version", hint: "Version",
-			enabled: hasProject, run: on(func(m *Model, r projectRow) tea.Cmd { m.versionMenu(r); return nil })},
-		{id: "projects.platform", ctx: ctxProjects, keys: []string{"p"}, desc: "Change the build platform", hint: "Platform",
-			enabled: hasProject, run: on(func(m *Model, r projectRow) tea.Cmd { m.platformMenu(r); return nil })},
-		{id: "projects.pin", ctx: ctxProjects, keys: []string{"f"}, desc: "Pin or unpin the project", hint: "Pin",
-			enabled: hasProject, run: on(func(m *Model, r projectRow) tea.Cmd { return m.togglePin(r) })},
+		on(&action{id: "projects.open", ctx: ctxProjects, keys: []string{"enter", "space"}, desc: "Open in Unity, signed in", hint: "Open"},
+			func(m *Model, r projectRow) tea.Cmd { return m.openProject(r) }),
+		on(&action{id: "projects.version", ctx: ctxProjects, keys: []string{"v"}, desc: "Change the Unity version", hint: "Version"},
+			func(m *Model, r projectRow) tea.Cmd { m.versionMenu(r); return nil }),
+		on(&action{id: "projects.platform", ctx: ctxProjects, keys: []string{"p"}, desc: "Change the build platform", hint: "Platform"},
+			func(m *Model, r projectRow) tea.Cmd { m.platformMenu(r); return nil }),
+		on(&action{id: "projects.pin", ctx: ctxProjects, keys: []string{"f"}, desc: "Pin or unpin the project", hint: "Pin"},
+			func(m *Model, r projectRow) tea.Cmd { return m.togglePin(r) }),
 		{id: "projects.new", ctx: ctxProjects, keys: []string{"n"}, desc: "Create a new project", hint: "New",
 			run: func(m *Model) tea.Cmd { return m.startNewProject() }},
 		{id: "projects.add", ctx: ctxProjects, keys: []string{"a"}, desc: "Add an existing project", hint: "Add",
 			run: func(m *Model) tea.Cmd { m.addProjectPrompt(); return nil }},
-		{id: "projects.remove", ctx: ctxProjects, keys: []string{"d"}, desc: "Remove the project from the list, or delete it", hint: "Remove",
-			enabled: hasProject, run: on(func(m *Model, r projectRow) tea.Cmd { m.removeMenu(r); return nil })},
+		on(&action{id: "projects.remove", ctx: ctxProjects, keys: []string{"d"}, desc: "Remove the project from the list, or delete it", hint: "Remove"},
+			func(m *Model, r projectRow) tea.Cmd { m.removeMenu(r); return nil }),
 		{id: "projects.sort", ctx: ctxProjects, keys: []string{"s"}, desc: "Sort the list",
 			run: func(m *Model) tea.Cmd { m.sortMenu(); return nil }},
-		{id: "projects.openFolder", ctx: ctxProjects, keys: []string{"o"}, desc: "Open the project folder in the file manager",
-			enabled: hasProject, run: on(func(m *Model, r projectRow) tea.Cmd { return m.openFolder(r.Path) })},
-		{id: "projects.addPackage", ctx: ctxProjects, keys: []string{"ctrl+a"}, desc: "Add an OpenUPM package to the project (needs the OpenUPM CLI)",
-			enabled: func(m *Model) bool { return hasProject(m) && m.openupm.path != "" }, run: on(func(m *Model, r projectRow) tea.Cmd { return m.addPackagePrompt(r) })},
-		{id: "projects.edit", ctx: ctxProjects, keys: []string{"e"}, desc: "Edit the project in a code editor",
-			enabled: hasProject, run: on(func(m *Model, r projectRow) tea.Cmd { return m.editProject(r) })},
-		{id: "projects.info", ctx: ctxProjects, keys: []string{"i"}, desc: "Show the project's details",
-			enabled: hasProject, run: on(func(m *Model, r projectRow) tea.Cmd { return m.projectInfoCmd(r) })},
-		{id: "projects.copy", ctx: ctxProjects, keys: []string{"y"}, desc: "Copy the path, name or version",
-			enabled: hasProject, run: on(func(m *Model, r projectRow) tea.Cmd { m.copyMenu(r); return nil })},
-		{id: "projects.clean", ctx: ctxProjects, keys: []string{"C"}, desc: "Clean the project's caches (Library, Temp ...)",
-			enabled: hasProject, run: on(func(m *Model, r projectRow) tea.Cmd { m.cleanConfirm(r); return nil })},
+		on(&action{id: "projects.openFolder", ctx: ctxProjects, keys: []string{"o"}, desc: "Open the project folder in the file manager"},
+			func(m *Model, r projectRow) tea.Cmd { return m.openFolder(r.Path) }),
+		on(&action{id: "projects.addPackage", ctx: ctxProjects, keys: []string{"ctrl+a"}, desc: "Add an OpenUPM package to the project (needs the OpenUPM CLI)",
+			enabled: func(m *Model) bool { return m.openupm.path != "" }},
+			func(m *Model, r projectRow) tea.Cmd { return m.addPackagePrompt(r) }),
+		on(&action{id: "projects.edit", ctx: ctxProjects, keys: []string{"e"}, desc: "Edit the project in a code editor"},
+			func(m *Model, r projectRow) tea.Cmd { return m.editProject(r) }),
+		on(&action{id: "projects.info", ctx: ctxProjects, keys: []string{"i"}, desc: "Show the project's details"},
+			func(m *Model, r projectRow) tea.Cmd { return m.projectInfoCmd(r) }),
+		on(&action{id: "projects.copy", ctx: ctxProjects, keys: []string{"y"}, desc: "Copy the path, name or version"},
+			func(m *Model, r projectRow) tea.Cmd { m.copyMenu(r); return nil }),
+		on(&action{id: "projects.clean", ctx: ctxProjects, keys: []string{"C"}, desc: "Clean the project's caches (Library, Temp ...)"},
+			func(m *Model, r projectRow) tea.Cmd { m.cleanConfirm(r); return nil }),
 	}
 }
 
