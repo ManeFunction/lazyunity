@@ -553,3 +553,12 @@ func TestInstallersWaitForRunningTasks(t *testing.T) {
 		t.Errorf("with nothing running the Unity CLI install asks:\n%s", screenText(m))
 	}
 }
+
+func TestEveryToolRowDoesSomething(t *testing.T) {
+	m := newTestModel(t)
+	for _, r := range m.toolsTab.Items() {
+		if r.run == nil {
+			t.Errorf("the %s row does nothing on enter", r.label)
+		}
+	}
+}

@@ -428,14 +428,23 @@ func displayPath(p string) string {
 	return p
 }
 
+// tone is how a tool's status is coloured.
+type tone int
+
+const (
+	tonePlain tone = iota
+	toneGood       // green: ready, signed in
+	toneWarn       // yellow: something to do
+)
+
 // toolRow is a line of the Tools tab.
 type toolRow struct {
 	id     string
 	label  string
 	status string
-	// good colours the status: true green, false yellow, nil plain.
-	good *bool
-	run  func(m *Model) tea.Cmd
+	tone   tone
+	// run is what enter does on the row.
+	run func(m *Model) tea.Cmd
 }
 
 func (m *Model) drawTool(r toolRow, w int, base lipgloss.Style) string {
@@ -444,12 +453,11 @@ func (m *Model) drawTool(r toolRow, w int, base lipgloss.Style) string {
 	labelW := 24
 	row.add(r.label, th.Text, labelW).gap(1)
 	st := th.Dim
-	if r.good != nil {
-		if *r.good {
-			st = th.Success
-		} else {
-			st = th.Warning
-		}
+	switch r.tone {
+	case toneGood:
+		st = th.Success
+	case toneWarn:
+		st = th.Warning
 	}
 	row.add(r.status, st, max(w-labelW-1, 1))
 	return row.done(w)

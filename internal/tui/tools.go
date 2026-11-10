@@ -9,24 +9,22 @@ import (
 	"github.com/ManeFunction/lazyunity/internal/unitycli"
 )
 
-func ptr[T any](v T) *T { return &v }
-
 // refreshTools rebuilds the Tools tab from what is known now.
 func (m *Model) refreshTools() {
 	var rows []toolRow
 
-	cli := toolRow{id: "cli", label: "Unity CLI"}
+	cli := toolRow{id: "cli", label: "Unity CLI", run: (*Model).cliTool}
 	switch m.cliStatus.State {
 	case unitycli.Ready:
-		cli.status, cli.good = "ready · "+m.cliStatus.Version.String(), ptr(true)
+		cli.status, cli.tone = "ready · "+m.cliStatus.Version.String(), toneGood
 	case unitycli.Outdated:
-		cli.status, cli.good = "outdated · press enter to update", ptr(false)
+		cli.status, cli.tone = "outdated · press enter to update", toneWarn
 	default:
-		cli.status, cli.good = "not installed · press enter to install", ptr(false)
+		cli.status, cli.tone = "not installed · press enter to install", toneWarn
 	}
 	rows = append(rows, cli)
 
-	acct := toolRow{id: "account", label: "Account"}
+	acct := toolRow{id: "account", label: "Account", run: (*Model).accountTool}
 	switch {
 	case m.cliStatus.State != unitycli.Ready:
 		acct.status = "needs the Unity CLI"
@@ -37,20 +35,27 @@ func (m *Model) refreshTools() {
 		if who == "" {
 			who = m.auth.User.Name
 		}
-		acct.status, acct.good = "signed in as "+who+" · enter to sign out", ptr(true)
+		acct.status, acct.tone = "signed in as "+who+" · enter to sign out", toneGood
 	default:
-		acct.status, acct.good = "signed out · press enter to sign in", ptr(false)
+		acct.status, acct.tone = "signed out · press enter to sign in", toneWarn
 	}
 	rows = append(rows, acct)
 
-	rows = append(rows, toolRow{id: "license", label: "License", status: "press enter to check"})
+	rows = append(rows, toolRow{id: "license", label: "License", status: "press enter to check",
+		run: func(m *Model) tea.Cmd { m.licenseMenu(); return nil }})
 	rows = append(rows, m.openupmRow())
 
 	dir := m.projectsDir()
-	rows = append(rows, toolRow{id: "projectdir", label: "Default project folder", status: displayPath(dir) + " · enter to change"})
-	rows = append(rows, toolRow{id: "config", label: "Config file", status: displayPath(filepath.Join(m.configDir, "config.yml")) + " · enter to edit"})
-	rows = append(rows, toolRow{id: "about", label: "About", status: "lazyunity " + m.version + " · by Mane Function"})
-	rows = append(rows, toolRow{id: "donate", label: "Donate", status: "support lazyunity on GitHub Sponsors · enter to open"})
+	rows = append(rows,
+		toolRow{id: "projectdir", label: "Default project folder", status: displayPath(dir) + " · enter to change",
+			run: func(m *Model) tea.Cmd { m.projectDirPrompt(); return nil }},
+		toolRow{id: "config", label: "Config file", status: displayPath(filepath.Join(m.configDir, "config.yml")) + " · enter to edit",
+			run: (*Model).editConfig},
+		toolRow{id: "about", label: "About", status: "lazyunity " + m.version + " · by Mane Function",
+			run: func(m *Model) tea.Cmd { m.aboutPopup(); return nil }},
+		toolRow{id: "donate", label: "Donate", status: "support lazyunity on GitHub Sponsors · enter to open",
+			run: func(m *Model) tea.Cmd { return m.openURL(sponsorURL) }},
+	)
 
 	m.toolsTab.SetItems(rows)
 }

@@ -146,34 +146,12 @@ func toolActions() []*action {
 			enabled: func(m *Model) bool { _, ok := m.toolsTab.Selected(); return ok },
 			run: func(m *Model) tea.Cmd {
 				r, ok := m.toolsTab.Selected()
-				if !ok {
+				if !ok || r.run == nil {
 					return nil
 				}
-				return m.runTool(r)
+				return r.run(m)
 			}},
 	}
-}
-
-func (m *Model) runTool(r toolRow) tea.Cmd {
-	switch r.id {
-	case "cli":
-		return m.cliTool()
-	case "account":
-		return m.accountTool()
-	case "license":
-		m.licenseMenu()
-	case "projectdir":
-		m.projectDirPrompt()
-	case "config":
-		return m.editConfig()
-	case "about":
-		m.aboutPopup()
-	case "openupm":
-		return m.openupmTool()
-	case "donate":
-		return m.openURL(sponsorURL)
-	}
-	return nil
 }
 
 type cliInstalledMsg struct{ err error }

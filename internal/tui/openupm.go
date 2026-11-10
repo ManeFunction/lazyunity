@@ -70,19 +70,19 @@ func firstWord(s string) string {
 
 // openupmStatus is the OpenUPM row of the Tools tab.
 func (m *Model) openupmRow() toolRow {
-	r := toolRow{id: "openupm", label: "OpenUPM CLI"}
+	r := toolRow{id: "openupm", label: "OpenUPM CLI", run: (*Model).openupmTool}
 	o := m.openupm
 	switch {
 	case !o.checked:
 		r.status = "checking…"
 	case o.path == "":
-		r.status, r.good = "not installed · enter to install", ptr(false)
+		r.status, r.tone = "not installed · enter to install", toneWarn
 	default:
 		v := o.version
 		if v == "" {
 			v = "installed"
 		}
-		r.status, r.good = v+" · enter to reinstall", ptr(true)
+		r.status, r.tone = v+" · enter to reinstall", toneGood
 	}
 	if src := m.cfg.OpenUPM; !src.FromRegistry() {
 		r.status += " · from " + repoName(src.Repo, src.Ref)
