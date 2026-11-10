@@ -6,6 +6,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/ManeFunction/lazyunity/internal/config"
 	"github.com/ManeFunction/lazyunity/internal/unitycli"
 )
 
@@ -68,7 +69,7 @@ func (m *Model) projectsDir() string {
 		return d
 	}
 	if d := m.cfg.Projects.DefaultLocation; d != "" {
-		return expandHome(d)
+		return config.ExpandHome(d)
 	}
 	return homeDir()
 }

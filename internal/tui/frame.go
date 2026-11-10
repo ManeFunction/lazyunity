@@ -3,8 +3,6 @@ package tui
 import (
 	"fmt"
 	"strings"
-
-	"charm.land/lipgloss/v2"
 )
 
 // scrollbar describes a list's scroll position for the thumb on a frame's edge.
@@ -111,9 +109,4 @@ func footerText(cursor, total int) string {
 		return ""
 	}
 	return fmt.Sprintf("%d of %d", cursor+1, total)
-}
-
-// joinColumns puts blocks side by side.
-func joinColumns(blocks ...string) string {
-	return lipgloss.JoinHorizontal(lipgloss.Top, blocks...)
 }

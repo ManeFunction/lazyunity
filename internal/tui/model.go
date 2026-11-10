@@ -353,7 +353,7 @@ func (m *Model) resolve(next func(*Model) tea.Cmd, done bool) tea.Cmd {
 }
 
 func (m *Model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
-	key := keyString(msg)
+	key := msg.String()
 	if key == "ctrl+c" && len(m.popups) > 0 {
 		return m.requestQuit()
 	}
@@ -593,7 +593,7 @@ func (m *Model) panelsView() string {
 		return lipgloss.JoinVertical(lipgloss.Left, frames[panelEditors], frames[panelOptions])
 	}
 	right := lipgloss.JoinVertical(lipgloss.Left, frames[panelEditors], frames[panelOptions])
-	return joinColumns(frames[panelProjects], right)
+	return lipgloss.JoinHorizontal(lipgloss.Top, frames[panelProjects], right)
 }
 
 func (m *Model) renderPanel(i int, r rect) string {

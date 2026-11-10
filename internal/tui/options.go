@@ -40,13 +40,13 @@ func (m *Model) addRootPrompt() {
 		title: "Add an Editor folder", label: "A folder that contains Unity Editor folders, such as ~/Unity/Hub/Editor:",
 		in: newInput(displayPath(homeDir()) + string(filepath.Separator)), complete: completeDir,
 		validate: func(text string) string {
-			if st, err := os.Stat(expandHome(text)); err != nil || !st.IsDir() {
+			if st, err := os.Stat(config.ExpandHome(text)); err != nil || !st.IsDir() {
 				return "That folder does not exist"
 			}
 			return ""
 		},
 		onSubmit: func(m *Model, text string) tea.Cmd {
-			path := filepath.Clean(expandHome(text))
+			path := filepath.Clean(config.ExpandHome(text))
 			if !m.st.AddRoot(path) {
 				m.toastf(toastInfo, "%s is already in the list", displayPath(path))
 				return nil
@@ -306,13 +306,13 @@ func (m *Model) projectDirPrompt() {
 		title: "Default project folder", label: "New projects are created in this folder:",
 		in: newInput(displayPath(m.projectsDir())), complete: completeDir,
 		validate: func(text string) string {
-			if st, err := os.Stat(expandHome(text)); err != nil || !st.IsDir() {
+			if st, err := os.Stat(config.ExpandHome(text)); err != nil || !st.IsDir() {
 				return "That folder does not exist"
 			}
 			return ""
 		},
 		onSubmit: func(m *Model, text string) tea.Cmd {
-			m.st.DefaultProjectDir = filepath.Clean(expandHome(text))
+			m.st.DefaultProjectDir = filepath.Clean(config.ExpandHome(text))
 			m.saveState()
 			m.refreshTools()
 			return nil

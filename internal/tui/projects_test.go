@@ -743,13 +743,6 @@ func TestCompleteDir(t *testing.T) {
 	}
 }
 
-func TestExpandHome(t *testing.T) {
-	h := homeDir()
-	if expandHome("~") != h || expandHome("~/x") != filepath.Join(h, "x") || expandHome("/a/~") != "/a/~" || expandHome("a") != "a" {
-		t.Error("expandHome")
-	}
-}
-
 func TestSelectedPath(t *testing.T) {
 	m := newTestModel(t)
 	if p, ok := m.selectedPath(); !ok || !strings.HasSuffix(p, "space") {

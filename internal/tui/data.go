@@ -7,6 +7,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/ManeFunction/lazyunity/internal/config"
 	"github.com/ManeFunction/lazyunity/internal/unity"
 	"github.com/ManeFunction/lazyunity/internal/unitycli"
 )
@@ -315,7 +316,7 @@ func (m *Model) allRoots() []string {
 	var out []string
 	seen := map[string]bool{}
 	add := func(p string) {
-		if p = filepath.Clean(expandHome(p)); p != "." && !seen[p] {
+		if p = filepath.Clean(config.ExpandHome(p)); p != "." && !seen[p] {
 			seen[p] = true
 			out = append(out, p)
 		}

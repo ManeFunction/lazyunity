@@ -10,6 +10,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/ManeFunction/lazyunity/internal/config"
 	"github.com/ManeFunction/lazyunity/internal/unitycli"
 )
 
@@ -75,7 +76,7 @@ func (m *Model) newProjectLocation(w newProject) {
 		in:       newInput(displayPath(m.projectsDir()) + string(filepath.Separator)),
 		complete: completeDir,
 		validate: func(text string) string {
-			p := expandHome(text)
+			p := config.ExpandHome(text)
 			if st, err := os.Stat(p); err != nil || !st.IsDir() {
 				return "That folder does not exist"
 			}
@@ -85,7 +86,7 @@ func (m *Model) newProjectLocation(w newProject) {
 			return ""
 		},
 		onSubmit: func(m *Model, text string) tea.Cmd {
-			w.parent = filepath.Clean(expandHome(text))
+			w.parent = filepath.Clean(config.ExpandHome(text))
 			m.newProjectEditor(w)
 			return nil
 		},

@@ -241,6 +241,3 @@ func renderHints(th *Theme, items []hintItem, w int) string {
 	s := strings.Join(parts, " | ")
 	return th.OptionsText.Render(truncate(s, w))
 }
-
-// keyString is the name of a key press, in the notation of the keymap.
-func keyString(msg tea.KeyPressMsg) string { return msg.String() }

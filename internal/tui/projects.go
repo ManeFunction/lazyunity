@@ -471,12 +471,9 @@ func (m *Model) deleteProjectFlow(r projectRow) {
 
 // ---- adding -----------------------------------------------------------------------------
 
-// expandHome turns a leading ~ into the home folder.
-func expandHome(p string) string { return config.ExpandHome(p) }
-
 // completeDir completes a folder path as far as it is unambiguous.
 func completeDir(text string) []string {
-	out := completeExpanded(expandHome(text))
+	out := completeExpanded(config.ExpandHome(text))
 	if strings.HasPrefix(text, "~") {
 		for i, o := range out {
 			out[i] = displayPath(o) // keep the ~ the user typed
@@ -549,7 +546,7 @@ func (m *Model) addProjectPrompt() {
 		in:       newInput(displayPath(m.projectsDir()) + string(filepath.Separator)),
 		complete: completeDir,
 		validate: func(text string) string {
-			p := expandHome(text)
+			p := config.ExpandHome(text)
 			if st, err := os.Stat(p); err != nil || !st.IsDir() {
 				return "That folder does not exist"
 			}
@@ -559,7 +556,7 @@ func (m *Model) addProjectPrompt() {
 			return ""
 		},
 		onSubmit: func(m *Model, text string) tea.Cmd {
-			path := filepath.Clean(expandHome(text))
+			path := filepath.Clean(config.ExpandHome(text))
 			c := m.cli
 			return m.runCLI("Adding the project", "Added "+filepath.Base(path),
 				func(ctx context.Context, _ *unitycli.Client) error { return c.AddProjects(ctx, path) },
