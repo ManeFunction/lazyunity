@@ -1,6 +1,7 @@
 package launch
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -170,4 +171,29 @@ func zombieChildren(t *testing.T) int {
 		}
 	}
 	return n
+}
+
+func TestEdit(t *testing.T) {
+	env := func(vars map[string]string) func(string) string {
+		return func(k string) string { return vars[k] }
+	}
+	cmd, err := Edit("", "/p/config.yml", "/p", env(map[string]string{"EDITOR": `nvim -c "set nu"`}))
+	if err != nil || !reflect.DeepEqual(cmd.Args, []string{"nvim", "-c", "set nu", "/p/config.yml"}) || cmd.Dir != "/p" {
+		t.Errorf("$EDITOR runs on the path, in dir: %v %v", cmd, err)
+	}
+	cmd, _ = Edit("", "/p", "/p", env(map[string]string{"EDITOR": "nano", "VISUAL": "code -w"}))
+	if cmd.Args[0] != "code" {
+		t.Errorf("$VISUAL comes first: %v", cmd.Args)
+	}
+	if _, err := Edit("", "/p", "/p", env(nil)); !errors.Is(err, ErrNoEditor) {
+		t.Errorf("no editor set: %v", err)
+	}
+	if _, err := Edit("", "/p", "/p", env(map[string]string{"EDITOR": `vim "`})); err == nil || errors.Is(err, ErrNoEditor) {
+		t.Errorf("a broken $EDITOR is an error of its own: %v", err)
+	}
+	if runtime.GOOS != "windows" {
+		if cmd, err := Edit("true {{dir}}", "/p", "/p", env(map[string]string{"EDITOR": "vim"})); cmd != nil || err != nil {
+			t.Errorf("os.edit starts the editor on its own and wins over $EDITOR: %v %v", cmd, err)
+		}
+	}
 }

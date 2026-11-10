@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -614,36 +613,43 @@ func (m *Model) openFolder(dir string) tea.Cmd {
 	return nil
 }
 
-// editProject opens the project in the configured code editor, or in $VISUAL /
-// $EDITOR in the terminal.
+// editProject opens the project in the code editor.
 func (m *Model) editProject(r projectRow) tea.Cmd {
-	if tmpl := m.cfg.OS.Edit; tmpl != "" {
-		if err := launch.Run(tmpl, r.Path); err != nil {
-			m.toastf(toastError, "Could not start the editor: %v", err)
-		}
-		return nil
-	}
-	editor := os.Getenv("VISUAL")
-	if editor == "" {
-		editor = os.Getenv("EDITOR")
-	}
-	if editor == "" {
+	return m.edit(r.Path, r.Path, func(m *Model) {
 		m.toastf(toastWarn, "Set os.edit in config.yml, or $EDITOR, to edit projects")
+	}, nil)
+}
+
+// edit opens path in the code editor: os.edit from config.yml, started on its
+// own, or else $VISUAL or $EDITOR, run in dir with the terminal handed over.
+// noEditor runs when none is set; done, if not nil, is the message once a
+// terminal editor has quit.
+func (m *Model) edit(path, dir string, noEditor func(m *Model), done tea.Msg) tea.Cmd {
+	cmd, err := launch.Edit(m.cfg.OS.Edit, path, dir, m.getenv)
+	switch {
+	case errors.Is(err, launch.ErrNoEditor):
+		noEditor(m)
+		return nil
+	case err != nil:
+		m.toastf(toastError, "Could not start the editor: %v", err)
+		return nil
+	case cmd == nil: // started on its own
 		return nil
 	}
-	words, err := launch.Split(editor)
-	if err != nil || len(words) == 0 {
-		m.toastf(toastError, "Cannot run $EDITOR: %v", err)
-		return nil
-	}
-	cmd := exec.Command(words[0], append(words[1:], ".")...)
-	cmd.Dir = r.Path
 	return tea.ExecProcess(cmd, func(err error) tea.Msg {
 		if err != nil {
 			return errorMsg{what: "Editor", err: err}
 		}
-		return nil
+		return done
 	})
+}
+
+// getenv reads an environment variable of the machine lazyunity runs on.
+func (m *Model) getenv(key string) string {
+	if m.env.Getenv != nil {
+		return m.env.Getenv(key)
+	}
+	return os.Getenv(key)
 }
 
 type projectInfoMsg struct {

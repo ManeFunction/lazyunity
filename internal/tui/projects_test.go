@@ -797,3 +797,16 @@ func TestNewProjectStartsOnTheDefaultEditor(t *testing.T) {
 		t.Errorf("the cursor starts on the default Editor, got %q", it.label)
 	}
 }
+
+func TestEditProject(t *testing.T) {
+	m := newTestModel(t)
+	selectProject(t, m, "Space Shooter")
+	m.env.Getenv = func(string) string { return "" }
+	if cmd := m.keymap.lookup(ctxProjects, "e").run(m); cmd != nil || !strings.Contains(screenText(m), "Set os.edit in config.yml, or $EDITOR") {
+		t.Errorf("without an editor the user is told how to set one:\n%s", screenText(m))
+	}
+	m.env.Getenv = func(k string) string { return map[string]string{"EDITOR": "vim"}[k] }
+	if cmd := m.keymap.lookup(ctxProjects, "e").run(m); cmd == nil {
+		t.Error("with $EDITOR the terminal is handed to it")
+	}
+}

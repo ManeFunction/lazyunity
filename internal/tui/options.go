@@ -15,7 +15,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/ManeFunction/lazyunity/internal/config"
-	"github.com/ManeFunction/lazyunity/internal/launch"
 	"github.com/ManeFunction/lazyunity/internal/unitycli"
 )
 
@@ -351,29 +350,11 @@ func (m *Model) editConfig() tea.Cmd {
 			os.WriteFile(path, []byte(configTemplate), 0o644)
 		}
 	}
-	if tmpl := m.cfg.OS.Edit; tmpl != "" {
-		if err := launch.Run(tmpl, path); err != nil {
-			m.toastf(toastError, "Could not start the editor: %v", err)
-		}
-		return nil
-	}
-	editor := os.Getenv("VISUAL")
-	if editor == "" {
-		editor = os.Getenv("EDITOR")
-	}
-	words, err := launch.Split(editor)
-	if err != nil || len(words) == 0 {
+	return m.edit(path, m.configDir, func(m *Model) {
 		// a popup rather than a toast: the path is long and must be readable
 		m.push(&infoPopup{title: "Config file", lines: append(wrapText("Edit this file to change lazyunity's settings:", 70),
 			"", path, "", "To open it from here, set $EDITOR, or os.edit in the file itself.")})
-		return nil
-	}
-	return tea.ExecProcess(exec.Command(words[0], append(words[1:], path)...), func(err error) tea.Msg {
-		if err != nil {
-			return errorMsg{what: "Editor", err: err}
-		}
-		return toastMsg{kind: toastInfo, text: "Restart lazyunity to apply config changes"}
-	})
+	}, toastMsg{kind: toastInfo, text: "Restart lazyunity to apply config changes"})
 }
 
 func (m *Model) aboutPopup() {

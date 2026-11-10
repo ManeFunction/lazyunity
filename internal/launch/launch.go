@@ -88,6 +88,34 @@ func Run(tmpl, dir string) error {
 	return start(exec.Command(argv[0], argv[1:]...))
 }
 
+// ErrNoEditor is Edit's answer when no code editor is set.
+var ErrNoEditor = errors.New("no code editor is set")
+
+// Edit opens path in a code editor. With tmpl, the os.edit command line of
+// config.yml ({{dir}} standing for path), the editor is started on its own and
+// the returned command is nil. Otherwise it is $VISUAL or $EDITOR, as read by
+// getenv: the command returned runs it on path, in dir, and is meant to be run
+// with the terminal handed over. ErrNoEditor means neither is set.
+func Edit(tmpl, path, dir string, getenv func(string) string) (*exec.Cmd, error) {
+	if strings.TrimSpace(tmpl) != "" {
+		return nil, Run(tmpl, path)
+	}
+	editor := getenv("VISUAL")
+	if editor == "" {
+		editor = getenv("EDITOR")
+	}
+	if strings.TrimSpace(editor) == "" {
+		return nil, ErrNoEditor
+	}
+	words, err := Split(editor)
+	if err != nil {
+		return nil, fmt.Errorf("$EDITOR: %w", err)
+	}
+	cmd := exec.Command(words[0], append(words[1:], path)...)
+	cmd.Dir = dir
+	return cmd, nil
+}
+
 // Expand splits a command line into words and puts dir where {{dir}} is. The
 // substitution happens after the splitting, so a folder with spaces in its name
 // stays one argument.
