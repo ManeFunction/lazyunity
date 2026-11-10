@@ -1,10 +1,8 @@
 package tui
 
 import (
-	"context"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -743,28 +741,6 @@ func TestSelectedPath(t *testing.T) {
 	press(m, "]")
 	if cmd := m.copySelectedPath(); cmd != nil || !strings.Contains(screenText(m), "Nothing here has a path") {
 		t.Error("copying nothing says so")
-	}
-}
-
-func TestOpenupmAddRunsInTheProject(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("uses a shell script")
-	}
-	dir := t.TempDir()
-	proj := filepath.Join(dir, "P")
-	os.MkdirAll(proj, 0o755)
-	exe := filepath.Join(dir, "openupm")
-	os.WriteFile(exe, []byte("#!/bin/sh\necho \"$@\" > args.txt\n"), 0o755)
-	if err := openupmAdd(context.Background(), exe, proj, []string{"a.b", "a.c"}); err != nil {
-		t.Fatal(err)
-	}
-	got, _ := os.ReadFile(filepath.Join(proj, "args.txt"))
-	if strings.TrimSpace(string(got)) != "add a.b a.c" {
-		t.Errorf("args = %q", got)
-	}
-	os.WriteFile(exe, []byte("#!/bin/sh\necho boom >&2\nexit 3\n"), 0o755)
-	if err := openupmAdd(context.Background(), exe, proj, []string{"a.b"}); err == nil || !strings.Contains(err.Error(), "boom") {
-		t.Errorf("a failure carries the output: %v", err)
 	}
 }
 

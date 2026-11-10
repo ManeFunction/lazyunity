@@ -4,13 +4,13 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/ManeFunction/lazyunity/internal/config"
+	"github.com/ManeFunction/lazyunity/internal/openupm"
 	"github.com/ManeFunction/lazyunity/internal/unitycli"
 )
 
@@ -165,8 +165,8 @@ func (m *Model) newProjectOptions(w newProject, template string) {
 		{id: optCloud, label: "Link to Unity Cloud", desc: "Create a Unity Cloud project for it. Needs you to be signed in."},
 		{id: optRecommended, label: "Add Unity's recommended packages and settings", desc: "Without this, the project is just the template.", checked: true},
 	}
-	openupm := m.openupm.path
-	if openupm != "" {
+	openupmPath := m.openupm.path
+	if openupmPath != "" {
 		items = append(items,
 			menuItem{id: optManetoolsFull, label: "Add ManeTools (full)", group: "manetools",
 				desc: "Adds " + strings.Join(manetoolsFullPackages, " and ") + " from OpenUPM."},
@@ -197,7 +197,7 @@ func (m *Model) newProjectOptions(w newProject, template string) {
 				packages = manetoolsCorePackages
 			}
 		}
-		return m.createProject(w, opts, openupm, packages)
+		return m.createProject(w, opts, openupmPath, packages)
 	}
 	m.push(menu)
 }
@@ -208,23 +208,13 @@ var (
 	manetoolsFullPackages = []string{"com.manefunction.tools-unity", "com.manefunction.tools-unity-ui"}
 )
 
-// openupmAdd adds packages to the project in dir with the OpenUPM CLI.
-func openupmAdd(ctx context.Context, exe, dir string, packages []string) error {
-	cmd := exec.CommandContext(ctx, exe, append([]string{"add"}, packages...)...)
-	cmd.Dir = dir
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("openupm add %s: %w: %s", strings.Join(packages, " "), err, strings.TrimSpace(string(out)))
-	}
-	return nil
-}
-
 // createProject creates the project. With packages, they are added with the
 // OpenUPM CLI before the Editor opens, so Unity resolves everything at once.
-func (m *Model) createProject(w newProject, opts unitycli.CreateOptions, openupm string, packages []string) tea.Cmd {
-	return m.withCLI(func(c unityCLI) tea.Cmd { return m.queueCreate(c, w, opts, openupm, packages) })
+func (m *Model) createProject(w newProject, opts unitycli.CreateOptions, openupmPath string, packages []string) tea.Cmd {
+	return m.withCLI(func(c unityCLI) tea.Cmd { return m.queueCreate(c, w, opts, openupmPath, packages) })
 }
 
-func (m *Model) queueCreate(c unityCLI, w newProject, opts unitycli.CreateOptions, openupm string, packages []string) tea.Cmd {
+func (m *Model) queueCreate(c unityCLI, w newProject, opts unitycli.CreateOptions, openupmPath string, packages []string) tea.Cmd {
 	open := opts.Open
 	if len(packages) > 0 {
 		opts.Open = false
@@ -241,7 +231,7 @@ func (m *Model) queueCreate(c unityCLI, w newProject, opts unitycli.CreateOption
 			if len(packages) == 0 {
 				return nil
 			}
-			if err := openupmAdd(ctx, openupm, w.path(), packages); err != nil {
+			if err := openupm.Add(ctx, openupmPath, w.path(), packages); err != nil {
 				return fmt.Errorf("the project was created, but ManeTools were not added: %w", err)
 			}
 			if open {

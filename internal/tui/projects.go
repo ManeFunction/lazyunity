@@ -13,6 +13,7 @@ import (
 
 	"github.com/ManeFunction/lazyunity/internal/config"
 	"github.com/ManeFunction/lazyunity/internal/launch"
+	"github.com/ManeFunction/lazyunity/internal/openupm"
 	"github.com/ManeFunction/lazyunity/internal/state"
 	"github.com/ManeFunction/lazyunity/internal/unity"
 	"github.com/ManeFunction/lazyunity/internal/unitycli"
@@ -591,7 +592,7 @@ func (m *Model) addPackagePrompt(r projectRow) tea.Cmd {
 				label: "add " + strings.Join(pkgs, ", "),
 				works: []string{workProject(r.Path)},
 				msg:   "OpenUPM is adding the package",
-				do:    func(ctx context.Context) error { return openupmAdd(ctx, exe, r.Path, pkgs) },
+				do:    func(ctx context.Context) error { return openupm.Add(ctx, exe, r.Path, pkgs) },
 				after: func(m *Model, err error) tea.Cmd {
 					if err == nil {
 						m.toastf(toastOK, "Added %s to %s", strings.Join(pkgs, ", "), r.name())

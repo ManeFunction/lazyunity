@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -146,39 +145,6 @@ func TestOpenUPMInstallAsks(t *testing.T) {
 	}
 }
 
-func TestOpenUPMInstallCommand(t *testing.T) {
-	env := func(c *exec.Cmd, key string) string {
-		v := ""
-		for _, e := range c.Env {
-			if after, ok := strings.CutPrefix(e, key+"="); ok {
-				v = after // the last one wins, as in exec
-			}
-		}
-		return v
-	}
-	official := openupmInstallCommand("linux", config.Default().OpenUPM)
-	if official.Args[0] != "/bin/sh" || env(official, "LAZYUNITY_OPENUPM_REPO") != "" {
-		t.Errorf("the official repository installs from the registry: %v", official.Args)
-	}
-	fork := openupmInstallCommand("linux", config.OpenUPM{Repo: " https://github.com/me/openupm-cli ", Ref: "fixes"})
-	if env(fork, "LAZYUNITY_OPENUPM_REPO") != "https://github.com/me/openupm-cli" || env(fork, "LAZYUNITY_OPENUPM_REF") != "fixes" {
-		t.Errorf("a fork is passed in the environment: %v", fork.Env[len(fork.Env)-2:])
-	}
-	for _, a := range fork.Args {
-		if strings.Contains(a, "me/openupm-cli") {
-			t.Errorf("the repository never reaches the shell's command line: %q", a)
-		}
-	}
-	if win := openupmInstallCommand("windows", config.Default().OpenUPM); win.Args[0] != "powershell" {
-		t.Errorf("windows: %v", win.Args)
-	}
-	if runtime.GOOS != "windows" {
-		if out, err := exec.Command("/bin/sh", "-n", "-c", openupmShScript).CombinedOutput(); err != nil {
-			t.Errorf("the install script does not parse: %v\n%s", err, out)
-		}
-	}
-}
-
 func TestConfigTemplateOffersTheForkCommentedOut(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "config.yml"), []byte(configTemplate), 0o644); err != nil {
@@ -198,24 +164,6 @@ func TestConfigTemplateOffersTheForkCommentedOut(t *testing.T) {
 	cfg, err = config.Load(dir)
 	if err != nil || cfg.OpenUPM.FromRegistry() || cfg.OpenUPM.Repo != config.ForkOpenUPMRepo || cfg.OpenUPM.Ref != config.ForkOpenUPMRef {
 		t.Errorf("uncommented: %+v %v", cfg.OpenUPM, err)
-	}
-}
-
-func TestFindOpenUPMFallsBackToUserBin(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-	t.Setenv("USERPROFILE", home)
-	want := filepath.Join(home, ".local", "bin", "openupm")
-	prev := lookPath
-	lookPath = func(name string) (string, error) {
-		if name == want {
-			return want, nil
-		}
-		return "", exec.ErrNotFound
-	}
-	t.Cleanup(func() { lookPath = prev })
-	if got, err := findOpenUPM(); err != nil || got != want {
-		t.Errorf("findOpenUPM = %q, %v; want %q", got, err, want)
 	}
 }
 
