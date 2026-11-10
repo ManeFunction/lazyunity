@@ -142,7 +142,11 @@ func TestDirectLaunchStartsTheEditor(t *testing.T) {
 	m.cli = nil
 	r := selectProject(t, m, "Space Shooter")
 	ed := m.editorFor("6000.6.8f1")
-	m.directLaunch(r, ed)
+	p := m.planOpen(r)
+	if p.route != openDirect {
+		t.Fatalf("without the CLI the Editor is started directly: route %d", p.route)
+	}
+	m.directLaunch(r, p)
 	if got := recorder(m).editors; len(got) != 1 || got[0] != ed.Location+" "+r.Path {
 		t.Errorf("the Editor was started with %q", got)
 	}

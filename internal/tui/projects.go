@@ -63,11 +63,15 @@ func (m *Model) saveState() {
 
 // forgetPending drops the version or platform chosen for a project and saves
 // that, when something was chosen.
-func (m *Model) forgetPending(path string) {
-	if m.st.PendingFor(path).Empty() {
+func (m *Model) forgetPending(path string) { m.settlePending(path, state.Pending{}) }
+
+// settlePending leaves what is still pending for a project after a change was
+// applied, and saves it when that changed anything.
+func (m *Model) settlePending(path string, left state.Pending) {
+	if m.st.PendingFor(path) == left {
 		return
 	}
-	m.st.SetPending(path, state.Pending{})
+	m.st.SetPending(path, left)
 	m.saveState()
 }
 
@@ -89,111 +93,82 @@ func (r projectRow) hasPlatform(ed *editorRow, buildTarget string) bool {
 
 // ---- opening ----------------------------------------------------------------------
 
-type openedMsg struct {
-	row projectRow
-	res unitycli.OpenResult
-	err error
+// planOpen decides how a project opens.
+func (m *Model) planOpen(r projectRow) openPlan {
+	return planOpen(r, m.editorFor(r.effVersion()), m.cli != nil)
 }
 
 func (m *Model) openProject(r projectRow) tea.Cmd {
-	if r.Missing {
+	p := m.planOpen(r)
+	switch p.route {
+	case openMissing:
 		m.toastf(toastError, "The folder of %s is gone: %s", r.name(), displayPath(r.Path))
-		return nil
-	}
-	ver := r.effVersion()
-	ed := m.editorFor(ver)
-	if ed == nil {
-		changeset := ""
-		if ver == r.Version {
-			changeset = r.Changeset
-		}
+	case openInstall:
 		m.push(&confirmPopup{
 			title: "Editor not installed", yes: "Install",
-			message: fmt.Sprintf("%s needs Unity %s, which is not installed. Install it now?", r.name(), ver),
-			onYes:   func(m *Model) tea.Cmd { return m.installEditorFlow(ver, changeset) },
+			message: fmt.Sprintf("%s needs Unity %s, which is not installed. Install it now?", r.name(), p.version),
+			onYes:   func(m *Model) tea.Cmd { return m.installEditorFlow(p.version, p.changeset) },
 		})
-		return nil
-	}
-	switch {
-	case !unity.AtLeast(ver, 2019, 1):
-		m.confirmDirect(r, ed, fmt.Sprintf("The Unity CLI cannot sign in Editors older than 2019.1, and %s is one.", ver))
-		return nil
-	case m.cli == nil:
-		m.confirmDirect(r, ed, "The Unity CLI is not available.")
-		return nil
-	}
-	if r.versionChanged() && unity.AtLeast(ver, 6000, 7) && !unity.AtLeast(r.Version, 6000, 7) {
-		m.upgradeMenu(r, ver)
-		return nil
-	}
-	if r.versionChanged() {
+	case openDirect:
+		m.push(&confirmPopup{
+			title: "Open without the Unity CLI", yes: "Open anyway",
+			message: p.why + " Opening the project directly works, but the Editor starts signed out, and Unity may start the official Hub to sign in.",
+			onYes:   func(m *Model) tea.Cmd { return m.directLaunch(r, p) },
+		})
+	case openUpgrade:
+		m.upgradeMenu(r, p)
+	case openConfirm:
 		m.push(&confirmPopup{
 			title: "Open with another version", yes: "Open",
-			message: fmt.Sprintf("Open %s with Unity %s? The project was made with %s, so Unity will ask to change it.", r.name(), ver, r.Version),
-			onYes:   func(m *Model) tea.Cmd { return m.runOpen(r) },
+			message: fmt.Sprintf("Open %s with Unity %s? The project was made with %s, so Unity will ask to change it.", r.name(), p.version, r.Version),
+			onYes:   func(m *Model) tea.Cmd { return m.runOpen(r, p) },
 		})
-		return nil
+	default:
+		return m.runOpen(r, p)
 	}
-	return m.runOpen(r)
+	return nil
 }
 
-// confirmDirect offers to launch the Editor without the CLI.
-func (m *Model) confirmDirect(r projectRow, ed *editorRow, why string) {
-	m.push(&confirmPopup{
-		title: "Open without the Unity CLI", yes: "Open anyway",
-		message: why + " Opening the project directly works, but the Editor starts signed out, and Unity may start the official Hub to sign in.",
-		onYes:   func(m *Model) tea.Cmd { return m.directLaunch(r, ed) },
-	})
-}
-
-func (m *Model) directLaunch(r projectRow, ed *editorRow) tea.Cmd {
-	target := ""
-	if r.targetChanged() {
-		if p, ok := unity.PlatformByBuildTarget(r.Pending.BuildTarget); ok {
-			target = p.CLITarget
-		}
-	}
-	if err := m.host.StartEditor(ed.Location, r.Path, target); err != nil {
+// directLaunch starts the plan's Editor on the project, without the CLI.
+func (m *Model) directLaunch(r projectRow, p openPlan) tea.Cmd {
+	if err := m.host.StartEditor(p.editor.Location, r.Path, p.buildTarget); err != nil {
 		m.showError("Opening "+r.name(), err)
 		return nil
 	}
-	return m.afterOpened(r, "Opening %s in Unity %s (signed out)")
+	return m.afterOpened(r, p, "Opening %s in Unity %s (signed out)")
+}
+
+type openedMsg struct {
+	row  projectRow
+	plan openPlan
+	res  unitycli.OpenResult
+	err  error
 }
 
 // runOpen opens the project through the CLI, which signs the Editor in.
-func (m *Model) runOpen(r projectRow) tea.Cmd {
-	opts := unitycli.OpenOptions{Project: r.Path}
-	if r.versionChanged() {
-		opts.EditorVersion = r.Pending.Version
-	}
-	if r.targetChanged() {
-		if p, ok := unity.PlatformByBuildTarget(r.Pending.BuildTarget); ok {
-			opts.BuildTarget = p.CLITarget
-		}
-	}
+func (m *Model) runOpen(r projectRow, p openPlan) tea.Cmd {
 	return m.withCLI(func(c unityCLI) tea.Cmd {
 		m.toastf(toastInfo, "Opening %s…", r.name())
 		return func() tea.Msg {
-			res, err := c.Open(context.Background(), opts)
-			return openedMsg{row: r, res: res, err: err}
+			res, err := c.Open(context.Background(), p.cli)
+			return openedMsg{row: r, plan: p, res: res, err: err}
 		}
 	})
 }
 
 func (m *Model) onOpened(msg openedMsg) tea.Cmd {
-	r := msg.row
+	r, p := msg.row, msg.plan
 	if msg.err != nil {
 		var e *unitycli.Error
 		text := msg.err.Error()
 		if errors.As(msg.err, &e) && e.Output != "" {
 			text += "\n\n" + e.Output
 		}
-		ed := m.editorFor(r.effVersion())
 		pop := &confirmPopup{title: "Could not open " + r.name(), message: text}
-		if ed != nil {
+		if p.editor != nil {
 			pop.yes = "Open directly"
 			pop.message += "\n\nOpen it directly instead? The Editor starts signed out."
-			pop.onYes = func(m *Model) tea.Cmd { return m.directLaunch(r, ed) }
+			pop.onYes = func(m *Model) tea.Cmd { return m.directLaunch(r, p) }
 		} else {
 			pop.yes = "OK"
 			pop.onYes = func(*Model) tea.Cmd { return nil }
@@ -205,13 +180,14 @@ func (m *Model) onOpened(msg openedMsg) tea.Cmd {
 		m.toastf(toastInfo, "%s is already open", r.name())
 		return nil
 	}
-	return m.afterOpened(r, "Opened %s in Unity %s")
+	return m.afterOpened(r, p, "Opened %s in Unity %s")
 }
 
-// afterOpened forgets the choices that have now been applied, and refreshes.
-func (m *Model) afterOpened(r projectRow, format string) tea.Cmd {
-	m.forgetPending(r.Path)
-	m.toastf(toastOK, format, r.name(), r.effVersion())
+// afterOpened keeps what is still pending after the project opened, and
+// refreshes.
+func (m *Model) afterOpened(r projectRow, p openPlan, format string) tea.Cmd {
+	m.settlePending(r.Path, p.after)
+	m.toastf(toastOK, format, r.name(), p.version)
 	if m.cfg.QuitAfterOpen {
 		m.quit = true
 	}
@@ -220,31 +196,28 @@ func (m *Model) afterOpened(r projectRow, format string) tea.Cmd {
 
 // upgradeMenu offers to upgrade a project to Unity 6.7 or later, which `open`
 // refuses to do by itself.
-func (m *Model) upgradeMenu(r projectRow, to string) {
+func (m *Model) upgradeMenu(r projectRow, p openPlan) {
 	run := func(cloud unitycli.CloudChoice) func(*Model) tea.Cmd {
 		return func(m *Model) tea.Cmd {
 			return m.withCLI(func(c unityCLI) tea.Cmd {
 				return m.enqueue(&task{
-					title: fmt.Sprintf("Upgrading %s to %s", r.name(), to),
-					label: r.name() + " → " + to,
+					title: fmt.Sprintf("Upgrading %s to %s", r.name(), p.version),
+					label: r.name() + " → " + p.version,
 					works: []string{workProject(r.Path)},
 					msg:   "Unity is upgrading the project; it opens when ready",
-					do:    func(ctx context.Context) error { return c.UpgradeProject(ctx, r.Path, to, cloud) },
+					do:    func(ctx context.Context) error { return c.UpgradeProject(ctx, r.Path, p.version, cloud) },
 					after: func(m *Model, err error) tea.Cmd {
 						if err != nil {
 							return nil
 						}
-						// the upgrade applies the version only: a platform choice
-						// waits for the next open
-						m.st.SetPending(r.Path, state.Pending{BuildTarget: r.Pending.BuildTarget})
-						m.saveState()
+						m.settlePending(r.Path, p.after)
 						return m.loadProjectsCmd()
 					},
 				})
 			})
 		}
 	}
-	menu := newMenu(fmt.Sprintf("Upgrade %s to Unity %s", r.name(), to), []menuItem{
+	menu := newMenu(fmt.Sprintf("Upgrade %s to Unity %s", r.name(), p.version), []menuItem{
 		{label: "Upgrade without Unity Cloud", run: run(unitycli.CloudOff),
 			desc: "Unity 6.7 and later projects are tied to a Unity Cloud project. This upgrades without linking one."},
 		{label: "Upgrade and link a new Unity Cloud project", run: run(unitycli.CloudNew),

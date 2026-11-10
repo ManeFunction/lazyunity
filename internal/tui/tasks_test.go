@@ -469,7 +469,7 @@ func TestFlowsWithoutTheCLIExplainItIsNeeded(t *testing.T) {
 		"plan an install":   func(m *Model) tea.Cmd { return m.planInstall(unitycli.InstallOptions{Version: "6000.5.1f1"}) },
 		"list templates":    func(m *Model) tea.Cmd { return m.loadTemplatesCmd(newProject{name: "G", version: "6000.6.8f1"}) },
 		"install an Editor": func(m *Model) tea.Cmd { return m.installEditorFlow("6000.5.1f1", "") },
-		"open a project":    func(m *Model) tea.Cmd { return m.runOpen(m.projectsTab.Items()[0]) },
+		"open a project":    func(m *Model) tea.Cmd { r := m.projectsTab.Items()[0]; return m.runOpen(r, m.planOpen(r)) },
 		"pin a project":     func(m *Model) tea.Cmd { return m.togglePin(m.projectsTab.Items()[0]) },
 		"create a project": func(m *Model) tea.Cmd {
 			return m.createProject(newProject{name: "G", parent: t.TempDir()}, unitycli.CreateOptions{}, "", nil)
