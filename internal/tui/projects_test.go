@@ -686,7 +686,7 @@ func TestNewProjectNeedsAnEditorAndTheCLI(t *testing.T) {
 
 func TestCompleteDir(t *testing.T) {
 	dir := t.TempDir()
-	for _, d := range []string{"alpha", "alpine", "beta"} {
+	for _, d := range []string{"alpha", "alpine", "beta", "xа", "xб"} {
 		os.MkdirAll(filepath.Join(dir, d), 0o755)
 	}
 	os.WriteFile(filepath.Join(dir, "afile"), nil, 0o644)
@@ -704,6 +704,7 @@ func TestCompleteDir(t *testing.T) {
 		{filepath.Join(dir, "afile"), nil},     // a file is not a folder
 		{filepath.Join(dir, "nope", "x"), nil}, // a missing parent
 		{dir + sep, nil},                       // alpha, alpine, beta share nothing
+		{filepath.Join(dir, "x"), nil},         // xа and xб share only x: a character is never split
 	}
 	for _, c := range cases {
 		got := completeDir(c.in)

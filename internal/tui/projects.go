@@ -549,16 +549,26 @@ func completeExpanded(text string) []string {
 	case 1:
 		return []string{filepath.Join(dir, names[0]) + string(filepath.Separator)}
 	}
-	common := names[0]
-	for _, n := range names[1:] {
-		for !strings.HasPrefix(n, common) {
-			common = common[:len(common)-1]
-		}
-	}
+	common := commonPrefix(names)
 	if len(common) > len(base) {
 		return []string{filepath.Join(dir, common)}
 	}
 	return nil
+}
+
+// commonPrefix is the longest prefix every name starts with, cut between
+// characters, never inside one.
+func commonPrefix(names []string) string {
+	common := []rune(names[0])
+	for _, n := range names[1:] {
+		r := []rune(n)
+		i := 0
+		for i < len(common) && i < len(r) && common[i] == r[i] {
+			i++
+		}
+		common = common[:i]
+	}
+	return string(common)
 }
 
 func (m *Model) addProjectPrompt() {
