@@ -398,6 +398,7 @@ func TestRemoveFromList(t *testing.T) {
 	m := newTestModel(t)
 	old := selectProject(t, m, "Old Platformer")
 	m.st.SetPending(old.Path, state.Pending{BuildTarget: "iOS"})
+	m.saveState()
 	c := useFakeCLI(t, m, map[string]fakeResp{
 		"projects remove " + old.Path + " --force": {Stdout: okJSON},
 		"projects --all": reloadProjectsResponse(),
@@ -414,6 +415,9 @@ func TestRemoveFromList(t *testing.T) {
 	if !m.st.PendingFor(old.Path).Empty() {
 		t.Error("choices for a removed project are forgotten")
 	}
+	if !state.Load(m.configDir).PendingFor(old.Path).Empty() {
+		t.Error("and that is saved at once, not only when lazyunity quits")
+	}
 	if _, err := os.Stat(old.Path); err != nil {
 		t.Error("removing from the list must not touch the folder")
 	}
@@ -428,6 +432,8 @@ func TestDeleteFromDiskNeedsTwoConfirmationsAndASafePath(t *testing.T) {
 	os.WriteFile(filepath.Join(proj, "important.txt"), []byte("x"), 0o644)
 	r := projectRow{}
 	r.Title, r.Path, r.Version = "Doomed", proj, "6000.6.8f1"
+	m.st.SetPending(proj, state.Pending{BuildTarget: "iOS"})
+	m.saveState()
 	c := useFakeCLI(t, m, map[string]fakeResp{
 		"projects remove " + proj + " --force": {Stdout: okJSON},
 		"projects --all":                       reloadProjectsResponse(),
@@ -459,6 +465,9 @@ func TestDeleteFromDiskNeedsTwoConfirmationsAndASafePath(t *testing.T) {
 	}
 	if !called(c, "projects remove "+proj+" --force") {
 		t.Errorf("the project also leaves the list: %v", calls(c))
+	}
+	if !state.Load(m.configDir).PendingFor(proj).Empty() {
+		t.Error("the deleted project's choices are forgotten, and that is saved")
 	}
 }
 

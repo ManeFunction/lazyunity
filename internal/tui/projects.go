@@ -70,6 +70,16 @@ func (m *Model) saveState() {
 	}
 }
 
+// forgetPending drops the version or platform chosen for a project and saves
+// that, when something was chosen.
+func (m *Model) forgetPending(path string) {
+	if m.st.PendingFor(path).Empty() {
+		return
+	}
+	m.st.SetPending(path, state.Pending{})
+	m.saveState()
+}
+
 // editorFor finds the installed Editor of a version.
 func (m *Model) editorFor(version string) *editorRow {
 	for i := range m.editors {
@@ -215,10 +225,7 @@ func (m *Model) onOpened(msg openedMsg) tea.Cmd {
 
 // afterOpened forgets the choices that have now been applied, and refreshes.
 func (m *Model) afterOpened(r projectRow, format string) tea.Cmd {
-	if !r.Pending.Empty() {
-		m.st.SetPending(r.Path, state.Pending{})
-		m.saveState()
-	}
+	m.forgetPending(r.Path)
 	m.toastf(toastOK, format, r.name(), r.effVersion())
 	if m.cfg.QuitAfterOpen {
 		m.quit = true
@@ -430,7 +437,7 @@ func (m *Model) removeMenu(r projectRow) {
 				return m.runCLI("Removing "+r.name(), "Removed "+r.name()+" from the list",
 					func(ctx context.Context, _ *unitycli.Client) error { return c.RemoveProjects(ctx, r.Path) },
 					func(m *Model) tea.Cmd {
-						m.st.SetPending(r.Path, state.Pending{})
+						m.forgetPending(r.Path)
 						return m.loadProjectsCmd()
 					})
 			},
@@ -487,7 +494,7 @@ func (m *Model) deleteProjectFlow(r projectRow) {
 						},
 						after: func(m *Model, err error) tea.Cmd {
 							if err == nil {
-								m.st.SetPending(r.Path, state.Pending{})
+								m.forgetPending(r.Path)
 							}
 							return m.loadProjectsCmd()
 						},
