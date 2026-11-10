@@ -13,6 +13,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/ManeFunction/lazyunity/internal/config"
+	"github.com/ManeFunction/lazyunity/internal/unitycli"
 )
 
 func init() {
@@ -215,5 +216,16 @@ func TestFindOpenUPMFallsBackToUserBin(t *testing.T) {
 	t.Cleanup(func() { lookPath = prev })
 	if got, err := findOpenUPM(); err != nil || got != want {
 		t.Errorf("findOpenUPM = %q, %v; want %q", got, err, want)
+	}
+}
+
+func TestReleaseNotesOpenInTheBrowser(t *testing.T) {
+	m := newTestModel(t)
+	opened := stubBrowser(t)
+	m.releasesTab.SetItems([]unitycli.Release{{Version: "6000.5.1f1", Architecture: "x86_64"}})
+	press(m, "2", "]")
+	press(m, "o")
+	if len(*opened) != 1 || (*opened)[0] != "https://unity.com/releases/editor/whats-new/6000.5.1f1" {
+		t.Errorf("o opens the release notes: %v", *opened)
 	}
 }

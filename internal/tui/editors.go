@@ -9,7 +9,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
-	"github.com/ManeFunction/lazyunity/internal/launch"
 	"github.com/ManeFunction/lazyunity/internal/unity"
 	"github.com/ManeFunction/lazyunity/internal/unitycli"
 )
@@ -526,13 +525,13 @@ func releaseActions() []*action {
 		{id: "releases.stream", ctx: ctxReleases, keys: []string{"ctrl+s"}, desc: "Filter by release stream (Supported, LTS, Beta, Alpha)", hint: "Stream",
 			run: func(m *Model) tea.Cmd { m.streamMenu(); return nil }},
 		on(&action{id: "releases.notes", ctx: ctxReleases, keys: []string{"o"}, desc: "Open the release notes in the browser"},
-			func(m *Model, r unitycli.Release) tea.Cmd {
-				if err := launch.OpenURL(m.goos, "https://unity.com/releases/editor/whats-new/"+r.Version); err != nil {
-					m.toastf(toastError, "Could not open the browser: %v", err)
-				}
-				return nil
-			}),
+			func(m *Model, r unitycli.Release) tea.Cmd { return m.openURL(releaseNotesURL(r.Version)) }),
 	}
+}
+
+// releaseNotesURL is the page of a release's notes.
+func releaseNotesURL(version string) string {
+	return "https://unity.com/releases/editor/whats-new/" + version
 }
 
 func (m *Model) streamMenu() {
