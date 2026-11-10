@@ -76,22 +76,19 @@ func (m *Model) projectsDir() string {
 
 // signInCmd signs the CLI in through the browser, as a task that can be cancelled.
 func (m *Model) signInCmd() tea.Cmd {
-	c := m.cli
-	if c == nil {
-		m.showCLIMissing()
-		return nil
-	}
-	return m.enqueue(&task{
-		title: "Signing in to Unity",
-		label: "sign in",
-		works: []string{"signin"},
-		msg:   "finish signing in in your browser",
-		do:    func(ctx context.Context) error { return c.Login(ctx) },
-		after: func(m *Model, err error) tea.Cmd {
-			if err == nil {
-				m.toastf(toastOK, "Signed in")
-			}
-			return m.loadAuthCmd()
-		},
+	return m.withCLI(func(c *unitycli.Client) tea.Cmd {
+		return m.enqueue(&task{
+			title: "Signing in to Unity",
+			label: "sign in",
+			works: []string{"signin"},
+			msg:   "finish signing in in your browser",
+			do:    func(ctx context.Context) error { return c.Login(ctx) },
+			after: func(m *Model, err error) tea.Cmd {
+				if err == nil {
+					m.toastf(toastOK, "Signed in")
+				}
+				return m.loadAuthCmd()
+			},
+		})
 	})
 }

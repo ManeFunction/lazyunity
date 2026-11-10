@@ -510,17 +510,44 @@ func clampF(v, lo, hi float64) float64 { return math.Min(math.Max(v, lo), hi) }
 
 // ---- quick CLI calls --------------------------------------------------------------
 
+// needCLI reports whether the Unity CLI is there to use. When it is not, it
+// tells the user that what they asked for needs it.
+func (m *Model) needCLI() bool {
+	if m.cli == nil {
+		m.showCLIMissing()
+		return false
+	}
+	return true
+}
+
+// withCLI runs f with the Unity CLI, for something the user asked for; without
+// a CLI, the user is told it is needed. Flows that use the CLI go through it,
+// and their commands use the client it hands them.
+func (m *Model) withCLI(f func(c *unitycli.Client) tea.Cmd) tea.Cmd {
+	if !m.needCLI() {
+		return nil
+	}
+	return f(m.cli)
+}
+
+// cliCmd is a call to the CLI that lazyunity makes by itself, such as a
+// reload. Without a CLI it quietly does nothing.
+func (m *Model) cliCmd(f func(ctx context.Context, c *unitycli.Client) tea.Msg) tea.Cmd {
+	c := m.cli
+	if c == nil {
+		return nil
+	}
+	return func() tea.Msg { return f(context.Background(), c) }
+}
+
 // runCLI runs a short CLI call in the background. On success ok is shown and
 // after is run; on failure an error popup opens.
 func (m *Model) runCLI(what, ok string, f func(ctx context.Context, c *unitycli.Client) error, after func(m *Model) tea.Cmd) tea.Cmd {
-	c := m.cli
-	if c == nil {
-		m.showCLIMissing()
-		return nil
-	}
-	return func() tea.Msg {
-		return cliDoneMsg{what: what, ok: ok, err: f(context.Background(), c), after: after}
-	}
+	return m.withCLI(func(c *unitycli.Client) tea.Cmd {
+		return func() tea.Msg {
+			return cliDoneMsg{what: what, ok: ok, err: f(context.Background(), c), after: after}
+		}
+	})
 }
 
 func (m *Model) onCLIDone(msg cliDoneMsg) tea.Cmd {

@@ -292,11 +292,7 @@ func tick() tea.Cmd {
 
 // Init starts the slow loads; what was cheap to load is already in place.
 func (m *Model) Init() tea.Cmd {
-	cmds := []tea.Cmd{tick(), probeOpenUPMCmd()}
-	if m.cli != nil {
-		cmds = append(cmds, m.loadEditorsCmd(), m.loadAuthCmd(), m.loadInstallPathCmd())
-	}
-	return tea.Batch(cmds...)
+	return tea.Batch(tick(), probeOpenUPMCmd(), m.loadEditorsCmd(), m.loadAuthCmd(), m.loadInstallPathCmd())
 }
 
 // Update handles every message.

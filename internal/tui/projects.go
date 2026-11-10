@@ -170,7 +170,6 @@ func (m *Model) directLaunch(r projectRow, ed *editorRow) tea.Cmd {
 
 // runOpen opens the project through the CLI, which signs the Editor in.
 func (m *Model) runOpen(r projectRow) tea.Cmd {
-	c := m.cli
 	opts := unitycli.OpenOptions{Project: r.Path}
 	if r.versionChanged() {
 		opts.EditorVersion = r.Pending.Version
@@ -180,11 +179,13 @@ func (m *Model) runOpen(r projectRow) tea.Cmd {
 			opts.BuildTarget = p.CLITarget
 		}
 	}
-	m.toastf(toastInfo, "Opening %s…", r.name())
-	return func() tea.Msg {
-		res, err := c.Open(context.Background(), opts)
-		return openedMsg{row: r, res: res, err: err}
-	}
+	return m.withCLI(func(c *unitycli.Client) tea.Cmd {
+		m.toastf(toastInfo, "Opening %s…", r.name())
+		return func() tea.Msg {
+			res, err := c.Open(context.Background(), opts)
+			return openedMsg{row: r, res: res, err: err}
+		}
+	})
 }
 
 func (m *Model) onOpened(msg openedMsg) tea.Cmd {
@@ -230,23 +231,24 @@ func (m *Model) afterOpened(r projectRow, format string) tea.Cmd {
 func (m *Model) upgradeMenu(r projectRow, to string) {
 	run := func(cloud unitycli.CloudChoice) func(*Model) tea.Cmd {
 		return func(m *Model) tea.Cmd {
-			c := m.cli
-			return m.enqueue(&task{
-				title: fmt.Sprintf("Upgrading %s to %s", r.name(), to),
-				label: r.name() + " → " + to,
-				works: []string{workProject(r.Path)},
-				msg:   "Unity is upgrading the project; it opens when ready",
-				do:    func(ctx context.Context) error { return c.UpgradeProject(ctx, r.Path, to, cloud) },
-				after: func(m *Model, err error) tea.Cmd {
-					if err != nil {
-						return nil
-					}
-					// the upgrade applies the version only: a platform choice
-					// waits for the next open
-					m.st.SetPending(r.Path, state.Pending{BuildTarget: r.Pending.BuildTarget})
-					m.saveState()
-					return m.loadProjectsCmd()
-				},
+			return m.withCLI(func(c *unitycli.Client) tea.Cmd {
+				return m.enqueue(&task{
+					title: fmt.Sprintf("Upgrading %s to %s", r.name(), to),
+					label: r.name() + " → " + to,
+					works: []string{workProject(r.Path)},
+					msg:   "Unity is upgrading the project; it opens when ready",
+					do:    func(ctx context.Context) error { return c.UpgradeProject(ctx, r.Path, to, cloud) },
+					after: func(m *Model, err error) tea.Cmd {
+						if err != nil {
+							return nil
+						}
+						// the upgrade applies the version only: a platform choice
+						// waits for the next open
+						m.st.SetPending(r.Path, state.Pending{BuildTarget: r.Pending.BuildTarget})
+						m.saveState()
+						return m.loadProjectsCmd()
+					},
+				})
 			})
 		}
 	}
@@ -364,14 +366,13 @@ func (m *Model) setPendingTarget(r projectRow, target string) {
 // ---- pin, sort, remove --------------------------------------------------------------
 
 func (m *Model) togglePin(r projectRow) tea.Cmd {
-	c := m.cli
 	pin := !r.IsFavorite
 	ok := "Pinned " + r.name()
 	if !pin {
 		ok = "Unpinned " + r.name()
 	}
 	return m.runCLI("Pinning "+r.name(), ok,
-		func(ctx context.Context, _ *unitycli.Client) error { return c.SetPinned(ctx, r.Path, pin) },
+		func(ctx context.Context, c *unitycli.Client) error { return c.SetPinned(ctx, r.Path, pin) },
 		func(m *Model) tea.Cmd { m.selectAfterLoad = r.Path; return m.loadProjectsCmd() })
 }
 
@@ -392,13 +393,12 @@ func (m *Model) sortMenu() {
 }
 
 func (m *Model) removeMenu(r projectRow) {
-	c := m.cli
 	menu := newMenu("Remove "+r.name(), []menuItem{
 		{
 			label: "Remove from the list", desc: "The folder and its files stay on disk. You can add the project again later.",
 			run: func(m *Model) tea.Cmd {
 				return m.runCLI("Removing "+r.name(), "Removed "+r.name()+" from the list",
-					func(ctx context.Context, _ *unitycli.Client) error { return c.RemoveProjects(ctx, r.Path) },
+					func(ctx context.Context, c *unitycli.Client) error { return c.RemoveProjects(ctx, r.Path) },
 					func(m *Model) tea.Cmd {
 						m.forgetPending(r.Path)
 						return m.loadProjectsCmd()
@@ -557,9 +557,8 @@ func (m *Model) addProjectPrompt() {
 		},
 		onSubmit: func(m *Model, text string) tea.Cmd {
 			path := filepath.Clean(config.ExpandHome(text))
-			c := m.cli
 			return m.runCLI("Adding the project", "Added "+filepath.Base(path),
-				func(ctx context.Context, _ *unitycli.Client) error { return c.AddProjects(ctx, path) },
+				func(ctx context.Context, c *unitycli.Client) error { return c.AddProjects(ctx, path) },
 				func(m *Model) tea.Cmd { m.selectAfterLoad = path; return m.loadProjectsCmd() })
 		},
 	})
@@ -654,16 +653,13 @@ type projectInfoMsg struct {
 }
 
 func (m *Model) projectInfoCmd(r projectRow) tea.Cmd {
-	c := m.cli
-	if c == nil {
-		m.showCLIMissing()
-		return nil
-	}
-	m.toastf(toastInfo, "Reading %s…", r.name())
-	return func() tea.Msg {
-		info, err := c.ProjectInfo(context.Background(), r.Path)
-		return projectInfoMsg{row: r, info: info, err: err}
-	}
+	return m.withCLI(func(c *unitycli.Client) tea.Cmd {
+		m.toastf(toastInfo, "Reading %s…", r.name())
+		return func() tea.Msg {
+			info, err := c.ProjectInfo(context.Background(), r.Path)
+			return projectInfoMsg{row: r, info: info, err: err}
+		}
+	})
 }
 
 func (m *Model) onProjectInfo(msg projectInfoMsg) {
@@ -764,13 +760,12 @@ func (m *Model) copyChoices(wanted int, choices [][2]string) {
 }
 
 func (m *Model) cleanConfirm(r projectRow) {
-	c := m.cli
 	m.push(&confirmPopup{
 		title: "Clean project", yes: "Clean", danger: true,
 		message: fmt.Sprintf("Delete the regenerable folders of %s (Library, Temp, Logs ...)? Your assets are not touched, but Unity has to rebuild the Library the next time you open it, which can take a long time.", r.name()),
 		onYes: func(m *Model) tea.Cmd {
 			return m.runCLI("Cleaning "+r.name(), "Cleaned "+r.name(),
-				func(ctx context.Context, _ *unitycli.Client) error { return c.CleanProject(ctx, r.Path) }, nil)
+				func(ctx context.Context, c *unitycli.Client) error { return c.CleanProject(ctx, r.Path) }, nil)
 		},
 	})
 }

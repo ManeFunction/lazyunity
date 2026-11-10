@@ -31,8 +31,7 @@ type templatesMsg struct {
 }
 
 func (m *Model) startNewProject() tea.Cmd {
-	if m.cli == nil {
-		m.showCLIMissing()
+	if !m.needCLI() {
 		return nil
 	}
 	if len(m.editors) == 0 {
@@ -120,12 +119,13 @@ func (m *Model) newProjectEditor(w newProject) {
 }
 
 func (m *Model) loadTemplatesCmd(w newProject) tea.Cmd {
-	c := m.cli
-	m.toastf(toastInfo, "Looking up templates…")
-	return func() tea.Msg {
-		items, err := c.Templates(context.Background(), w.version)
-		return templatesMsg{wiz: w, items: items, err: err}
-	}
+	return m.withCLI(func(c *unitycli.Client) tea.Cmd {
+		m.toastf(toastInfo, "Looking up templates…")
+		return func() tea.Msg {
+			items, err := c.Templates(context.Background(), w.version)
+			return templatesMsg{wiz: w, items: items, err: err}
+		}
+	})
 }
 
 func (m *Model) onTemplates(msg templatesMsg) {
@@ -221,7 +221,10 @@ func openupmAdd(ctx context.Context, exe, dir string, packages []string) error {
 // createProject creates the project. With packages, they are added with the
 // OpenUPM CLI before the Editor opens, so Unity resolves everything at once.
 func (m *Model) createProject(w newProject, opts unitycli.CreateOptions, openupm string, packages []string) tea.Cmd {
-	c := m.cli
+	return m.withCLI(func(c *unitycli.Client) tea.Cmd { return m.queueCreate(c, w, opts, openupm, packages) })
+}
+
+func (m *Model) queueCreate(c *unitycli.Client, w newProject, opts unitycli.CreateOptions, openupm string, packages []string) tea.Cmd {
 	open := opts.Open
 	if len(packages) > 0 {
 		opts.Open = false

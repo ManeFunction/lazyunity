@@ -461,3 +461,39 @@ func TestAQueueShowsShortLabels(t *testing.T) {
 	}
 	m.cancelTasks()
 }
+
+// Every flow that needs the CLI says so when there is none, including the ones
+// reached from a popup that was opened while there still was one.
+func TestFlowsWithoutTheCLIExplainItIsNeeded(t *testing.T) {
+	flows := map[string]func(m *Model) tea.Cmd{
+		"plan an install":   func(m *Model) tea.Cmd { return m.planInstall(unitycli.InstallOptions{Version: "6000.5.1f1"}) },
+		"list templates":    func(m *Model) tea.Cmd { return m.loadTemplatesCmd(newProject{name: "G", version: "6000.6.8f1"}) },
+		"install an Editor": func(m *Model) tea.Cmd { return m.installEditorFlow("6000.5.1f1", "") },
+		"open a project":    func(m *Model) tea.Cmd { return m.runOpen(m.projectsTab.Items()[0]) },
+		"pin a project":     func(m *Model) tea.Cmd { return m.togglePin(m.projectsTab.Items()[0]) },
+		"create a project": func(m *Model) tea.Cmd {
+			return m.createProject(newProject{name: "G", parent: t.TempDir()}, unitycli.CreateOptions{}, "", nil)
+		},
+		"remove a module": func(m *Model) tea.Cmd {
+			m.removeModuleConfirm(m.editors[0], unitycli.Module{ID: "webgl", Name: "WebGL"})
+			m.cli = nil // the CLI went away while the question was open
+			_, cmd := m.Update(keyMsg("enter"))
+			return cmd
+		},
+	}
+	for name, flow := range flows {
+		m := newTestModel(t)
+		if name != "remove a module" {
+			m.cli = nil
+		} else {
+			useFakeCLI(t, m, nil)
+		}
+		drain(m, flow(m))
+		if len(m.popups) == 0 || !strings.Contains(screenText(m), "Unity CLI needed") {
+			t.Errorf("%s without the CLI should say it is needed:\n%s", name, screenText(m))
+		}
+		if len(m.tasks) != 0 {
+			t.Errorf("%s without the CLI queued a task", name)
+		}
+	}
+}

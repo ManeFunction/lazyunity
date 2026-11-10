@@ -86,12 +86,8 @@ const (
 // ---- commands -----------------------------------------------------------------
 
 func (m *Model) loadProjectsCmd() tea.Cmd {
-	c := m.cli
-	if c == nil {
-		return nil
-	}
-	return func() tea.Msg {
-		ps, err := c.Projects(context.Background())
+	return m.cliCmd(func(ctx context.Context, c *unitycli.Client) tea.Msg {
+		ps, err := c.Projects(ctx)
 		missing := map[string]bool{}
 		for _, p := range ps {
 			if _, serr := os.Stat(p.Path); serr != nil {
@@ -99,18 +95,14 @@ func (m *Model) loadProjectsCmd() tea.Cmd {
 			}
 		}
 		return projectsMsg{projects: ps, missing: missing, err: err}
-	}
+	})
 }
 
 func (m *Model) loadEditorsCmd() tea.Cmd {
-	c := m.cli
-	if c == nil {
-		return nil
-	}
-	return func() tea.Msg {
-		eds, err := c.Editors(context.Background())
+	return m.cliCmd(func(ctx context.Context, c *unitycli.Client) tea.Msg {
+		eds, err := c.Editors(ctx)
 		return editorsMsg{editors: eds, err: err}
-	}
+	})
 }
 
 func (m *Model) scanEditorsCmd() tea.Cmd {
@@ -119,31 +111,22 @@ func (m *Model) scanEditorsCmd() tea.Cmd {
 }
 
 func (m *Model) loadAuthCmd() tea.Cmd {
-	c := m.cli
-	if c == nil {
-		return nil
-	}
-	return func() tea.Msg {
-		info, err := c.AuthStatus(context.Background())
+	return m.cliCmd(func(ctx context.Context, c *unitycli.Client) tea.Msg {
+		info, err := c.AuthStatus(ctx)
 		return authMsg{info: info, err: err}
-	}
+	})
 }
 
 func (m *Model) loadInstallPathCmd() tea.Cmd {
-	c := m.cli
-	if c == nil {
-		return nil
-	}
-	return func() tea.Msg {
-		p, err := c.InstallPath(context.Background())
+	return m.cliCmd(func(ctx context.Context, c *unitycli.Client) tea.Msg {
+		p, err := c.InstallPath(ctx)
 		return installPathMsg{path: p, err: err}
-	}
+	})
 }
 
 // loadReleasesCmd loads a page of releases. With reset the list starts over.
 func (m *Model) loadReleasesCmd(reset bool) tea.Cmd {
-	c := m.cli
-	if c == nil || m.releases.loading {
+	if m.releases.loading {
 		return nil
 	}
 	offset := m.releases.nextOffset
@@ -155,11 +138,14 @@ func (m *Model) loadReleasesCmd(reset bool) tea.Cmd {
 	if m.releasesTab.filter() != "" {
 		limit = releasesPerSearch
 	}
-	m.releases.loading = true
-	load := func() tea.Msg {
-		page, err := c.Releases(context.Background(), stream, offset, limit)
+	load := m.cliCmd(func(ctx context.Context, c *unitycli.Client) tea.Msg {
+		page, err := c.Releases(ctx, stream, offset, limit)
 		return releasesMsg{stream: stream, gen: gen, offset: offset, page: page, err: err}
+	})
+	if load == nil {
+		return nil
 	}
+	m.releases.loading = true
 	return tea.Batch(load, m.startSpinner())
 }
 
@@ -174,13 +160,13 @@ func (m *Model) searchReleasesCmd() tea.Cmd {
 
 // refreshAllCmd reloads everything.
 func (m *Model) refreshAllCmd() tea.Cmd {
-	cmds := []tea.Cmd{m.scanEditorsCmd(), probeOpenUPMCmd()}
-	if m.cli != nil {
-		cmds = append(cmds, m.loadProjectsCmd(), m.loadEditorsCmd(), m.loadAuthCmd(), m.loadInstallPathCmd())
-		if m.releases.loaded {
-			m.releases = releasesState{stream: m.releases.stream, gen: m.releases.gen + 1}
-			cmds = append(cmds, m.loadReleasesCmd(true))
-		}
+	cmds := []tea.Cmd{
+		m.scanEditorsCmd(), probeOpenUPMCmd(),
+		m.loadProjectsCmd(), m.loadEditorsCmd(), m.loadAuthCmd(), m.loadInstallPathCmd(),
+	}
+	if m.releases.loaded {
+		m.releases = releasesState{stream: m.releases.stream, gen: m.releases.gen + 1}
+		cmds = append(cmds, m.loadReleasesCmd(true))
 	}
 	return tea.Batch(cmds...)
 }
