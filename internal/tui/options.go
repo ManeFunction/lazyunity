@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -286,7 +287,8 @@ func (m *Model) onLicense(msg licenseMsg) {
 		}
 	}
 	if msg.err != nil {
-		if e, ok := msg.err.(*unitycli.Error); ok && e.NeedsConfig() {
+		var e *unitycli.Error
+		if errors.As(msg.err, &e) && e.NeedsConfig() {
 			lines = append([]string{"No active license. Choose \"Activate the free Personal license\" in this menu.", ""}, lines...)
 		} else {
 			m.showError("License status", msg.err)

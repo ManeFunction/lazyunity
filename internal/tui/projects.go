@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -191,7 +192,7 @@ func (m *Model) onOpened(msg openedMsg) tea.Cmd {
 	if msg.err != nil {
 		var e *unitycli.Error
 		text := msg.err.Error()
-		if asCLIError(msg.err, &e) && e.Output != "" {
+		if errors.As(msg.err, &e) && e.Output != "" {
 			text += "\n\n" + e.Output
 		}
 		ed := m.editorFor(r.effVersion())
@@ -222,14 +223,6 @@ func (m *Model) afterOpened(r projectRow, format string) tea.Cmd {
 		m.quit = true
 	}
 	return m.loadProjectsCmd()
-}
-
-func asCLIError(err error, target **unitycli.Error) bool {
-	e, ok := err.(*unitycli.Error)
-	if ok {
-		*target = e
-	}
-	return ok
 }
 
 // upgradeMenu offers to upgrade a project to Unity 6.7 or later, which `open`

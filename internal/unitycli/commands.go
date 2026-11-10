@@ -3,6 +3,7 @@ package unitycli
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -439,7 +440,8 @@ func (c *Client) AuthStatus(ctx context.Context) (AuthInfo, error) {
 	var info AuthInfo
 	env, err := c.Run(ctx, "auth", "status")
 	if err != nil {
-		if e, ok := err.(*Error); ok && e.NotSignedIn() {
+		var e *Error
+		if errors.As(err, &e) && e.NotSignedIn() {
 			return info, nil
 		}
 		return info, err
