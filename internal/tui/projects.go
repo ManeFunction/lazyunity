@@ -295,12 +295,7 @@ func (m *Model) versionMenu(r projectRow) {
 			run: func(m *Model) tea.Cmd { m.setPendingVersion(r, v); return nil },
 		})
 	}
-	items = append(items, menuItem{label: "Install another version…", run: func(m *Model) tea.Cmd {
-		m.setFocus(panelEditors)
-		m.panels[panelEditors].drill = nil
-		m.panels[panelEditors].cur = 1
-		return m.afterTabSwitch()
-	}})
+	items = append(items, menuItem{label: "Install another version…", run: (*Model).showReleases})
 	menu := newMenu("Unity version for "+r.name(), items)
 	menu.wanted = 48
 	// start on the version in use
