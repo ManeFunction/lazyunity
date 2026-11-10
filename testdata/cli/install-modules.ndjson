@@ -1,0 +1,7 @@
+{"type":"progress","pct":0,"msg":"Starting install...","phase":"download"}
+{"type":"progress","pct":11,"msg":"Downloading 日本語...","phase":"download"}
+{"type":"progress","pct":100,"msg":"Downloading 日本語...","phase":"download"}
+{"type":"progress","pct":100,"msg":"Validating...","phase":"download"}
+{"type":"progress","pct":50,"msg":"Installing 日本語...","phase":"install"}
+{"type":"progress","pct":100,"msg":"Install complete"}
+{"type":"result","success":true,"command":"install-modules","data":{"completedUids":["language-ja"],"items":[{"uid":"language-ja","name":"日本語","kind":"module","status":"installed"}]},"errors":[],"warnings":[]}

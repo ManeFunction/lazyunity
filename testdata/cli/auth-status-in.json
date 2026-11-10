@@ -1,0 +1,14 @@
+{
+ "success": true,
+ "data": {
+  "loggedIn": true,
+  "sessionState": "active",
+  "mode": "oauth",
+  "credentialSource": "keyring",
+  "user": {
+   "name": "Test User",
+   "email": "test@example.com"
+  }
+ },
+ "errors": []
+}

@@ -1,0 +1,27 @@
+{
+ "success": true,
+ "command": "templates list",
+ "data": {
+  "items": [
+   {
+    "name": "com.unity.template.universal-2d",
+    "displayName": "Universal 2D",
+    "type": "CORE",
+    "version": "7.0.0",
+    "status": "ready"
+   },
+   {
+    "name": "com.unity.template.urp-blank",
+    "displayName": "3D URP",
+    "type": "CORE",
+    "version": "17.2.6",
+    "status": "ready"
+   }
+  ],
+  "total": 2,
+  "nextPage": null,
+  "partial": false
+ },
+ "errors": [],
+ "warnings": []
+}

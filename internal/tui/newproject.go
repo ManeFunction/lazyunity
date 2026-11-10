@@ -1,0 +1,251 @@
+package tui
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+
+	tea "charm.land/bubbletea/v2"
+
+	"github.com/ManeFunction/lazyunity/internal/unitycli"
+)
+
+// newProject is the state of the "new project" wizard: name, location, Editor,
+// template, options. Each step is a popup; Esc anywhere cancels.
+type newProject struct {
+	name    string
+	parent  string
+	version string
+}
+
+func (w newProject) path() string { return filepath.Join(w.parent, w.name) }
+
+type templatesMsg struct {
+	wiz   newProject
+	items []unitycli.Template
+	err   error
+}
+
+func (m *Model) startNewProject() tea.Cmd {
+	if m.cli == nil {
+		m.showCLIMissing()
+		return nil
+	}
+	if len(m.editors) == 0 {
+		m.toastf(toastWarn, "Install a Unity Editor first")
+		return m.showReleases()
+	}
+	m.push(&promptPopup{
+		title: "New project (1/5)", label: "Name of the project:", in: newInput(""),
+		validate: validateProjectName,
+		onSubmit: func(m *Model, name string) tea.Cmd {
+			m.newProjectLocation(newProject{name: name})
+			return nil
+		},
+	})
+	return nil
+}
+
+// validateProjectName rejects names that are not a single, plain folder name.
+func validateProjectName(name string) string {
+	switch {
+	case name == "":
+		return "Give the project a name"
+	case name == "." || name == "..":
+		return "That is not a usable name"
+	case strings.ContainsAny(name, `/\`):
+		return "A name cannot contain / or \\"
+	case strings.ContainsAny(name, `<>:"|?*`) || strings.ContainsRune(name, 0):
+		return `A name cannot contain < > : " | ? *`
+	case strings.TrimSpace(name) != name || strings.HasSuffix(name, "."):
+		return "A name cannot start with a space or end with a space or dot"
+	}
+	return ""
+}
+
+func (m *Model) newProjectLocation(w newProject) {
+	m.push(&promptPopup{
+		title: "New project (2/5)", label: "Create it in this folder:",
+		in:       newInput(displayPath(m.projectsDir()) + string(filepath.Separator)),
+		complete: completeDir,
+		validate: func(text string) string {
+			p := expandHome(text)
+			if st, err := os.Stat(p); err != nil || !st.IsDir() {
+				return "That folder does not exist"
+			}
+			if _, err := os.Stat(filepath.Join(p, w.name)); err == nil {
+				return "There is already something called " + w.name + " there"
+			}
+			return ""
+		},
+		onSubmit: func(m *Model, text string) tea.Cmd {
+			w.parent = filepath.Clean(expandHome(text))
+			m.newProjectEditor(w)
+			return nil
+		},
+	})
+}
+
+func (m *Model) newProjectEditor(w newProject) {
+	var items []menuItem
+	pick := 0
+	for i, e := range m.editors {
+		tags := []string{}
+		if e.Default {
+			tags = append(tags, "default")
+			pick = i
+		}
+		if e.LTS {
+			tags = append(tags, "LTS")
+		}
+		v := e.Version
+		items = append(items, menuItem{
+			label: e.Version, right: strings.Join(tags, ", "),
+			run: func(m *Model) tea.Cmd {
+				return m.loadTemplatesCmd(newProject{name: w.name, parent: w.parent, version: v})
+			},
+		})
+	}
+	menu := newMenu("New project (3/5): Unity version", items)
+	menu.wanted = 44
+	for i := 0; i < pick; i++ {
+		menu.list.Move(1)
+	}
+	m.push(menu)
+}
+
+func (m *Model) loadTemplatesCmd(w newProject) tea.Cmd {
+	c := m.cli
+	m.toastf(toastInfo, "Looking up templates…")
+	return func() tea.Msg {
+		items, err := c.Templates(context.Background(), w.version)
+		return templatesMsg{wiz: w, items: items, err: err}
+	}
+}
+
+func (m *Model) onTemplates(msg templatesMsg) {
+	if msg.err != nil {
+		m.showError("Listing templates", msg.err)
+		return
+	}
+	if len(msg.items) == 0 {
+		m.toastf(toastWarn, "Unity %s has no project templates installed", msg.wiz.version)
+		return
+	}
+	var items []menuItem
+	for _, t := range msg.items {
+		tpl := t
+		name := t.DisplayName
+		if name == "" {
+			name = t.Name
+		}
+		items = append(items, menuItem{
+			label: name, right: t.Version, desc: t.Name,
+			run: func(m *Model) tea.Cmd { m.newProjectOptions(msg.wiz, tpl.Name); return nil },
+		})
+	}
+	menu := newMenu("New project (4/5): template", items)
+	menu.wanted = 44
+	m.push(menu)
+}
+
+func (m *Model) newProjectOptions(w newProject, template string) {
+	items := []menuItem{
+		{label: "Link to Unity Cloud", desc: "Create a Unity Cloud project for it. Needs you to be signed in."},
+		{label: "Add Unity's recommended packages and settings", desc: "Without this, the project is just the template.", checked: true},
+	}
+	const manetoolsFull, manetoolsCore = "Add ManeTools (full)", "Add ManeTools (w/o UI module)"
+	openupm := m.openupm.path
+	if openupm != "" {
+		items = append(items,
+			menuItem{label: manetoolsFull, group: "manetools",
+				desc: "Adds " + strings.Join(manetoolsFullPackages, " and ") + " from OpenUPM."},
+			menuItem{label: manetoolsCore, group: "manetools",
+				desc: "Adds " + strings.Join(manetoolsCorePackages, " and ") + " from OpenUPM, without the UI module."})
+	} else {
+		items = append(items, menuItem{label: "Add ManeTools (install OpenUPM to use)", disabled: "Install the OpenUPM CLI first (Options, Tools)",
+			desc: "ManeTools come from OpenUPM. Install the OpenUPM CLI in the Tools tab, then create the project."})
+	}
+	menu := newMenu("New project (5/5): options", items)
+	menu.multi = true
+	menu.wanted = 56
+	menu.submit = func(m *Model, picked []menuItem) tea.Cmd {
+		opts := unitycli.CreateOptions{
+			Name: w.name, ParentDir: w.parent, EditorVersion: w.version, Template: template,
+			Cloud: unitycli.CloudOff, Bare: true, Open: true,
+		}
+		var packages []string
+		for _, p := range picked {
+			switch p.label {
+			case "Link to Unity Cloud":
+				opts.Cloud = unitycli.CloudNew
+			case manetoolsFull:
+				packages = manetoolsFullPackages
+			case manetoolsCore:
+				packages = manetoolsCorePackages
+			default:
+				opts.Bare = false
+			}
+		}
+		return m.createProject(w, opts, openupm, packages)
+	}
+	m.push(menu)
+}
+
+// The ManeTools packages on OpenUPM.
+var (
+	manetoolsCorePackages = []string{"com.manefunction.tools-unity"}
+	manetoolsFullPackages = []string{"com.manefunction.tools-unity", "com.manefunction.tools-unity-ui"}
+)
+
+// openupmAdd adds packages to the project in dir with the OpenUPM CLI.
+func openupmAdd(ctx context.Context, exe, dir string, packages []string) error {
+	cmd := exec.CommandContext(ctx, exe, append([]string{"add"}, packages...)...)
+	cmd.Dir = dir
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("openupm add %s: %w: %s", strings.Join(packages, " "), err, strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
+// createProject creates the project. With packages, they are added with the
+// OpenUPM CLI before the Editor opens, so Unity resolves everything at once.
+func (m *Model) createProject(w newProject, opts unitycli.CreateOptions, openupm string, packages []string) tea.Cmd {
+	c := m.cli
+	open := opts.Open
+	if len(packages) > 0 {
+		opts.Open = false
+	}
+	return m.enqueue(&task{
+		title: "Creating " + w.name,
+		label: "create " + w.name,
+		works: []string{workProject(w.path())},
+		msg:   "Unity is creating the project; it opens when ready",
+		do: func(ctx context.Context) error {
+			if err := c.CreateProject(ctx, opts); err != nil {
+				return err
+			}
+			if len(packages) == 0 {
+				return nil
+			}
+			if err := openupmAdd(ctx, openupm, w.path(), packages); err != nil {
+				return fmt.Errorf("the project was created, but ManeTools were not added: %w", err)
+			}
+			if open {
+				_, err := c.Open(ctx, unitycli.OpenOptions{Project: w.path(), EditorVersion: w.version})
+				return err
+			}
+			return nil
+		},
+		after: func(m *Model, err error) tea.Cmd {
+			if err == nil {
+				m.toastf(toastOK, "Created %s", w.name)
+				m.selectAfterLoad = w.path()
+			}
+			return m.loadProjectsCmd()
+		},
+	})
+}

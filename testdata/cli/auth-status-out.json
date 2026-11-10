@@ -1,0 +1,12 @@
+{
+ "success": false,
+ "data": {
+  "loggedIn": false
+ },
+ "errors": [
+  {
+   "code": "NOT_SIGNED_IN",
+   "message": "Not signed in"
+  }
+ ]
+}

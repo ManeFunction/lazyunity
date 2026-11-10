@@ -1,0 +1,9 @@
+{
+ "success": true,
+ "command": "install-path",
+ "data": {
+  "path": "/home/user/Unity/Hub/Editor"
+ },
+ "errors": [],
+ "warnings": []
+}

@@ -1,0 +1,33 @@
+{
+ "success": true,
+ "command": "projects list",
+ "data": {
+  "items": [
+   {
+    "title": "Demo Project",
+    "sourceFingerprint": "1793890375239.104,1793788234574.83,1777150031562.20466,0,0,1793879600278.10058,1777150330228.2559,0,1793788139644.8864,0,0,0,0,0|spn:false;eds:",
+    "lastModified": 1793890375239,
+    "isCustomEditor": false,
+    "path": "/home/user/Projects/Demo Project",
+    "containingFolderPath": "/home/user/Projects",
+    "version": "6000.6.8f1",
+    "architecture": "x86_64",
+    "changeset": "237b6593792b",
+    "isFavorite": false,
+    "genesisOrgId": "0",
+    "organizationId": "0",
+    "localProjectId": "00000000000000000000000000000000",
+    "cloudEnabled": true,
+    "hasCustomDisplayName": false,
+    "buildTarget": "StandaloneLinux64",
+    "renderPipeline": "URP",
+    "openInEditorUrl": ""
+   }
+  ],
+  "total": 1,
+  "nextPage": null,
+  "partial": false
+ },
+ "errors": [],
+ "warnings": []
+}

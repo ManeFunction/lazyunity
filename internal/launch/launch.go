@@ -1,0 +1,171 @@
+// Package launch starts programs that must outlive lazyunity: a Unity Editor
+// opened directly, the file manager, a code editor.
+package launch
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"net/url"
+	"os"
+	"os/exec"
+	"strings"
+	"time"
+)
+
+// Editor starts a Unity Editor directly, without the Unity CLI. The Editor then
+// starts signed out. It runs on its own, detached from the terminal.
+func Editor(exe, project, buildTarget string) error {
+	args := []string{"-projectPath", project}
+	if buildTarget != "" {
+		args = append(args, "-buildTarget", buildTarget)
+	}
+	return start(exec.Command(exe, args...))
+}
+
+// OpenFolder shows dir in the file manager. tmpl, when not empty, is the command
+// to run instead of the system's default; {{dir}} stands for the folder.
+//
+// On Linux the file manager is asked over D-Bus first (the same call that "show
+// in folder" uses), because xdg-open follows the inode/directory handler, which
+// can be a terminal. xdg-open is the fallback.
+func OpenFolder(goos, tmpl, dir string) error {
+	if goos == "linux" && strings.TrimSpace(tmpl) == "" && showFolderDBus(dir) {
+		return nil
+	}
+	return openWith(goos, tmpl, dir)
+}
+
+func openWith(goos, tmpl, dir string) error {
+	argv, err := FolderCommand(goos, tmpl, dir)
+	if err != nil {
+		return err
+	}
+	return start(exec.Command(argv[0], argv[1:]...))
+}
+
+// showFolderDBus asks org.freedesktop.FileManager1 to show dir. It reports
+// whether a file manager took the request.
+func showFolderDBus(dir string) bool {
+	gdbus, err := exec.LookPath("gdbus")
+	if err != nil {
+		return false
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	uri := (&url.URL{Scheme: "file", Path: dir}).String()
+	cmd := exec.CommandContext(ctx, gdbus, "call", "--session",
+		"--dest", "org.freedesktop.FileManager1", "--object-path", "/org/freedesktop/FileManager1",
+		"--method", "org.freedesktop.FileManager1.ShowFolders", "['"+uri+"']", "")
+	return cmd.Run() == nil
+}
+
+// OpenURL opens a web page in the default browser.
+func OpenURL(goos, link string) error {
+	return openWith(goos, "", link) // the same system command opens both
+}
+
+// FolderCommand is the command OpenFolder runs.
+func FolderCommand(goos, tmpl, dir string) ([]string, error) {
+	if strings.TrimSpace(tmpl) != "" {
+		return Expand(tmpl, dir)
+	}
+	switch goos {
+	case "windows":
+		return []string{"explorer", dir}, nil
+	case "darwin":
+		return []string{"open", dir}, nil
+	}
+	return []string{"xdg-open", dir}, nil
+}
+
+// Run starts a command line detached. {{dir}} in tmpl stands for dir.
+func Run(tmpl, dir string) error {
+	argv, err := Expand(tmpl, dir)
+	if err != nil {
+		return err
+	}
+	return start(exec.Command(argv[0], argv[1:]...))
+}
+
+// Expand splits a command line into words and puts dir where {{dir}} is. The
+// substitution happens after the splitting, so a folder with spaces in its name
+// stays one argument.
+func Expand(tmpl, dir string) ([]string, error) {
+	words, err := Split(tmpl)
+	if err != nil {
+		return nil, err
+	}
+	if len(words) == 0 {
+		return nil, errors.New("empty command")
+	}
+	for i, w := range words {
+		words[i] = strings.ReplaceAll(w, "{{dir}}", dir)
+	}
+	return words, nil
+}
+
+// Split cuts a command line into words. Single and double quotes group words
+// and a backslash escapes the next character, as in a shell, but nothing is
+// ever expanded.
+func Split(s string) ([]string, error) {
+	var words []string
+	var cur strings.Builder
+	inWord := false
+	var quote rune
+	escaped := false
+	for _, r := range s {
+		switch {
+		case escaped:
+			cur.WriteRune(r)
+			escaped = false
+		case r == '\\' && quote != '\'':
+			escaped = true
+			inWord = true
+		case quote != 0:
+			if r == quote {
+				quote = 0
+			} else {
+				cur.WriteRune(r)
+			}
+		case r == '\'' || r == '"':
+			quote = r
+			inWord = true
+		case r == ' ' || r == '\t':
+			if inWord {
+				words = append(words, cur.String())
+				cur.Reset()
+				inWord = false
+			}
+		default:
+			cur.WriteRune(r)
+			inWord = true
+		}
+	}
+	if quote != 0 {
+		return nil, fmt.Errorf("unterminated %c in command", quote)
+	}
+	if escaped {
+		return nil, errors.New("command ends with a backslash")
+	}
+	if inWord {
+		words = append(words, cur.String())
+	}
+	return words, nil
+}
+
+// start runs cmd on its own: no terminal, output thrown away, and not waited
+// for.
+func start(cmd *exec.Cmd) error {
+	devnull, err := os.OpenFile(os.DevNull, os.O_RDWR, 0)
+	if err != nil {
+		return err
+	}
+	defer devnull.Close()
+	cmd.Stdin, cmd.Stdout, cmd.Stderr = devnull, devnull, devnull
+	detach(cmd)
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	return cmd.Process.Release()
+}

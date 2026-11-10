@@ -1,0 +1,1 @@
+{"type":"result","success":true,"command":"install","data":{"alreadyInstalled":false,"editor":{"version":"6000.5.1f1","architecture":"x86_64","downloadSize":4385104080,"checksum":"md5-/zaWMDYsEn8PvHVmFluHig=="},"modules":[{"id":"webgl","name":"Web Build Support","downloadSize":1611008024}],"totalDownloadSize":5996112104},"errors":[],"warnings":[]}

@@ -1,0 +1,37 @@
+{
+ "success": true,
+ "command": "releases",
+ "data": {
+  "items": [
+   {
+    "version": "6000.7.0b8",
+    "architecture": "x86_64",
+    "stream": "BETA",
+    "lts": false,
+    "installed": false,
+    "revisionHash": null
+   },
+   {
+    "version": "7000.0.0a16",
+    "architecture": "x86_64",
+    "stream": "ALPHA",
+    "lts": false,
+    "installed": false,
+    "revisionHash": null
+   },
+   {
+    "version": "6000.0.85f2",
+    "architecture": "x86_64",
+    "stream": "LTS",
+    "lts": true,
+    "installed": false,
+    "revisionHash": null
+   }
+  ],
+  "total": null,
+  "nextPage": 3,
+  "partial": false
+ },
+ "errors": [],
+ "warnings": []
+}

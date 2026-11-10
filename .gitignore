@@ -1,0 +1,15 @@
+# build output
+/bin/
+/dist/
+/lazyunity
+/lazyunity.exe
+
+# go
+*.test
+*.out
+coverage.*
+
+# editor / OS
+.idea/
+.vscode/
+.DS_Store

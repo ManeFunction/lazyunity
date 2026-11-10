@@ -1,0 +1,255 @@
+{
+ "success": true,
+ "command": "editors info",
+ "data": {
+  "version": "6000.5.1f1",
+  "changeset": "0d9463e84828",
+  "stream": "SUPPORTED",
+  "releaseDate": "2026-06-24T09:16:03.513Z",
+  "downloadUrl": "https://download.unity3d.com/download_unity/0d9463e84828/LinuxEditorInstaller/Unity-6000.5.1f1.tar.xz",
+  "modules": [
+   {
+    "id": "android",
+    "name": "Android Build Support",
+    "description": "Allows building your Unity projects for the Android platform",
+    "downloadSize": {
+     "value": 1739702928,
+     "unit": "BYTE"
+    },
+    "installedSize": {
+     "value": 3479405856,
+     "unit": "BYTE"
+    },
+    "required": false,
+    "preSelected": false,
+    "hidden": false
+   },
+   {
+    "id": "ios",
+    "name": "iOS Build Support",
+    "description": "Allows building your Unity projects for the iOS platform",
+    "downloadSize": {
+     "value": 551161692,
+     "unit": "BYTE"
+    },
+    "installedSize": {
+     "value": 2538321920,
+     "unit": "BYTE"
+    },
+    "required": false,
+    "preSelected": false,
+    "hidden": false
+   },
+   {
+    "id": "visionos",
+    "name": "visionOS Build Support",
+    "description": "Allows building your Unity projects for the VisionOS platfor",
+    "downloadSize": {
+     "value": 263776472,
+     "unit": "BYTE"
+    },
+    "installedSize": {
+     "value": 1233018880,
+     "unit": "BYTE"
+    },
+    "required": false,
+    "preSelected": false,
+    "hidden": false
+   },
+   {
+    "id": "linux-il2cpp",
+    "name": "Linux Build Support (IL2CPP)",
+    "description": "Allows building your Unity projects for the Linux-IL2CPP pla",
+    "downloadSize": {
+     "value": 60320780,
+     "unit": "BYTE"
+    },
+    "installedSize": {
+     "value": 230881280,
+     "unit": "BYTE"
+    },
+    "required": false,
+    "preSelected": false,
+    "hidden": false
+   },
+   {
+    "id": "linux-server",
+    "name": "Linux Dedicated Server Build Support",
+    "description": "Allows building your Unity projects for the Linux-Server pla",
+    "downloadSize": {
+     "value": 164492488,
+     "unit": "BYTE"
+    },
+    "installedSize": {
+     "value": 635514880,
+     "unit": "BYTE"
+    },
+    "required": false,
+    "preSelected": false,
+    "hidden": false
+   },
+   {
+    "id": "mac-mono",
+    "name": "Mac Build Support (Mono)",
+    "description": "Allows building your Unity projects for the Mac-Mono platfor",
+    "downloadSize": {
+     "value": 734220905,
+     "unit": "BYTE"
+    },
+    "installedSize": {
+     "value": 1468441810,
+     "unit": "BYTE"
+    },
+    "required": false,
+    "preSelected": false,
+    "hidden": false
+   },
+   {
+    "id": "mac-server",
+    "name": "Mac Dedicated Server Build Support",
+    "description": "Allows building your Unity projects for the Mac-Server platf",
+    "downloadSize": {
+     "value": 1436785648,
+     "unit": "BYTE"
+    },
+    "installedSize": {
+     "value": 2873571296,
+     "unit": "BYTE"
+    },
+    "required": false,
+    "preSelected": false,
+    "hidden": false
+   },
+   {
+    "id": "webgl",
+    "name": "Web Build Support",
+    "description": "Allows building your Unity projects for the Web platform",
+    "downloadSize": {
+     "value": 1611008024,
+     "unit": "BYTE"
+    },
+    "installedSize": {
+     "value": 7280476160,
+     "unit": "BYTE"
+    },
+    "required": false,
+    "preSelected": false,
+    "hidden": false
+   },
+   {
+    "id": "windows-mono",
+    "name": "Windows Build Support (Mono)",
+    "description": "Allows building your Unity projects for the Windows-Mono pla",
+    "downloadSize": {
+     "value": 399164336,
+     "unit": "BYTE"
+    },
+    "installedSize": {
+     "value": 798328672,
+     "unit": "BYTE"
+    },
+    "required": false,
+    "preSelected": false,
+    "hidden": false
+   },
+   {
+    "id": "windows-server",
+    "name": "Windows Dedicated Server Build Support",
+    "description": "Allows building your Unity projects for the Windows-Server p",
+    "downloadSize": {
+     "value": 398869111,
+     "unit": "BYTE"
+    },
+    "installedSize": {
+     "value": 797738222,
+     "unit": "BYTE"
+    },
+    "required": false,
+    "preSelected": false,
+    "hidden": false
+   },
+   {
+    "id": "language-ja",
+    "name": "日本語",
+    "description": "日本語",
+    "downloadSize": {
+     "value": 2936241,
+     "unit": "BYTE"
+    },
+    "installedSize": {
+     "value": 2936241,
+     "unit": "BYTE"
+    },
+    "required": true,
+    "preSelected": false,
+    "hidden": false
+   },
+   {
+    "id": "language-ko",
+    "name": "한국어",
+    "description": "한국어",
+    "downloadSize": {
+     "value": 2777994,
+     "unit": "BYTE"
+    },
+    "installedSize": {
+     "value": 2777994,
+     "unit": "BYTE"
+    },
+    "required": true,
+    "preSelected": false,
+    "hidden": false
+   },
+   {
+    "id": "language-zh-hant",
+    "name": "繁體中文",
+    "description": "繁體中文",
+    "downloadSize": {
+     "value": 2558536,
+     "unit": "BYTE"
+    },
+    "installedSize": {
+     "value": 2558536,
+     "unit": "BYTE"
+    },
+    "required": true,
+    "preSelected": false,
+    "hidden": false
+   },
+   {
+    "id": "language-zh-hans",
+    "name": "简体中文",
+    "description": "简体中文",
+    "downloadSize": {
+     "value": 2560890,
+     "unit": "BYTE"
+    },
+    "installedSize": {
+     "value": 2560890,
+     "unit": "BYTE"
+    },
+    "required": true,
+    "preSelected": false,
+    "hidden": false
+   },
+   {
+    "id": "documentation",
+    "name": "Documentation",
+    "description": "Offline Documentation",
+    "downloadSize": {
+     "value": 470250280,
+     "unit": "BYTE"
+    },
+    "installedSize": {
+     "value": 959310571,
+     "unit": "BYTE"
+    },
+    "required": true,
+    "preSelected": false,
+    "hidden": false
+   }
+  ]
+ },
+ "errors": [],
+ "warnings": []
+}
