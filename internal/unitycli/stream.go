@@ -55,6 +55,20 @@ func (s *Stream) Wait() error {
 	return s.err
 }
 
+// FinishedStream is a stream that has already ended: frames are still there to
+// read, and Wait returns err. It stands in for a running command where a
+// Client is replaced, such as in the tests of the packages that use one.
+func FinishedStream(err error, frames ...Frame) *Stream {
+	ch := make(chan Frame, len(frames))
+	for _, f := range frames {
+		ch <- f
+	}
+	close(ch)
+	done := make(chan struct{})
+	close(done)
+	return &Stream{Frames: ch, done: done, err: err}
+}
+
 // pipeGrace is how long to keep reading after the process has exited. The CLI's
 // helpers may hold the pipe open forever, so reading to EOF is not an option.
 const pipeGrace = 500 * time.Millisecond

@@ -52,7 +52,7 @@ func (m *Model) showReleases() tea.Cmd {
 
 func (m *Model) setDefaultEditor(e editorRow) tea.Cmd {
 	return m.runCLI("Setting the default Editor", "Unity "+e.Version+" is now the default",
-		func(ctx context.Context, c *unitycli.Client) error { return c.SetDefaultEditor(ctx, e.Version) },
+		func(ctx context.Context, c unityCLI) error { return c.SetDefaultEditor(ctx, e.Version) },
 		func(m *Model) tea.Cmd { return m.loadEditorsCmd() })
 }
 
@@ -83,7 +83,7 @@ func (m *Model) uninstallConfirm(e editorRow) {
 	m.push(&confirmPopup{
 		title: "Uninstall Unity " + e.Version, yes: "Uninstall", danger: true, message: msg,
 		onYes: func(m *Model) tea.Cmd {
-			return m.withCLI(func(c *unitycli.Client) tea.Cmd {
+			return m.withCLI(func(c unityCLI) tea.Cmd {
 				return m.enqueue(&task{
 					title: "Uninstalling Unity " + e.Version,
 					label: "uninstall " + e.Version,
@@ -102,7 +102,7 @@ func (m *Model) upgradeConfirm(e editorRow) {
 		message: fmt.Sprintf("Install the newest patch of Unity %s, carrying this Editor's modules over? "+
 			"The new version is installed next to this one; this one stays.", unityLine(e.Version)),
 		onYes: func(m *Model) tea.Cmd {
-			return m.withCLI(func(c *unitycli.Client) tea.Cmd {
+			return m.withCLI(func(c unityCLI) tea.Cmd {
 				return m.enqueue(&task{
 					title: "Upgrading Unity " + e.Version,
 					label: "upgrade " + e.Version,
@@ -221,7 +221,7 @@ func (m *Model) reloadModulesCmd() tea.Cmd {
 	if !ok {
 		return nil
 	}
-	return m.cliCmd(func(ctx context.Context, c *unitycli.Client) tea.Msg {
+	return m.cliCmd(func(ctx context.Context, c unityCLI) tea.Msg {
 		mods, err := c.Modules(ctx, e.Version, e.Arch)
 		return modulesMsg{version: e.Version, mods: mods, err: err}
 	})
@@ -232,7 +232,7 @@ func (m *Model) removeModuleConfirm(e editorRow, mod unitycli.Module) {
 		title: "Remove " + mod.Name, yes: "Remove", danger: true,
 		message: fmt.Sprintf("Remove %s from Unity %s? Projects set to build for it will need it installed again.", mod.Name, e.Version),
 		onYes: func(m *Model) tea.Cmd {
-			return m.withCLI(func(c *unitycli.Client) tea.Cmd {
+			return m.withCLI(func(c unityCLI) tea.Cmd {
 				return m.enqueue(&task{
 					title: fmt.Sprintf("Removing %s from Unity %s", mod.Name, e.Version),
 					label: e.Version + ": remove " + mod.Name,
@@ -247,10 +247,10 @@ func (m *Model) removeModuleConfirm(e editorRow, mod unitycli.Module) {
 
 // installModules adds modules to an installed Editor, as a task.
 func (m *Model) installModules(e editorRow, mods []unitycli.Module) tea.Cmd {
-	return m.withCLI(func(c *unitycli.Client) tea.Cmd { return m.queueModules(c, e, mods) })
+	return m.withCLI(func(c unityCLI) tea.Cmd { return m.queueModules(c, e, mods) })
 }
 
-func (m *Model) queueModules(c *unitycli.Client, e editorRow, mods []unitycli.Module) tea.Cmd {
+func (m *Model) queueModules(c unityCLI, e editorRow, mods []unitycli.Module) tea.Cmd {
 	var ids, names, works, busy []string
 	for _, x := range mods {
 		if m.taskOn(workModule(e.Version, x.ID)) != nil {
@@ -300,7 +300,7 @@ type addModulesMsg struct {
 // addModulesFlow lists what an Editor can still take and lets the user tick
 // modules to install. With platformsOnly it offers build platforms only.
 func (m *Model) addModulesFlow(e editorRow, platformsOnly bool) tea.Cmd {
-	return m.withCLI(func(c *unitycli.Client) tea.Cmd {
+	return m.withCLI(func(c unityCLI) tea.Cmd {
 		m.toastf(toastInfo, "Looking up the modules of Unity %s…", e.Version)
 		return func() tea.Msg {
 			mods, err := c.Modules(context.Background(), e.Version, e.Arch)
@@ -397,7 +397,7 @@ func (m *Model) installEditorFlow(version, changeset string) tea.Cmd {
 		return nil
 	}
 	m.toastf(toastInfo, "Looking up Unity %s…", version)
-	return m.cliCmd(func(ctx context.Context, c *unitycli.Client) tea.Msg {
+	return m.cliCmd(func(ctx context.Context, c unityCLI) tea.Msg {
 		mods, err := c.ReleaseModules(ctx, version)
 		return releaseModulesMsg{version: version, changeset: changeset, mods: mods, err: err}
 	})
@@ -429,7 +429,7 @@ func (m *Model) onReleaseModules(msg releaseModulesMsg) tea.Cmd {
 
 // planInstall asks the CLI what the install would download.
 func (m *Model) planInstall(o unitycli.InstallOptions) tea.Cmd {
-	return m.withCLI(func(c *unitycli.Client) tea.Cmd {
+	return m.withCLI(func(c unityCLI) tea.Cmd {
 		return func() tea.Msg {
 			plan, err := c.PlanInstall(context.Background(), o)
 			return planMsg{opts: o, plan: plan, err: err}
@@ -460,13 +460,13 @@ func (m *Model) onPlan(msg planMsg) {
 	m.push(&confirmPopup{
 		title: "Install Unity " + opts.Version, yes: "Install", message: text,
 		onYes: func(m *Model) tea.Cmd {
-			return m.withCLI(func(c *unitycli.Client) tea.Cmd { return m.queueInstall(c, opts, names) })
+			return m.withCLI(func(c unityCLI) tea.Cmd { return m.queueInstall(c, opts, names) })
 		},
 	})
 }
 
 // queueInstall queues the install of an Editor.
-func (m *Model) queueInstall(c *unitycli.Client, opts unitycli.InstallOptions, names []string) tea.Cmd {
+func (m *Model) queueInstall(c unityCLI, opts unitycli.InstallOptions, names []string) tea.Cmd {
 	title := "Installing Unity " + opts.Version
 	if len(names) > 0 {
 		title += " + " + joinNames(names)
@@ -555,7 +555,7 @@ func (m *Model) cleanCacheFlow() tea.Cmd {
 		m.toastf(toastWarn, "Wait for the tasks to finish before cleaning the download cache")
 		return nil
 	}
-	return m.cliCmd(func(ctx context.Context, c *unitycli.Client) tea.Msg {
+	return m.cliCmd(func(ctx context.Context, c unityCLI) tea.Msg {
 		info, err := c.DownloadCache(ctx)
 		return cacheInfoMsg{info: info, err: err}
 	})
@@ -581,7 +581,7 @@ func (m *Model) onCacheInfo(msg cacheInfoMsg) {
 			info.FileCount, files, humanBytes(info.SizeBytes), info.Path),
 		onYes: func(m *Model) tea.Cmd {
 			return m.runCLI("Cleaning the download cache", "Freed "+humanBytes(info.SizeBytes),
-				func(ctx context.Context, c *unitycli.Client) error { return c.CleanDownloadCache(ctx) }, nil)
+				func(ctx context.Context, c unityCLI) error { return c.CleanDownloadCache(ctx) }, nil)
 		},
 	})
 }

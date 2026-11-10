@@ -86,7 +86,7 @@ const (
 // ---- commands -----------------------------------------------------------------
 
 func (m *Model) loadProjectsCmd() tea.Cmd {
-	return m.cliCmd(func(ctx context.Context, c *unitycli.Client) tea.Msg {
+	return m.cliCmd(func(ctx context.Context, c unityCLI) tea.Msg {
 		ps, err := c.Projects(ctx)
 		missing := map[string]bool{}
 		for _, p := range ps {
@@ -99,7 +99,7 @@ func (m *Model) loadProjectsCmd() tea.Cmd {
 }
 
 func (m *Model) loadEditorsCmd() tea.Cmd {
-	return m.cliCmd(func(ctx context.Context, c *unitycli.Client) tea.Msg {
+	return m.cliCmd(func(ctx context.Context, c unityCLI) tea.Msg {
 		eds, err := c.Editors(ctx)
 		return editorsMsg{editors: eds, err: err}
 	})
@@ -111,14 +111,14 @@ func (m *Model) scanEditorsCmd() tea.Cmd {
 }
 
 func (m *Model) loadAuthCmd() tea.Cmd {
-	return m.cliCmd(func(ctx context.Context, c *unitycli.Client) tea.Msg {
+	return m.cliCmd(func(ctx context.Context, c unityCLI) tea.Msg {
 		info, err := c.AuthStatus(ctx)
 		return authMsg{info: info, err: err}
 	})
 }
 
 func (m *Model) loadInstallPathCmd() tea.Cmd {
-	return m.cliCmd(func(ctx context.Context, c *unitycli.Client) tea.Msg {
+	return m.cliCmd(func(ctx context.Context, c unityCLI) tea.Msg {
 		p, err := c.InstallPath(ctx)
 		return installPathMsg{path: p, err: err}
 	})
@@ -138,7 +138,7 @@ func (m *Model) loadReleasesCmd(reset bool) tea.Cmd {
 	if m.releasesTab.filter() != "" {
 		limit = releasesPerSearch
 	}
-	load := m.cliCmd(func(ctx context.Context, c *unitycli.Client) tea.Msg {
+	load := m.cliCmd(func(ctx context.Context, c unityCLI) tea.Msg {
 		page, err := c.Releases(ctx, stream, offset, limit)
 		return releasesMsg{stream: stream, gen: gen, offset: offset, page: page, err: err}
 	})

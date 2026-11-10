@@ -90,7 +90,7 @@ func (m *Model) setInstallRoot(r rootRow) tea.Cmd {
 		return nil
 	}
 	return m.runCLI("Setting the install location", "New Editors now install into "+displayPath(r.Path),
-		func(ctx context.Context, c *unitycli.Client) error { return c.SetInstallPath(ctx, r.Path) },
+		func(ctx context.Context, c unityCLI) error { return c.SetInstallPath(ctx, r.Path) },
 		func(m *Model) tea.Cmd { return m.loadInstallPathCmd() })
 }
 
@@ -114,7 +114,7 @@ func (m *Model) registerStrays() tea.Cmd {
 	if len(paths) == 0 {
 		return nil
 	}
-	cmd := m.cliCmd(func(ctx context.Context, c *unitycli.Client) tea.Msg {
+	cmd := m.cliCmd(func(ctx context.Context, c unityCLI) tea.Msg {
 		// Registering only makes the CLI's own commands work for these Editors. If
 		// it is refused (Unity checks signatures on some systems) nothing is lost,
 		// so it must not nag at every start; the command log keeps the evidence.
@@ -174,7 +174,7 @@ func (m *Model) cliTool() tea.Cmd {
 	}
 	menu := newMenu("Unity CLI "+m.cliStatus.Version.String(), []menuItem{
 		{label: "Update (self-update)", desc: "Asks the CLI to update itself to the newest release.", run: func(m *Model) tea.Cmd {
-			return m.withCLI(func(c *unitycli.Client) tea.Cmd {
+			return m.withCLI(func(c unityCLI) tea.Cmd {
 				return m.enqueue(&task{
 					title: "Updating the Unity CLI",
 					label: "update the Unity CLI",
@@ -227,7 +227,7 @@ func (m *Model) accountTool() tea.Cmd {
 		message: "Sign out of " + m.auth.User.Email + "? Editors opened from lazyunity will start signed out until you sign in again.",
 		onYes: func(m *Model) tea.Cmd {
 			return m.runCLI("Signing out", "Signed out",
-				func(ctx context.Context, c *unitycli.Client) error { return c.Logout(ctx) },
+				func(ctx context.Context, c unityCLI) error { return c.Logout(ctx) },
 				func(m *Model) tea.Cmd { return m.loadAuthCmd() })
 		},
 	})
@@ -245,7 +245,7 @@ func (m *Model) licenseMenu() {
 	}
 	menu := newMenu("License", []menuItem{
 		{label: "Show the license status", desc: "The first time, Unity downloads its licensing client (about 110 MB).", run: func(m *Model) tea.Cmd {
-			return m.withCLI(func(c *unitycli.Client) tea.Cmd {
+			return m.withCLI(func(c unityCLI) tea.Cmd {
 				m.toastf(toastInfo, "Checking the license…")
 				return func() tea.Msg {
 					raw, err := c.LicenseStatus(context.Background())
@@ -259,7 +259,7 @@ func (m *Model) licenseMenu() {
 				message: "Activating Unity Personal means you accept the Unity Personal license terms (https://unity.com/legal/licenses/unity-personal-license). Continue?",
 				onYes: func(m *Model) tea.Cmd {
 					return m.runCLI("Activating the license", "License activated",
-						func(ctx context.Context, c *unitycli.Client) error { return c.ActivatePersonalLicense(ctx) }, nil)
+						func(ctx context.Context, c unityCLI) error { return c.ActivatePersonalLicense(ctx) }, nil)
 				},
 			})
 			return nil
@@ -270,7 +270,7 @@ func (m *Model) licenseMenu() {
 				message: "Return the active license? Editors cannot be used on this computer until it is activated again.",
 				onYes: func(m *Model) tea.Cmd {
 					return m.runCLI("Returning the license", "License returned",
-						func(ctx context.Context, c *unitycli.Client) error { return c.ReturnLicense(ctx) }, nil)
+						func(ctx context.Context, c unityCLI) error { return c.ReturnLicense(ctx) }, nil)
 				},
 			})
 			return nil

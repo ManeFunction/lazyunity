@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -113,10 +114,7 @@ func TestSetInstallLocation(t *testing.T) {
 	m.st.AddRoot(extra)
 	m.refreshRoots()
 	press(m, "3", "]")
-	c := useFakeCLI(t, m, map[string]fakeResp{
-		"install-path --set " + extra: {Stdout: okJSON},
-		"install-path --get":          {Stdout: `{"success":true,"data":{"path":"` + extra + `"}}`},
-	})
+	f := useFakeCLI(t, m)
 	selectRoot(t, m, "Editor")
 	press(m, "space")
 	if !strings.Contains(screenText(m), "already installed there") {
@@ -124,8 +122,8 @@ func TestSetInstallLocation(t *testing.T) {
 	}
 	selectRoot(t, m, filepath.Base(extra))
 	drain(m, m.keymap.lookup(ctxRoots, "space").run(m))
-	if !called(c, "install-path --set "+extra) || !called(c, "install-path --get") {
-		t.Fatalf("calls: %v", calls(c))
+	if !f.called("SetInstallPath", extra) || !f.called("InstallPath") {
+		t.Fatalf("calls: %v", f.Calls())
 	}
 	if m.installRoot != extra {
 		t.Errorf("the new install root should be adopted, got %q", m.installRoot)
@@ -144,11 +142,8 @@ func TestSetInstallLocation(t *testing.T) {
 
 func TestStrayEditorsAreRegisteredOnceAndQuietly(t *testing.T) {
 	m := newTestModel(t)
-	loc := m.editors[0].Location
-	c := useFakeCLI(t, m, map[string]fakeResp{
-		"editors add " + m.editors[0].Location + " " + m.editors[1].Location: {Exit: 1, Stdout: `{"success":false,"errors":[{"code":"X","message":"signature check failed"}]}`},
-	})
-	_ = loc
+	f := useFakeCLI(t, m)
+	f.err["AddEditors"] = cliError(1, "signature check failed")
 	m.cliEditorsLoaded = false
 	if cmd := m.registerStrays(); cmd != nil {
 		t.Error("nothing is registered before the CLI's own list is known")
@@ -162,15 +157,15 @@ func TestStrayEditorsAreRegisteredOnceAndQuietly(t *testing.T) {
 	if len(m.popups) != 0 || strings.Contains(screenText(m), "signature") {
 		t.Errorf("a refused registration must stay quiet:\n%s", screenText(m))
 	}
-	if len(calls(c)) != 1 {
-		t.Errorf("calls: %v", calls(c))
+	if calls := f.Calls(); len(calls) != 1 || !f.called("AddEditors", []string{m.editors[0].Location, m.editors[1].Location}) {
+		t.Errorf("calls: %v", calls)
 	}
 	if again := m.registerStrays(); again != nil {
 		t.Error("each Editor is tried once per run")
 	}
 	// Editors the CLI already lists are left alone
 	m2 := newTestModel(t)
-	useFakeCLI(t, m2, nil)
+	useFakeCLI(t, m2)
 	m2.cliEditorsLoaded = true
 	for _, e := range m2.editors {
 		m2.cliEditors = append(m2.cliEditors, unitycli.Editor{Version: e.Version, Location: e.Location})
@@ -244,7 +239,7 @@ func TestCLIToolInstallsWhenMissing(t *testing.T) {
 
 func TestCLIToolOffersUpdateWhenReady(t *testing.T) {
 	m := newTestModel(t)
-	useFakeCLI(t, m, nil)
+	useFakeCLI(t, m)
 	runToolRow(m, "cli")
 	out := screenText(m)
 	if !strings.Contains(out, "Update (self-update)") || !strings.Contains(out, "Reinstall with the official installer") {
@@ -256,7 +251,7 @@ func TestCLIStatusMessage(t *testing.T) {
 	m := newTestModel(t)
 	m.cli = nil
 	cmd := m.onCLIStatus(cliStatusMsg{st: unitycli.Status{State: unitycli.Ready, Path: "/x/unity", Version: unitycli.MinVersion}})
-	if m.cli == nil || m.cli.Path != "/x/unity" || cmd == nil || !strings.Contains(screenText(m), "Unity CLI 1.0.0-beta.16 is ready") {
+	if c, ok := m.cli.(*unitycli.Client); !ok || c.Path != "/x/unity" || cmd == nil || !strings.Contains(screenText(m), "Unity CLI 1.0.0-beta.16 is ready") {
 		t.Errorf("a ready CLI is adopted and the data is loaded: cli=%v", m.cli)
 	}
 	m.onCLIStatus(cliStatusMsg{st: unitycli.Status{State: unitycli.Outdated}})
@@ -269,18 +264,15 @@ func TestAccountToolSignsOut(t *testing.T) {
 	m := newTestModel(t)
 	m.auth, m.authKnown = unitycli.AuthInfo{LoggedIn: true}, true
 	m.refreshTools()
-	c := useFakeCLI(t, m, map[string]fakeResp{
-		"auth logout --yes": {Stdout: okJSON},
-		"auth status":       {Stdout: `{"success":false,"data":{"loggedIn":false},"errors":[{"code":"NOT_SIGNED_IN","message":"x"}]}`, Exit: 3},
-	})
+	f := useFakeCLI(t, m) // signed out after the logout
 	runToolRow(m, "account")
 	if len(m.popups) != 1 || !strings.Contains(screenText(m), "Sign out") {
 		t.Fatalf("a confirmation:\n%s", screenText(m))
 	}
 	_, cmd := m.Update(keyMsg("enter"))
 	drain(m, cmd)
-	if !called(c, "auth logout --yes") || m.auth.LoggedIn || !strings.Contains(screenText(m), "Signed out") {
-		t.Errorf("calls: %v, loggedIn=%v", calls(c), m.auth.LoggedIn)
+	if !f.called("Logout") || !f.called("AuthStatus") || m.auth.LoggedIn || !strings.Contains(screenText(m), "Signed out") {
+		t.Errorf("calls: %v, loggedIn=%v", f.Calls(), m.auth.LoggedIn)
 	}
 }
 
@@ -288,25 +280,22 @@ func TestAccountToolSignsInWhenSignedOut(t *testing.T) {
 	m := newTestModel(t)
 	m.auth, m.authKnown = unitycli.AuthInfo{}, true
 	m.refreshTools()
-	c := useFakeCLI(t, m, map[string]fakeResp{
-		"auth login":  {Stdout: okJSON},
-		"auth status": {Stdout: `{"success":true,"data":{"loggedIn":true,"user":{"email":"a@b.c"}}}`},
-	})
+	f := useFakeCLI(t, m)
+	f.auth = unitycli.AuthInfo{LoggedIn: true} // after the sign-in
 	cmd := runToolRow(m, "account")
 	if len(m.tasks) != 1 || m.tasks[0].title != "Signing in to Unity" {
 		t.Fatalf("sign-in is a task the user can cancel: %v", m.tasks)
 	}
 	drain(m, cmd)
-	if !called(c, "auth login") || !m.auth.LoggedIn || !strings.Contains(screenText(m), "Signed in") {
-		t.Errorf("calls: %v", calls(c))
+	if !f.called("Login") || !m.auth.LoggedIn || !strings.Contains(screenText(m), "Signed in") {
+		t.Errorf("calls: %v", f.Calls())
 	}
 }
 
 func TestLicenseMenu(t *testing.T) {
 	m := newTestModel(t)
-	c := useFakeCLI(t, m, map[string]fakeResp{
-		"license status": {Stdout: `{"success":true,"data":{"licenses":[{"type":"Personal"}]}}`},
-	})
+	f := useFakeCLI(t, m)
+	f.license = json.RawMessage(`{"licenses":[{"type":"Personal"}]}`)
 	runToolRow(m, "license")
 	out := screenText(m)
 	for _, want := range []string{"Show the license status", "Activate the free Personal license", "Return the license"} {
@@ -316,16 +305,16 @@ func TestLicenseMenu(t *testing.T) {
 	}
 	_, cmd := m.Update(keyMsg("enter")) // show status
 	drain(m, cmd)
-	if !called(c, "license status") || !strings.Contains(screenText(m), "Personal") || !strings.Contains(screenText(m), "License status") {
+	if !f.called("LicenseStatus") || !strings.Contains(screenText(m), "Personal") || !strings.Contains(screenText(m), "License status") {
 		t.Errorf("screen:\n%s", screenText(m))
 	}
 }
 
 func TestLicenseStatusWithNoLicense(t *testing.T) {
 	m := newTestModel(t)
-	useFakeCLI(t, m, map[string]fakeResp{
-		"license status": {Stdout: `{"success":false,"data":{"active":false},"errors":[{"code":"NO_LICENSE","message":"none"}]}`, Exit: 4},
-	})
+	f := useFakeCLI(t, m)
+	f.license = json.RawMessage(`{"active":false}`)
+	f.err["LicenseStatus"] = cliError(unitycli.ExitNeedsConfig, "none")
 	runToolRow(m, "license")
 	_, cmd := m.Update(keyMsg("enter"))
 	drain(m, cmd)
@@ -336,19 +325,19 @@ func TestLicenseStatusWithNoLicense(t *testing.T) {
 
 func TestActivatePersonalLicenseNeedsConsent(t *testing.T) {
 	m := newTestModel(t)
-	c := useFakeCLI(t, m, map[string]fakeResp{"license activate --personal --accept-eula": {Stdout: okJSON}})
+	f := useFakeCLI(t, m)
 	runToolRow(m, "license")
 	press(m, "j", "enter")
 	if len(m.popups) != 1 || !strings.Contains(screenText(m), "Activate Unity Personal") || !strings.Contains(screenText(m), "license terms") {
 		t.Fatalf("the terms must be shown first:\n%s", screenText(m))
 	}
-	if len(calls(c)) != 0 {
+	if len(f.Calls()) != 0 {
 		t.Error("nothing is activated before the user accepts")
 	}
 	_, cmd := m.Update(keyMsg("enter"))
 	drain(m, cmd)
-	if !called(c, "license activate --personal --accept-eula") {
-		t.Errorf("calls: %v", calls(c))
+	if !f.called("ActivatePersonalLicense") {
+		t.Errorf("calls: %v", f.Calls())
 	}
 }
 
@@ -433,14 +422,10 @@ func TestCommandLog(t *testing.T) {
 		t.Error("an empty log says so")
 	}
 	press(m, "esc")
-	c := useFakeCLI(t, m, map[string]fakeResp{
-		"projects --all":     reloadProjectsResponse(),
-		"install-path --get": {Stdout: `{"success":true,"data":{"path":"/x"}}`},
-	})
-	drain(m, m.loadProjectsCmd())
-	drain(m, m.loadInstallPathCmd())
-	if len(calls(c)) != 2 {
-		t.Fatalf("calls: %v", calls(c))
+	f := useFakeCLI(t, m)
+	f.log = []unitycli.LogEntry{
+		{Args: []string{"projects", "--all"}, Stdout: `{"success":true}`},
+		{Args: []string{"install-path", "--get"}, Stdout: `{"success":true,"data":{"path":"/x"}}`},
 	}
 	press(m, "@")
 	out := screenText(m)
@@ -453,7 +438,7 @@ func TestCommandLog(t *testing.T) {
 	}
 	_, cmd := m.Update(keyMsg("enter"))
 	drain(m, cmd)
-	if !strings.Contains(screenText(m), `"path":"/x"`) && !strings.Contains(screenText(m), "path") {
+	if !strings.Contains(screenText(m), `"path":"/x"`) {
 		t.Errorf("the entry shows the output:\n%s", screenText(m))
 	}
 }

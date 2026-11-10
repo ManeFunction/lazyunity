@@ -76,7 +76,7 @@ func (m *Model) projectsDir() string {
 
 // signInCmd signs the CLI in through the browser, as a task that can be cancelled.
 func (m *Model) signInCmd() tea.Cmd {
-	return m.withCLI(func(c *unitycli.Client) tea.Cmd {
+	return m.withCLI(func(c unityCLI) tea.Cmd {
 		return m.enqueue(&task{
 			title: "Signing in to Unity",
 			label: "sign in",

@@ -11,7 +11,6 @@ import (
 	"github.com/ManeFunction/lazyunity/internal/unitycli"
 )
 
-const streamOK = `{"type":"result","success":true,"command":"install","data":{}}`
 
 func selectEditor(t *testing.T, m *Model, version string) editorRow {
 	t.Helper()
@@ -29,12 +28,16 @@ func TestDrillIntoModulesAndBack(t *testing.T) {
 	m := newTestModel(t)
 	press(m, "2")
 	selectEditor(t, m, "6000.6.8f1")
-	useFakeCLI(t, m, map[string]fakeResp{"modules 6000.6.8f1 --architecture x86_64": {File: "modules.json"}})
+	f := useFakeCLI(t, m)
+	f.modules = fixture[unitycli.Module](t, "modules.json")
 	_, cmd := m.Update(keyMsg("enter"))
 	if !strings.Contains(screenText(m), "[2]─Editors > 6000.6.8f1") || !strings.Contains(screenText(m), "Loading modules…") {
 		t.Fatalf("drilling in shows the Editor in the title while loading:\n%s", screenText(m))
 	}
 	drain(m, cmd)
+	if !f.called("Modules", "6000.6.8f1", "x86_64") {
+		t.Errorf("the modules of the selected Editor are asked for: %v", f.Calls())
+	}
 	out := screenText(m)
 	for _, want := range []string{"Android Build Support", "Platforms", "Web Build Support", "[ ]", "Documentation"} {
 		if !strings.Contains(out, want) {
@@ -66,7 +69,8 @@ func TestModulesListFailureIsShown(t *testing.T) {
 	m := newTestModel(t)
 	press(m, "2")
 	selectEditor(t, m, "6000.6.8f1")
-	useFakeCLI(t, m, map[string]fakeResp{"modules 6000.6.8f1 --architecture x86_64": {Stderr: "no network", Exit: 7}})
+	f := useFakeCLI(t, m)
+	f.err["Modules"] = cliError(unitycli.ExitNetwork, "no network")
 	_, cmd := m.Update(keyMsg("enter"))
 	drain(m, cmd)
 	if !strings.Contains(screenText(m), "Could not list the modules") {
@@ -78,11 +82,10 @@ func TestInstallAModuleFromTheModulesList(t *testing.T) {
 	m := newTestModel(t)
 	press(m, "2")
 	selectEditor(t, m, "6000.6.8f1")
-	c := useFakeCLI(t, m, map[string]fakeResp{
-		"modules 6000.6.8f1 --architecture x86_64": {File: "modules.json"},
-		"install-modules --editor-version 6000.6.8f1 --module android --architecture x86_64 --child-modules --accept-eula --yes --format ndjson": {
-			Lines: []string{`{"type":"progress","pct":40,"msg":"Downloading Android Build Support...","phase":"download"}`, streamOK}},
-	})
+	f := useFakeCLI(t, m)
+	f.modules = fixture[unitycli.Module](t, "modules.json")
+	pct := 40.0
+	f.frames = []unitycli.Frame{{Type: "progress", Pct: &pct, Message: "Downloading Android Build Support...", Phase: "download"}}
 	_, cmd := m.Update(keyMsg("enter"))
 	drain(m, cmd)
 	tab, _, _ := m.modulesTab()
@@ -95,18 +98,12 @@ func TestInstallAModuleFromTheModulesList(t *testing.T) {
 		t.Fatalf("a task should start: %v", m.tasks)
 	}
 	drain(m, cmd)
-	if !called(c, "install-modules --editor-version 6000.6.8f1 --module android --architecture x86_64 --child-modules --accept-eula --yes --format ndjson") {
-		t.Errorf("calls: %v", calls(c))
+	if !f.called("InstallModules", "6000.6.8f1", "x86_64", []string{"android"}) {
+		t.Errorf("calls: %v", f.Calls())
 	}
 	// the open modules list is refreshed afterwards
-	n := 0
-	for _, got := range calls(c) {
-		if got == "modules 6000.6.8f1 --architecture x86_64" {
-			n++
-		}
-	}
-	if n < 2 {
-		t.Errorf("the module list should be reloaded after the install: %v", calls(c))
+	if n := f.count("Modules", "6000.6.8f1", "x86_64"); n < 2 {
+		t.Errorf("the module list should be reloaded after the install: %v", f.Calls())
 	}
 }
 
@@ -114,7 +111,8 @@ func TestInstallingAnInstalledModuleIsRefused(t *testing.T) {
 	m := newTestModel(t)
 	press(m, "2")
 	selectEditor(t, m, "6000.6.8f1")
-	useFakeCLI(t, m, map[string]fakeResp{"modules 6000.6.8f1 --architecture x86_64": {File: "modules.json"}})
+	f := useFakeCLI(t, m)
+	f.modules = fixture[unitycli.Module](t, "modules.json")
 	_, cmd := m.Update(keyMsg("enter"))
 	drain(m, cmd)
 	// the fixture has nothing installed: mark one as installed
@@ -139,10 +137,8 @@ func TestRemoveAModule(t *testing.T) {
 	m := newTestModel(t)
 	press(m, "2")
 	selectEditor(t, m, "6000.6.8f1")
-	c := useFakeCLI(t, m, map[string]fakeResp{
-		"modules 6000.6.8f1 --architecture x86_64":                                    {File: "modules.json"},
-		"editors module remove 6000.6.8f1 --module webgl --architecture x86_64 --yes": {Stdout: okJSON},
-	})
+	f := useFakeCLI(t, m)
+	f.modules = fixture[unitycli.Module](t, "modules.json")
 	_, cmd := m.Update(keyMsg("enter"))
 	drain(m, cmd)
 	tab, _, _ := m.modulesTab()
@@ -160,8 +156,8 @@ func TestRemoveAModule(t *testing.T) {
 	}
 	_, cmd = m.Update(keyMsg("enter"))
 	drain(m, cmd)
-	if !called(c, "editors module remove 6000.6.8f1 --module webgl --architecture x86_64 --yes") {
-		t.Errorf("calls: %v", calls(c))
+	if !f.called("RemoveModules", "6000.6.8f1", "x86_64", []string{"webgl"}) {
+		t.Errorf("calls: %v", f.Calls())
 	}
 }
 
@@ -169,10 +165,8 @@ func TestAddModulesFromTheEditorList(t *testing.T) {
 	m := newTestModel(t)
 	press(m, "2")
 	selectEditor(t, m, "6000.6.8f1")
-	c := useFakeCLI(t, m, map[string]fakeResp{
-		"modules 6000.6.8f1 --architecture x86_64": {File: "modules.json"},
-		"install-modules --editor-version 6000.6.8f1 --module android --module ios --architecture x86_64 --child-modules --accept-eula --yes --format ndjson": {Lines: []string{streamOK}},
-	})
+	f := useFakeCLI(t, m)
+	f.modules = fixture[unitycli.Module](t, "modules.json")
 	drain(m, m.keymap.lookup(ctxEditors, "a").run(m))
 	menu, ok := m.popups[len(m.popups)-1].(*menuPopup)
 	if !ok || !menu.multi {
@@ -190,15 +184,16 @@ func TestAddModulesFromTheEditorList(t *testing.T) {
 	}
 	_, cmd := m.Update(keyMsg("enter"))
 	drain(m, cmd)
-	if !called(c, "install-modules --editor-version 6000.6.8f1 --module android --module ios --architecture x86_64 --child-modules --accept-eula --yes --format ndjson") {
-		t.Errorf("calls: %v", calls(c))
+	if !f.called("InstallModules", "6000.6.8f1", "x86_64", []string{"android", "ios"}) {
+		t.Errorf("calls: %v", f.Calls())
 	}
 }
 
 func TestAddPlatformFromTheProjectPlatformMenu(t *testing.T) {
 	m := newTestModel(t)
 	selectProject(t, m, "Space Shooter")
-	useFakeCLI(t, m, map[string]fakeResp{"modules 6000.6.8f1 --architecture x86_64": {File: "modules.json"}})
+	f := useFakeCLI(t, m)
+	f.modules = fixture[unitycli.Module](t, "modules.json")
 	press(m, "p")
 	menu := m.popups[0].(*menuPopup)
 	menu.list.SelectKey("Add a platform module…")
@@ -221,14 +216,20 @@ func TestNothingLeftToAdd(t *testing.T) {
 
 func TestInstallANewEditorEndToEnd(t *testing.T) {
 	m := newTestModel(t)
-	c := useFakeCLI(t, m, map[string]fakeResp{
-		"editors info 6000.5.1f1":                     {File: "editors-info.json"},
-		"install 6000.5.1f1 --module webgl --dry-run": {File: "install-dryrun.ndjson"},
-		"install 6000.5.1f1 --module webgl --child-modules --accept-eula --yes --format ndjson": {
-			Lines: []string{`{"type":"progress","pct":10,"msg":"Downloading Unity...","phase":"download"}`, streamOK}},
-		"editors --installed": editorsResponse(m),
-		"projects --all":      reloadProjectsResponse(),
-	})
+	f := useFakeCLI(t, m)
+	f.releaseModules = []unitycli.Module{
+		{ID: "android", Name: "Android Build Support", Category: "Platforms", DownloadBytes: 1 << 30},
+		{ID: "webgl", Name: "Web Build Support", Category: "Platforms", DownloadBytes: 1 << 29},
+	}
+	f.plan.TotalDownloadSize = 5996112104
+	f.plan.Modules = append(f.plan.Modules, struct {
+		ID           string `json:"id"`
+		Name         string `json:"name"`
+		DownloadSize int64  `json:"downloadSize"`
+	}{ID: "webgl", Name: "Web Build Support"})
+	pct := 10.0
+	f.frames = []unitycli.Frame{{Type: "progress", Pct: &pct, Message: "Downloading Unity...", Phase: "download"}}
+	f.editors = cliEditors(m)
 	drain(m, m.installEditorFlow("6000.5.1f1", ""))
 	menu, ok := m.popups[len(m.popups)-1].(*menuPopup)
 	if !ok || !menu.multi || !strings.Contains(screenText(m), "Install Unity 6000.5.1f1: choose modules") {
@@ -241,6 +242,10 @@ func TestInstallANewEditorEndToEnd(t *testing.T) {
 	press(m, "space")
 	_, cmd := m.Update(keyMsg("enter"))
 	drain(m, cmd) // asks the CLI for the plan
+	want := unitycli.InstallOptions{Version: "6000.5.1f1", Modules: []string{"webgl"}}
+	if !f.called("PlanInstall", want) {
+		t.Errorf("the plan is asked for the ticked modules: %v", f.Calls())
+	}
 	out := screenText(m)
 	for _, want := range []string{"Install Unity 6000.5.1f1 with Web Build Support", "Download: 6.0 GB", "license terms"} {
 		if !strings.Contains(out, want) {
@@ -255,10 +260,10 @@ func TestInstallANewEditorEndToEnd(t *testing.T) {
 		t.Fatalf("the install task: %v", m.tasks)
 	}
 	drain(m, cmd)
-	if !called(c, "install 6000.5.1f1 --module webgl --child-modules --accept-eula --yes --format ndjson") {
-		t.Errorf("calls: %v", calls(c))
+	if !f.called("Install", want) {
+		t.Errorf("calls: %v", f.Calls())
 	}
-	if !called(c, "editors --installed") {
+	if !f.called("Editors") {
 		t.Error("the Editor list is refreshed when the install ends")
 	}
 	if !strings.Contains(screenText(m), "Installed Unity 6000.5.1f1") {
@@ -268,7 +273,7 @@ func TestInstallANewEditorEndToEnd(t *testing.T) {
 
 func TestInstallEditorAlreadyInstalled(t *testing.T) {
 	m := newTestModel(t)
-	useFakeCLI(t, m, nil)
+	useFakeCLI(t, m)
 	if cmd := m.installEditorFlow("6000.6.8f1", ""); cmd != nil || !strings.Contains(screenText(m), "already installed") {
 		t.Errorf("screen:\n%s", screenText(m))
 	}
@@ -282,8 +287,8 @@ func TestInstallEditorAlreadyInstalled(t *testing.T) {
 
 func TestInstallFailsWithoutAnEditorList(t *testing.T) {
 	m := newTestModel(t)
-	useFakeCLI(t, m, map[string]fakeResp{"editors info 9999.1.1f1": {
-		Stdout: `{"success":false,"errors":[{"code":"NOT_FOUND","message":"No such release"}]}`, Exit: 11}})
+	f := useFakeCLI(t, m)
+	f.err["ReleaseModules"] = cliError(unitycli.ExitNotFound, "No such release")
 	drain(m, m.installEditorFlow("9999.1.1f1", ""))
 	if len(m.popups) != 1 || !strings.Contains(screenText(m), "No such release") {
 		t.Errorf("screen:\n%s", screenText(m))
@@ -294,23 +299,20 @@ func TestUninstallListsTheProjectsThatUseIt(t *testing.T) {
 	m := newTestModel(t)
 	press(m, "2")
 	selectEditor(t, m, "2022.3.62f1") // Old Platformer uses it
-	c := useFakeCLI(t, m, map[string]fakeResp{
-		"uninstall 2022.3.62f1 --architecture x86_64 --yes": {Stdout: okJSON},
-		"editors --installed":                               editorsResponse(m),
-		"projects --all":                                    reloadProjectsResponse(),
-	})
+	f := useFakeCLI(t, m)
+	f.editors = cliEditors(m)
 	press(m, "d")
 	out := screenText(m)
 	if len(m.popups) != 1 || !strings.Contains(out, "Uninstall Unity 2022.3.62f1") || !strings.Contains(out, "1 project use it: Old Platformer") {
 		t.Fatalf("the confirmation names the projects:\n%s", out)
 	}
-	if len(calls(c)) != 0 {
+	if len(f.Calls()) != 0 {
 		t.Error("nothing runs before the user agrees")
 	}
 	_, cmd := m.Update(keyMsg("enter"))
 	drain(m, cmd)
-	if !called(c, "uninstall 2022.3.62f1 --architecture x86_64 --yes") || !called(c, "editors --installed") {
-		t.Errorf("calls: %v", calls(c))
+	if !f.called("Uninstall", "2022.3.62f1", "x86_64") || !f.called("Editors") {
+		t.Errorf("calls: %v", f.Calls())
 	}
 }
 
@@ -318,9 +320,9 @@ func TestUninstallDeclined(t *testing.T) {
 	m := newTestModel(t)
 	press(m, "2")
 	selectEditor(t, m, "6000.6.8f1")
-	c := useFakeCLI(t, m, nil)
+	f := useFakeCLI(t, m)
 	press(m, "d", "esc")
-	if len(calls(c)) != 0 || len(m.popups) != 0 {
+	if len(f.Calls()) != 0 || len(m.popups) != 0 {
 		t.Error("declining does nothing")
 	}
 }
@@ -329,13 +331,11 @@ func TestSetDefaultEditor(t *testing.T) {
 	m := newTestModel(t)
 	press(m, "2")
 	selectEditor(t, m, "2022.3.62f1")
-	c := useFakeCLI(t, m, map[string]fakeResp{
-		"editors default 2022.3.62f1": {Stdout: okJSON},
-		"editors --installed":         editorsResponse(m),
-	})
+	f := useFakeCLI(t, m)
+	f.editors = cliEditors(m)
 	drain(m, m.keymap.lookup(ctxEditors, "space").run(m))
-	if !called(c, "editors default 2022.3.62f1") || !strings.Contains(screenText(m), "Unity 2022.3.62f1 is now the default") {
-		t.Errorf("calls: %v", calls(c))
+	if !f.called("SetDefaultEditor", "2022.3.62f1") || !strings.Contains(screenText(m), "Unity 2022.3.62f1 is now the default") {
+		t.Errorf("calls: %v", f.Calls())
 	}
 }
 
@@ -343,19 +343,16 @@ func TestUpgradeEditor(t *testing.T) {
 	m := newTestModel(t)
 	press(m, "2")
 	selectEditor(t, m, "2022.3.62f1")
-	c := useFakeCLI(t, m, map[string]fakeResp{
-		"editors upgrade 2022.3.62f1 --yes --accept-eula --format ndjson": {Lines: []string{streamOK}},
-		"editors --installed": editorsResponse(m),
-		"projects --all":      reloadProjectsResponse(),
-	})
+	f := useFakeCLI(t, m)
+	f.editors = cliEditors(m)
 	press(m, "u")
 	if len(m.popups) != 1 || !strings.Contains(screenText(m), "newest patch of Unity 2022.3") {
 		t.Fatalf("screen:\n%s", screenText(m))
 	}
 	_, cmd := m.Update(keyMsg("enter"))
 	drain(m, cmd)
-	if !called(c, "editors upgrade 2022.3.62f1 --yes --accept-eula --format ndjson") {
-		t.Errorf("calls: %v", calls(c))
+	if !f.called("UpgradeEditor", "2022.3.62f1") {
+		t.Errorf("calls: %v", f.Calls())
 	}
 }
 
@@ -372,11 +369,12 @@ func TestEditorCopyMenu(t *testing.T) {
 
 func TestReleasesLoadFilterAndPage(t *testing.T) {
 	m := newTestModel(t)
-	c := useFakeCLI(t, m, map[string]fakeResp{
-		"releases --limit 25 --offset 0 --stream tech": {File: "releases.json"}, // 3 items, next offset 3
-		"releases --limit 25 --offset 3 --stream tech": {Stdout: `{"success":true,"data":{"items":[{"version":"2021.3.1f1","architecture":"x86_64","stream":"LTS","lts":true,"installed":false}],"nextPage":null}}`},
-		"releases --limit 25 --offset 0 --stream lts":  {Stdout: `{"success":true,"data":{"items":[{"version":"6000.0.85f2","architecture":"x86_64","stream":"LTS","lts":true,"installed":false}],"nextPage":null}}`},
-	})
+	f := useFakeCLI(t, m)
+	f.releases = map[string]unitycli.ReleasePage{
+		releasesKey("tech", 0, 25): {Items: fixture[unitycli.Release](t, "releases.json"), NextOffset: 3},
+		releasesKey("tech", 3, 25): {Items: []unitycli.Release{{Version: "2021.3.1f1", Architecture: "x86_64", Stream: "LTS", LTS: true}}},
+		releasesKey("lts", 0, 25):  {Items: []unitycli.Release{{Version: "6000.0.85f2", Architecture: "x86_64", Stream: "LTS", LTS: true}}},
+	}
 	press(m, "2")
 	cmd := m.switchTab(1)
 	if !strings.Contains(screenText(m), "Loading releases…") {
@@ -393,7 +391,7 @@ func TestReleasesLoadFilterAndPage(t *testing.T) {
 	drain(m, m.keymap.lookup(ctxReleases, "j").run(m))
 	drain(m, m.keymap.lookup(ctxReleases, "j").run(m))
 	if m.releasesTab.Len() != 4 || m.releases.nextOffset != 0 {
-		t.Errorf("the next page should be appended: %d releases, next offset %d (calls %v)", m.releasesTab.Len(), m.releases.nextOffset, calls(c))
+		t.Errorf("the next page should be appended: %d releases, next offset %d (calls %v)", m.releasesTab.Len(), m.releases.nextOffset, f.Calls())
 	}
 	// the stream filter starts the list over
 	press(m, "ctrl+s")
@@ -404,7 +402,7 @@ func TestReleasesLoadFilterAndPage(t *testing.T) {
 	_, cmd = m.Update(keyMsg("enter"))
 	drain(m, cmd)
 	if m.releasesTab.Len() != 1 || m.releases.stream != "lts" || m.st.ReleaseStream != "lts" {
-		t.Errorf("filtered: %d releases, stream %q, remembered %q (calls %v)", m.releasesTab.Len(), m.releases.stream, m.st.ReleaseStream, calls(c))
+		t.Errorf("filtered: %d releases, stream %q, remembered %q (calls %v)", m.releasesTab.Len(), m.releases.stream, m.st.ReleaseStream, f.Calls())
 	}
 	if item, _ := m.releasesTab.Selected(); item.Version != "6000.0.85f2" {
 		t.Errorf("the list was replaced, got %q", item.Version)
@@ -430,17 +428,15 @@ func TestReleasesStartOnSupported(t *testing.T) {
 
 func TestReleasesFilterRowSearchesEveryPage(t *testing.T) {
 	m := newTestModel(t)
-	page := func(items string, next string) fakeResp {
-		return fakeResp{Stdout: `{"success":true,"data":{"items":[` + items + `],"nextPage":` + next + `}}`}
+	rel := func(v string) unitycli.Release {
+		return unitycli.Release{Version: v, Architecture: "x86_64", Stream: "SUPPORTED"}
 	}
-	rel := func(v string) string {
-		return `{"version":"` + v + `","architecture":"x86_64","stream":"SUPPORTED","lts":false,"installed":false}`
+	f := useFakeCLI(t, m)
+	f.releases = map[string]unitycli.ReleasePage{
+		releasesKey("tech", 0, 25):  {Items: []unitycli.Release{rel("6000.6.8f1"), rel("6000.6.7f1")}, NextOffset: 2},
+		releasesKey("tech", 2, 200): {Items: []unitycli.Release{rel("6000.5.3f1")}, NextOffset: 3},
+		releasesKey("tech", 3, 200): {Items: []unitycli.Release{rel("6000.4.1f1")}},
 	}
-	c := useFakeCLI(t, m, map[string]fakeResp{
-		"releases --limit 25 --offset 0 --stream tech":  page(rel("6000.6.8f1")+","+rel("6000.6.7f1"), "2"),
-		"releases --limit 200 --offset 2 --stream tech": page(rel("6000.5.3f1"), "3"),
-		"releases --limit 200 --offset 3 --stream tech": page(rel("6000.4.1f1"), "null"),
-	})
 	press(m, "2")
 	drain(m, m.switchTab(1))
 	out := screenText(m)
@@ -456,7 +452,7 @@ func TestReleasesFilterRowSearchesEveryPage(t *testing.T) {
 		drain(m, cmd)
 	}
 	if m.releasesTab.Len() != 1 || m.releases.nextOffset != 0 {
-		t.Fatalf("every page is searched: %d matches, next offset %d (calls %v)", m.releasesTab.Len(), m.releases.nextOffset, calls(c))
+		t.Fatalf("every page is searched: %d matches, next offset %d (calls %v)", m.releasesTab.Len(), m.releases.nextOffset, f.Calls())
 	}
 	if r, _ := m.releasesTab.Selected(); r.Version != "6000.4.1f1" {
 		t.Errorf("match = %q", r.Version)
@@ -522,12 +518,12 @@ func TestCompleteDirKeepsTilde(t *testing.T) {
 }
 
 func TestCleanDownloadCache(t *testing.T) {
-	info := `{"success":true,"command":"cache info","data":{"path":"/home/u/.config/unityhub/downloads","sizeBytes":1509051525,"size":"1.4 GB","fileCount":3}}`
-	empty := `{"success":true,"command":"cache info","data":{"path":"/home/u/.config/unityhub/downloads","sizeBytes":0,"fileCount":0}}`
+	info := unitycli.CacheInfo{Path: "/home/u/.config/unityhub/downloads", SizeBytes: 1509051525, FileCount: 3}
 
 	m := newTestModel(t)
 	press(m, "2")
-	useFakeCLI(t, m, map[string]fakeResp{"cache info": {Stdout: info}, "cache clean --yes": {Stdout: okJSON}})
+	f := useFakeCLI(t, m)
+	f.cache = info
 	_, cmd := m.Update(keyMsg("C"))
 	drain(m, cmd)
 	out := screenText(m)
@@ -541,7 +537,7 @@ func TestCleanDownloadCache(t *testing.T) {
 	}
 	_, cmd = m.Update(keyMsg("enter"))
 	drain(m, cmd)
-	if len(m.popups) != 0 || !strings.Contains(screenText(m), "Freed 1.5 GB") {
+	if len(m.popups) != 0 || !strings.Contains(screenText(m), "Freed 1.5 GB") || !f.called("CleanDownloadCache") {
 		t.Errorf("confirming cleans the cache:\n%s", screenText(m))
 	}
 
@@ -552,7 +548,8 @@ func TestCleanDownloadCache(t *testing.T) {
 	if m.focusCtx() != ctxReleases {
 		t.Fatalf("context = %v, want releases", m.focusCtx())
 	}
-	useFakeCLI(t, m, map[string]fakeResp{"cache info": {Stdout: empty}})
+	f = useFakeCLI(t, m)
+	f.cache = unitycli.CacheInfo{Path: info.Path}
 	_, cmd = m.Update(keyMsg("C"))
 	drain(m, cmd)
 	if len(m.popups) != 0 || !strings.Contains(screenText(m), "The download cache is empty") {
@@ -562,7 +559,7 @@ func TestCleanDownloadCache(t *testing.T) {
 	// not while an install is downloading into it
 	m = newTestModel(t)
 	press(m, "2")
-	useFakeCLI(t, m, map[string]fakeResp{})
+	useFakeCLI(t, m)
 	m.enqueue(&task{title: "Installing", do: func(ctx context.Context) error { <-ctx.Done(); return ctx.Err() }})
 	if cmd := m.cleanCacheFlow(); cmd != nil || !strings.Contains(screenText(m), "Wait for the tasks to finish") {
 		t.Errorf("cleaning while busy is refused:\n%s", screenText(m))

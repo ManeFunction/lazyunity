@@ -213,3 +213,22 @@ func TestInstallModulesAndUpgradeArguments(t *testing.T) {
 		t.Errorf("Install with options: %v", err)
 	}
 }
+
+func TestFinishedStream(t *testing.T) {
+	pct := 50.0
+	s := FinishedStream(nil, Frame{Type: "progress", Pct: &pct})
+	f, ok := <-s.Frames
+	if !ok || *f.Pct != 50 {
+		t.Fatalf("the frame is there to read: %+v %v", f, ok)
+	}
+	if _, ok := <-s.Frames; ok {
+		t.Error("and then the stream is closed")
+	}
+	if s.Wait() != nil {
+		t.Error("a stream finished without an error waits with none")
+	}
+	failed := &Error{ExitCode: 1}
+	if FinishedStream(failed).Wait() != failed {
+		t.Error("Wait returns the stream's error")
+	}
+}

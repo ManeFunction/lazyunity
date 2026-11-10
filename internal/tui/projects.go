@@ -179,7 +179,7 @@ func (m *Model) runOpen(r projectRow) tea.Cmd {
 			opts.BuildTarget = p.CLITarget
 		}
 	}
-	return m.withCLI(func(c *unitycli.Client) tea.Cmd {
+	return m.withCLI(func(c unityCLI) tea.Cmd {
 		m.toastf(toastInfo, "Opening %s…", r.name())
 		return func() tea.Msg {
 			res, err := c.Open(context.Background(), opts)
@@ -231,7 +231,7 @@ func (m *Model) afterOpened(r projectRow, format string) tea.Cmd {
 func (m *Model) upgradeMenu(r projectRow, to string) {
 	run := func(cloud unitycli.CloudChoice) func(*Model) tea.Cmd {
 		return func(m *Model) tea.Cmd {
-			return m.withCLI(func(c *unitycli.Client) tea.Cmd {
+			return m.withCLI(func(c unityCLI) tea.Cmd {
 				return m.enqueue(&task{
 					title: fmt.Sprintf("Upgrading %s to %s", r.name(), to),
 					label: r.name() + " → " + to,
@@ -372,7 +372,7 @@ func (m *Model) togglePin(r projectRow) tea.Cmd {
 		ok = "Unpinned " + r.name()
 	}
 	return m.runCLI("Pinning "+r.name(), ok,
-		func(ctx context.Context, c *unitycli.Client) error { return c.SetPinned(ctx, r.Path, pin) },
+		func(ctx context.Context, c unityCLI) error { return c.SetPinned(ctx, r.Path, pin) },
 		func(m *Model) tea.Cmd { m.selectAfterLoad = r.Path; return m.loadProjectsCmd() })
 }
 
@@ -398,7 +398,7 @@ func (m *Model) removeMenu(r projectRow) {
 			label: "Remove from the list", desc: "The folder and its files stay on disk. You can add the project again later.",
 			run: func(m *Model) tea.Cmd {
 				return m.runCLI("Removing "+r.name(), "Removed "+r.name()+" from the list",
-					func(ctx context.Context, c *unitycli.Client) error { return c.RemoveProjects(ctx, r.Path) },
+					func(ctx context.Context, c unityCLI) error { return c.RemoveProjects(ctx, r.Path) },
 					func(m *Model) tea.Cmd {
 						m.forgetPending(r.Path)
 						return m.loadProjectsCmd()
@@ -558,7 +558,7 @@ func (m *Model) addProjectPrompt() {
 		onSubmit: func(m *Model, text string) tea.Cmd {
 			path := filepath.Clean(config.ExpandHome(text))
 			return m.runCLI("Adding the project", "Added "+filepath.Base(path),
-				func(ctx context.Context, c *unitycli.Client) error { return c.AddProjects(ctx, path) },
+				func(ctx context.Context, c unityCLI) error { return c.AddProjects(ctx, path) },
 				func(m *Model) tea.Cmd { m.selectAfterLoad = path; return m.loadProjectsCmd() })
 		},
 	})
@@ -653,7 +653,7 @@ type projectInfoMsg struct {
 }
 
 func (m *Model) projectInfoCmd(r projectRow) tea.Cmd {
-	return m.withCLI(func(c *unitycli.Client) tea.Cmd {
+	return m.withCLI(func(c unityCLI) tea.Cmd {
 		m.toastf(toastInfo, "Reading %s…", r.name())
 		return func() tea.Msg {
 			info, err := c.ProjectInfo(context.Background(), r.Path)
@@ -765,7 +765,7 @@ func (m *Model) cleanConfirm(r projectRow) {
 		message: fmt.Sprintf("Delete the regenerable folders of %s (Library, Temp, Logs ...)? Your assets are not touched, but Unity has to rebuild the Library the next time you open it, which can take a long time.", r.name()),
 		onYes: func(m *Model) tea.Cmd {
 			return m.runCLI("Cleaning "+r.name(), "Cleaned "+r.name(),
-				func(ctx context.Context, c *unitycli.Client) error { return c.CleanProject(ctx, r.Path) }, nil)
+				func(ctx context.Context, c unityCLI) error { return c.CleanProject(ctx, r.Path) }, nil)
 		},
 	})
 }

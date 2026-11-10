@@ -68,7 +68,7 @@ type Model struct {
 	configDir string
 	version   string
 
-	cli       *unitycli.Client
+	cli       unityCLI // nil when there is no usable CLI
 	cliStatus unitycli.Status
 	env       unitycli.Env
 	goos      string
@@ -128,9 +128,12 @@ func New(o Options) (*Model, error) {
 	}
 	m := &Model{
 		cfg: o.Config, st: o.State, th: th, configDir: o.ConfigDir, version: o.Version,
-		cli: o.Client, cliStatus: o.CLI, env: o.Env, goos: o.GOOS, now: o.Now,
+		cliStatus: o.CLI, env: o.Env, goos: o.GOOS, now: o.Now,
 		mode: parseScreenMode(o.Config.GUI.ScreenMode), installRoot: o.InstallRoot,
 		missing: map[string]bool{}, installed: map[string]bool{}, registered: map[string]bool{},
+	}
+	if o.Client != nil { // a nil *Client in the interface would not be nil
+		m.cli = o.Client
 	}
 	if m.now == nil {
 		m.now = time.Now

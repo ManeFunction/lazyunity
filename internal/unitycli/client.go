@@ -54,13 +54,6 @@ func New(path string) *Client {
 	return &Client{Path: path, newCmd: exec.CommandContext}
 }
 
-// NewWithCommand returns a Client that builds its processes with newCmd instead
-// of running path. It exists so that other packages' tests can stand in a fake
-// CLI.
-func NewWithCommand(path string, newCmd func(ctx context.Context, name string, args ...string) *exec.Cmd) *Client {
-	return &Client{Path: path, newCmd: newCmd}
-}
-
 // Log returns a copy of the command log, oldest first.
 func (c *Client) Log() []LogEntry {
 	c.mu.Lock()

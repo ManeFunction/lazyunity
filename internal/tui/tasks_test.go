@@ -285,7 +285,7 @@ func TestTheSameWorkIsNotQueuedTwice(t *testing.T) {
 		t.Errorf("another module queues: %d tasks", len(m.tasks))
 	}
 	// installModules leaves out what is already queued
-	m.cli = unitycli.New("unity") // never run: the first task holds the queue
+	useFakeCLI(t, m) // never run: the first task holds the queue
 	ed := editorRow{}
 	ed.Version = "6000.6.8f1"
 	if cmd := m.installModules(ed, []unitycli.Module{{ID: "android", Name: "Android Build Support"}}); cmd != nil {
@@ -372,16 +372,16 @@ func TestCtrlCDuringPopupAlsoAsksWhenBusy(t *testing.T) {
 
 func TestRunCLI(t *testing.T) {
 	m := newTestModel(t)
-	m.cli = unitycli.New("/definitely/not/here") // only its presence matters: f below does not use it
+	useFakeCLI(t, m) // only its presence matters: f below does not use it
 	ranAfter := 0
-	cmd := m.runCLI("Pinning", "Pinned", func(context.Context, *unitycli.Client) error { return nil },
+	cmd := m.runCLI("Pinning", "Pinned", func(context.Context, unityCLI) error { return nil },
 		func(*Model) tea.Cmd { ranAfter++; return nil })
 	drain(m, cmd)
 	if ranAfter != 1 || !strings.Contains(screenText(m), "Pinned") {
 		t.Errorf("success: after=%d", ranAfter)
 	}
 
-	cmd = m.runCLI("Pinning", "", func(context.Context, *unitycli.Client) error {
+	cmd = m.runCLI("Pinning", "", func(context.Context, unityCLI) error {
 		return &unitycli.Error{ExitCode: 1, Message: "no such project"}
 	}, func(*Model) tea.Cmd { ranAfter++; return nil })
 	drain(m, cmd)
@@ -486,7 +486,7 @@ func TestFlowsWithoutTheCLIExplainItIsNeeded(t *testing.T) {
 		if name != "remove a module" {
 			m.cli = nil
 		} else {
-			useFakeCLI(t, m, nil)
+			useFakeCLI(t, m)
 		}
 		drain(m, flow(m))
 		if len(m.popups) == 0 || !strings.Contains(screenText(m), "Unity CLI needed") {

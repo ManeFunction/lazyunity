@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/ManeFunction/lazyunity/internal/state"
+	"github.com/ManeFunction/lazyunity/internal/unitycli"
 )
 
 func selectProject(t *testing.T, m *Model, name string) projectRow {
@@ -23,20 +24,17 @@ func selectProject(t *testing.T, m *Model, name string) projectRow {
 	return projectRow{}
 }
 
-func reloadProjectsResponse() fakeResp { return fakeResp{File: "projects.json"} }
 
 func TestOpenProjectRunsTheCLI(t *testing.T) {
 	m := newTestModel(t)
 	space := selectProject(t, m, "Space Shooter")
-	c := useFakeCLI(t, m, map[string]fakeResp{
-		"open " + space.Path: {Stdout: `{"success":true,"command":"open","data":{"alreadyOpen":false}}`},
-		"projects --all":     reloadProjectsResponse(),
-	})
+	f := useFakeCLI(t, m)
+	f.projects = fixture[unitycli.Project](t, "projects.json")
 	drain(m, m.keymap.lookup(ctxProjects, "enter").run(m))
-	if !called(c, "open "+space.Path) {
-		t.Fatalf("the CLI should have been asked to open the project: %v", calls(c))
+	if !f.called("Open", unitycli.OpenOptions{Project: space.Path}) {
+		t.Fatalf("the CLI should have been asked to open the project: %v", f.Calls())
 	}
-	if !called(c, "projects --all") {
+	if !f.called("Projects") {
 		t.Error("the list should be refreshed after opening, to update the last-opened time")
 	}
 	if !strings.Contains(screenText(m), "Opened Space Shooter in Unity 6000.6.8f1") {
@@ -49,10 +47,9 @@ func TestOpenProjectRunsTheCLI(t *testing.T) {
 
 func TestOpenAlreadyOpen(t *testing.T) {
 	m := newTestModel(t)
-	space := selectProject(t, m, "Space Shooter")
-	useFakeCLI(t, m, map[string]fakeResp{
-		"open " + space.Path: {Stdout: `{"success":true,"command":"open","data":{"alreadyOpen":true}}`},
-	})
+	selectProject(t, m, "Space Shooter")
+	f := useFakeCLI(t, m)
+	f.opened.AlreadyOpen = true
 	press(m, "space")
 	drain(m, m.keymap.lookup(ctxProjects, "space").run(m))
 	if !strings.Contains(screenText(m), "already open") {
@@ -66,13 +63,10 @@ func TestOpenAppliesAndClearsThePendingPlatform(t *testing.T) {
 	m.st.SetPending(old.Path, state.Pending{BuildTarget: "StandaloneLinux64"})
 	m.refreshProjects()
 	selectProject(t, m, "Old Platformer")
-	c := useFakeCLI(t, m, map[string]fakeResp{
-		"open " + old.Path + " --build-target linux64": {Stdout: `{"success":true,"command":"open","data":{}}`},
-		"projects --all": reloadProjectsResponse(),
-	})
+	f := useFakeCLI(t, m)
 	drain(m, m.keymap.lookup(ctxProjects, "enter").run(m))
-	if !called(c, "open "+old.Path+" --build-target linux64") {
-		t.Fatalf("the platform choice must reach the CLI as -buildTarget: %v", calls(c))
+	if !f.called("Open", unitycli.OpenOptions{Project: old.Path, BuildTarget: "linux64"}) {
+		t.Fatalf("the platform choice must reach the CLI as -buildTarget: %v", f.Calls())
 	}
 	if !m.st.PendingFor(old.Path).Empty() {
 		t.Error("an applied choice must be forgotten")
@@ -85,21 +79,18 @@ func TestOpenWithAnotherVersionAsksFirst(t *testing.T) {
 	m.st.SetPending(old.Path, state.Pending{Version: "6000.6.8f1"})
 	m.refreshProjects()
 	selectProject(t, m, "Old Platformer")
-	c := useFakeCLI(t, m, map[string]fakeResp{
-		"open " + old.Path + " --editor-version 6000.6.8f1": {Stdout: `{"success":true,"command":"open","data":{}}`},
-		"projects --all": reloadProjectsResponse(),
-	})
+	f := useFakeCLI(t, m)
 	cmd := m.keymap.lookup(ctxProjects, "enter").run(m)
 	if cmd != nil || len(m.popups) != 1 || !strings.Contains(screenText(m), "Open with another version") {
 		t.Fatalf("changing version needs a confirmation:\n%s", screenText(m))
 	}
-	if len(calls(c)) != 0 {
+	if len(f.Calls()) != 0 {
 		t.Error("nothing runs before the user agrees")
 	}
 	_, cmd = m.Update(keyMsg("enter")) // agree
 	drain(m, cmd)
-	if !called(c, "open "+old.Path+" --editor-version 6000.6.8f1") {
-		t.Errorf("after agreeing: %v", calls(c))
+	if !f.called("Open", unitycli.OpenOptions{Project: old.Path, EditorVersion: "6000.6.8f1"}) {
+		t.Errorf("after agreeing: %v", f.Calls())
 	}
 }
 
@@ -168,13 +159,12 @@ func TestDirectLaunchStartsTheEditor(t *testing.T) {
 
 func TestOpenFailureOffersDirectLaunch(t *testing.T) {
 	m := newTestModel(t)
-	space := selectProject(t, m, "Space Shooter")
-	useFakeCLI(t, m, map[string]fakeResp{
-		"open " + space.Path: {Stdout: `{"success":false,"errors":[{"code":"X","message":"the identity server did not start"}]}`, Exit: 6, Stderr: "details here"},
-	})
+	selectProject(t, m, "Space Shooter")
+	f := useFakeCLI(t, m)
+	f.err["Open"] = &unitycli.Error{ExitCode: unitycli.ExitCommandFailed, Message: "the identity server did not start", Output: "details here"}
 	drain(m, m.keymap.lookup(ctxProjects, "enter").run(m))
 	out := screenText(m)
-	for _, want := range []string{"Could not open Space Shooter", "the identity server did not start", "Open directly"} {
+	for _, want := range []string{"Could not open Space Shooter", "the identity server did not start", "details here", "Open directly"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("should contain %q:\n%s", want, out)
 		}
@@ -190,18 +180,15 @@ func TestUpgradeToUnity67GoesThroughUpgrade(t *testing.T) {
 	m.st.SetPending(old.Path, state.Pending{Version: "6000.7.0b8"})
 	m.refreshProjects()
 	selectProject(t, m, "Old Platformer")
-	c := useFakeCLI(t, m, map[string]fakeResp{
-		"projects upgrade " + old.Path + " --to 6000.7.0b8 --yes --no-cloud": {Stdout: okJSON},
-		"projects --all": reloadProjectsResponse(),
-	})
+	f := useFakeCLI(t, m)
 	m.keymap.lookup(ctxProjects, "enter").run(m)
 	if len(m.popups) != 1 || !strings.Contains(screenText(m), "Upgrade without Unity Cloud") {
 		t.Fatalf("`open` cannot move a project to 6.7, so an upgrade menu is offered:\n%s", screenText(m))
 	}
 	_, cmd := m.Update(keyMsg("enter"))
 	drain(m, cmd)
-	if !called(c, "projects upgrade "+old.Path+" --to 6000.7.0b8 --yes --no-cloud") {
-		t.Errorf("calls: %v", calls(c))
+	if !f.called("UpgradeProject", old.Path, "6000.7.0b8", unitycli.CloudOff) {
+		t.Errorf("calls: %v", f.Calls())
 	}
 	if !m.st.PendingFor(old.Path).Empty() {
 		t.Error("the choice is applied by the upgrade")
@@ -216,10 +203,7 @@ func TestUpgradeToUnity67KeepsThePendingPlatform(t *testing.T) {
 	m.st.SetPending(old.Path, state.Pending{Version: "6000.7.0b8", BuildTarget: "StandaloneLinux64"})
 	m.refreshProjects()
 	selectProject(t, m, "Old Platformer")
-	useFakeCLI(t, m, map[string]fakeResp{
-		"projects upgrade " + old.Path + " --to 6000.7.0b8 --yes --no-cloud": {Stdout: okJSON},
-		"projects --all": reloadProjectsResponse(),
-	})
+	useFakeCLI(t, m)
 	m.keymap.lookup(ctxProjects, "enter").run(m)
 	_, cmd := m.Update(keyMsg("enter"))
 	drain(m, cmd)
@@ -334,13 +318,11 @@ func TestPlatformMenuNeedsTheEditor(t *testing.T) {
 func TestPinRunsPinAndReloads(t *testing.T) {
 	m := newTestModel(t)
 	old := selectProject(t, m, "Old Platformer")
-	c := useFakeCLI(t, m, map[string]fakeResp{
-		"projects pin " + old.Path: {Stdout: okJSON},
-		"projects --all":           reloadProjectsResponse(),
-	})
+	f := useFakeCLI(t, m)
+	f.projects = fixture[unitycli.Project](t, "projects.json")
 	drain(m, m.keymap.lookup(ctxProjects, "f").run(m))
-	if !called(c, "projects pin "+old.Path) || !called(c, "projects --all") {
-		t.Errorf("calls: %v", calls(c))
+	if !f.called("SetPinned", old.Path, true) || !f.called("Projects") {
+		t.Errorf("calls: %v", f.Calls())
 	}
 	if !strings.Contains(screenText(m), "Pinned Old Platformer") {
 		t.Error("the user should be told")
@@ -348,13 +330,10 @@ func TestPinRunsPinAndReloads(t *testing.T) {
 
 	m = newTestModel(t)                           // the reload replaced the list, so start again for the other direction
 	space := selectProject(t, m, "Space Shooter") // already pinned: unpin
-	c = useFakeCLI(t, m, map[string]fakeResp{
-		"projects unpin " + space.Path: {Stdout: okJSON},
-		"projects --all":               reloadProjectsResponse(),
-	})
+	f = useFakeCLI(t, m)
 	drain(m, m.keymap.lookup(ctxProjects, "f").run(m))
-	if !called(c, "projects unpin "+space.Path) {
-		t.Errorf("calls: %v", calls(c))
+	if !f.called("SetPinned", space.Path, false) {
+		t.Errorf("calls: %v", f.Calls())
 	}
 }
 
@@ -366,10 +345,7 @@ func TestAddProject(t *testing.T) {
 	os.WriteFile(filepath.Join(proj, "ProjectSettings", "ProjectVersion.txt"), []byte("m_EditorVersion: 6000.6.8f1\n"), 0o644)
 	notProject := filepath.Join(dir, "Empty")
 	os.MkdirAll(notProject, 0o755)
-	c := useFakeCLI(t, m, map[string]fakeResp{
-		"projects add " + proj: {Stdout: okJSON},
-		"projects --all":       reloadProjectsResponse(),
-	})
+	f := useFakeCLI(t, m)
 
 	press(m, "a")
 	pp := m.popups[0].(*promptPopup)
@@ -386,8 +362,8 @@ func TestAddProject(t *testing.T) {
 	pp.in.Set(proj)
 	_, cmd := m.Update(keyMsg("enter"))
 	drain(m, cmd)
-	if !called(c, "projects add "+proj) || len(m.popups) != 0 {
-		t.Errorf("calls: %v popups=%d", calls(c), len(m.popups))
+	if !f.called("AddProjects", []string{proj}) || len(m.popups) != 0 {
+		t.Errorf("calls: %v popups=%d", f.Calls(), len(m.popups))
 	}
 	if !strings.Contains(screenText(m), "Added New Game") {
 		t.Error("the user should be told")
@@ -399,18 +375,15 @@ func TestRemoveFromList(t *testing.T) {
 	old := selectProject(t, m, "Old Platformer")
 	m.st.SetPending(old.Path, state.Pending{BuildTarget: "iOS"})
 	m.saveState()
-	c := useFakeCLI(t, m, map[string]fakeResp{
-		"projects remove " + old.Path + " --force": {Stdout: okJSON},
-		"projects --all": reloadProjectsResponse(),
-	})
+	f := useFakeCLI(t, m)
 	press(m, "d")
 	if len(m.popups) != 1 || !strings.Contains(screenText(m), "Remove from the list") || !strings.Contains(screenText(m), "Delete the folder from disk…") {
 		t.Fatalf("screen:\n%s", screenText(m))
 	}
 	_, cmd := m.Update(keyMsg("enter"))
 	drain(m, cmd)
-	if !called(c, "projects remove "+old.Path+" --force") {
-		t.Errorf("calls: %v", calls(c))
+	if !f.called("RemoveProjects", []string{old.Path}) {
+		t.Errorf("calls: %v", f.Calls())
 	}
 	if !m.st.PendingFor(old.Path).Empty() {
 		t.Error("choices for a removed project are forgotten")
@@ -434,10 +407,7 @@ func TestDeleteFromDiskNeedsTwoConfirmationsAndASafePath(t *testing.T) {
 	r.Title, r.Path, r.Version = "Doomed", proj, "6000.6.8f1"
 	m.st.SetPending(proj, state.Pending{BuildTarget: "iOS"})
 	m.saveState()
-	c := useFakeCLI(t, m, map[string]fakeResp{
-		"projects remove " + proj + " --force": {Stdout: okJSON},
-		"projects --all":                       reloadProjectsResponse(),
-	})
+	f := useFakeCLI(t, m)
 
 	m.deleteProjectFlow(r)
 	if !strings.Contains(screenText(m), "Delete the folder of Doomed from disk?") {
@@ -463,8 +433,8 @@ func TestDeleteFromDiskNeedsTwoConfirmationsAndASafePath(t *testing.T) {
 	if _, err := os.Stat(proj); !os.IsNotExist(err) {
 		t.Error("the folder should be gone")
 	}
-	if !called(c, "projects remove "+proj+" --force") {
-		t.Errorf("the project also leaves the list: %v", calls(c))
+	if !f.called("RemoveProjects", []string{proj}) {
+		t.Errorf("the project also leaves the list: %v", f.Calls())
 	}
 	if !state.Load(m.configDir).PendingFor(proj).Empty() {
 		t.Error("the deleted project's choices are forgotten, and that is saved")
@@ -542,9 +512,16 @@ func TestSortMenu(t *testing.T) {
 func TestProjectInfo(t *testing.T) {
 	m := newTestModel(t)
 	space := selectProject(t, m, "Space Shooter")
-	info := `{"success":true,"command":"projects info","data":{"title":"Space Shooter","path":"` + space.Path + `","version":"6000.6.8f1","changeset":"237b6593792b","buildTarget":"StandaloneLinux64","renderPipeline":"URP","cloudEnabled":true,"scriptingBackend":{"Android":"IL2CPP"},"packages":{"com.unity.inputsystem":"1.20.1","com.unity.modules.ui":"1.0.0","com.unity.ugui":"2.6.0"}}}`
-	useFakeCLI(t, m, map[string]fakeResp{"projects info " + space.Path: {Stdout: info}})
+	f := useFakeCLI(t, m)
+	f.projectInfo = unitycli.ProjectInfo{
+		Project:          unitycli.Project{Title: "Space Shooter", Path: space.Path, Version: "6000.6.8f1", Changeset: "237b6593792b", BuildTarget: "StandaloneLinux64", RenderPipeline: "URP", CloudEnabled: true},
+		ScriptingBackend: map[string]string{"Android": "IL2CPP"},
+		Packages:         map[string]string{"com.unity.inputsystem": "1.20.1", "com.unity.modules.ui": "1.0.0", "com.unity.ugui": "2.6.0"},
+	}
 	drain(m, m.keymap.lookup(ctxProjects, "i").run(m))
+	if !f.called("ProjectInfo", space.Path) {
+		t.Errorf("calls: %v", f.Calls())
+	}
 	out := screenText(m)
 	for _, want := range []string{"Space Shooter", "6000.6.8f1 (237b6593792b)", "URP", "Unity Cloud", "yes", "IL2CPP", "com.unity.inputsystem", "1.20.1", "1 built-in modules"} {
 		if !strings.Contains(out, want) {
@@ -582,18 +559,18 @@ func TestCopyMenu(t *testing.T) {
 func TestClean(t *testing.T) {
 	m := newTestModel(t)
 	space := selectProject(t, m, "Space Shooter")
-	c := useFakeCLI(t, m, map[string]fakeResp{"projects clean " + space.Path + " --yes": {Stdout: okJSON}})
+	f := useFakeCLI(t, m)
 	press(m, "C")
 	if len(m.popups) != 1 || !strings.Contains(screenText(m), "Clean project") || !strings.Contains(screenText(m), "rebuild") {
 		t.Fatalf("screen:\n%s", screenText(m))
 	}
-	if len(calls(c)) != 0 {
+	if len(f.Calls()) != 0 {
 		t.Error("nothing runs before the user agrees")
 	}
 	_, cmd := m.Update(keyMsg("enter"))
 	drain(m, cmd)
-	if !called(c, "projects clean "+space.Path+" --yes") || !strings.Contains(screenText(m), "Cleaned Space Shooter") {
-		t.Errorf("calls: %v", calls(c))
+	if !f.called("CleanProject", space.Path) || !strings.Contains(screenText(m), "Cleaned Space Shooter") {
+		t.Errorf("calls: %v", f.Calls())
 	}
 }
 
@@ -635,11 +612,8 @@ func TestNewProjectNameValidation(t *testing.T) {
 func TestNewProjectWizard(t *testing.T) {
 	m := newTestModel(t)
 	parent := t.TempDir()
-	c := useFakeCLI(t, m, map[string]fakeResp{
-		"templates --installed --brief --editor-version 6000.6.8f1":                                                                           {File: "templates.json"},
-		"projects create My Game --path " + parent + " --editor-version 6000.6.8f1 --template com.unity.template.urp-blank --no-cloud --open": {Stdout: okJSON},
-		"projects --all": reloadProjectsResponse(),
-	})
+	f := useFakeCLI(t, m)
+	f.templates = fixture[unitycli.Template](t, "templates.json")
 
 	cmd := m.keymap.lookup(ctxProjects, "n").run(m)
 	if cmd != nil || len(m.popups) != 1 || !strings.Contains(screenText(m), "New project (1/5)") {
@@ -661,6 +635,9 @@ func TestNewProjectWizard(t *testing.T) {
 	}
 	_, cmd = m.Update(keyMsg("enter")) // the first Editor, 6000.6.8f1
 	drain(m, cmd)
+	if !f.called("Templates", "6000.6.8f1") {
+		t.Errorf("the chosen Editor's templates are listed: %v", f.Calls())
+	}
 	out := screenText(m)
 	if !strings.Contains(out, "New project (4/5)") || !strings.Contains(out, "3D URP") || !strings.Contains(out, "Universal 2D") {
 		t.Fatalf("step 4:\n%s", out)
@@ -669,10 +646,14 @@ func TestNewProjectWizard(t *testing.T) {
 	if !strings.Contains(screenText(m), "New project (5/5)") || !strings.Contains(screenText(m), "[ ] Link to Unity Cloud") || !strings.Contains(screenText(m), "[x] Add Unity's recommended") {
 		t.Fatalf("step 5:\n%s", screenText(m))
 	}
-	_, cmd = m.Update(keyMsg("enter")) // the defaults: no cloud, recommended packages and settings (no --bare)
+	_, cmd = m.Update(keyMsg("enter")) // the defaults: no cloud, recommended packages and settings (not bare)
 	drain(m, cmd)
-	if len(calls(c)) == 0 || !called(c, "projects create My Game --path "+parent+" --editor-version 6000.6.8f1 --template com.unity.template.urp-blank --no-cloud --open") {
-		t.Errorf("calls: %v", calls(c))
+	want := unitycli.CreateOptions{
+		Name: "My Game", ParentDir: parent, EditorVersion: "6000.6.8f1", Template: "com.unity.template.urp-blank",
+		Cloud: unitycli.CloudOff, Open: true,
+	}
+	if !f.called("CreateProject", want) {
+		t.Errorf("calls: %v", f.Calls())
 	}
 	if !strings.Contains(screenText(m), "Created My Game") {
 		t.Error("the user should be told")
@@ -684,7 +665,7 @@ func TestNewProjectWizard(t *testing.T) {
 
 func TestNewProjectWizardRefusesAnExistingFolder(t *testing.T) {
 	m := newTestModel(t)
-	useFakeCLI(t, m, nil)
+	useFakeCLI(t, m)
 	parent := t.TempDir()
 	os.MkdirAll(filepath.Join(parent, "Taken"), 0o755)
 	m.newProjectLocation(newProject{name: "Taken"})
@@ -703,7 +684,7 @@ func TestNewProjectNeedsAnEditorAndTheCLI(t *testing.T) {
 		t.Error("without the CLI nothing can be created")
 	}
 	m.popups = nil
-	useFakeCLI(t, m, nil)
+	useFakeCLI(t, m)
 	m.editors, m.local = nil, nil
 	m.refreshEditors()
 	cmd := m.keymap.lookup(ctxProjects, "n").run(m)
