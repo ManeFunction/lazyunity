@@ -62,6 +62,9 @@ func validateProjectName(name string) string {
 		return `A name cannot contain < > : " | ? *`
 	case strings.TrimSpace(name) != name || strings.HasSuffix(name, "."):
 		return "A name cannot start with a space or end with a space or dot"
+	case strings.HasPrefix(name, "-"):
+		// the name is a positional argument of the CLI, which would read it as an option
+		return "A name cannot start with -"
 	}
 	return ""
 }

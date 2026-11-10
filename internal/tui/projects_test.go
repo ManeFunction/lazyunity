@@ -590,7 +590,7 @@ func TestProjectActionsNeedAProject(t *testing.T) {
 
 func TestNewProjectNameValidation(t *testing.T) {
 	good := []string{"My Game", "game-2", "a", "Ünity ゲーム"}
-	bad := []string{"", ".", "..", "a/b", `a\b`, "a:b", "a*b", " lead", "trail ", "dots.", `q"`, "a|b", "a?b", "<x>"}
+	bad := []string{"", ".", "..", "a/b", `a\b`, "a:b", "a*b", " lead", "trail ", "dots.", `q"`, "a|b", "a?b", "<x>", "-a", "--open", "--path"}
 	for _, n := range good {
 		if got := validateProjectName(n); got != "" {
 			t.Errorf("%q should be fine, got %q", n, got)
