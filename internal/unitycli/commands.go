@@ -47,8 +47,26 @@ func (c *Client) SetPinned(ctx context.Context, path string, pinned bool) error 
 	if pinned {
 		verb = "pin"
 	}
-	_, err := c.Run(ctx, "projects", verb, path)
+	_, err := c.Run(ctx, "projects", verb, globEscape(path))
 	return err
+}
+
+// globEscape makes a path match only itself where the CLI takes a glob pattern
+// (`projects pin` and `unpin` match every project whose title or path fits):
+// each glob character is put in a character class of its own.
+func globEscape(s string) string {
+	var b strings.Builder
+	for _, r := range s {
+		switch r {
+		case '[', '*', '?', '{', '}':
+			b.WriteByte('[')
+			b.WriteRune(r)
+			b.WriteByte(']')
+		default:
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
 }
 
 // CleanProject deletes a project's regenerable cache folders (Library, Temp ...).

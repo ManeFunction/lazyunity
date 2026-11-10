@@ -213,6 +213,7 @@ func TestArguments(t *testing.T) {
 		"projects remove /a --force":                           ok,
 		"projects pin /a":                                      ok,
 		"projects unpin /a":                                    ok,
+		"projects pin /g/Game [[]v2] [*][?][{]x[}]":            ok,
 		"projects clean /a --yes":                              ok,
 		"projects upgrade /a --to 6000.7.0f1 --yes --no-cloud": ok,
 		"editors add /e":                                       ok,
@@ -246,6 +247,7 @@ func TestArguments(t *testing.T) {
 	check("RemoveProjects", c.RemoveProjects(ctx, "/a"))
 	check("pin", c.SetPinned(ctx, "/a", true))
 	check("unpin", c.SetPinned(ctx, "/a", false))
+	check("pin with glob characters", c.SetPinned(ctx, "/g/Game [v2] *?{x}", true))
 	check("CleanProject", c.CleanProject(ctx, "/a"))
 	check("UpgradeProject", c.UpgradeProject(ctx, "/a", "6000.7.0f1", CloudOff))
 	check("AddEditors", c.AddEditors(ctx, "/e"))
