@@ -11,6 +11,12 @@ import (
 	"github.com/ManeFunction/lazyunity/internal/unitycli"
 )
 
+// pretendInstalled makes the inventory list one more Editor, which is on no disk.
+func pretendInstalled(m *Model, e editorRow) {
+	m.inv.all = append(m.inv.all, e)
+	m.inv.versions[e.Version] = true
+}
+
 func selectProject(t *testing.T, m *Model, name string) projectRow {
 	t.Helper()
 	for _, r := range m.projectsTab.Items() {
@@ -162,8 +168,7 @@ func TestOpenFailureOffersDirectLaunch(t *testing.T) {
 func TestUpgradeToUnity67GoesThroughUpgrade(t *testing.T) {
 	m := newTestModel(t)
 	// pretend a 6000.7 Editor is installed
-	m.editors = append(m.editors, editorRow{Version: "6000.7.0b8", Location: "/x/Unity", Platforms: m.editors[0].Platforms})
-	m.installed["6000.7.0b8"] = true
+	pretendInstalled(m, editorRow{Version: "6000.7.0b8", Location: "/x/Unity", Platforms: m.inv.editors()[0].Platforms})
 	old := selectProject(t, m, "Old Platformer")
 	m.st.SetPending(old.Path, state.Pending{Version: "6000.7.0b8"})
 	m.refreshProjects()
@@ -185,8 +190,7 @@ func TestUpgradeToUnity67GoesThroughUpgrade(t *testing.T) {
 
 func TestUpgradeToUnity67KeepsThePendingPlatform(t *testing.T) {
 	m := newTestModel(t)
-	m.editors = append(m.editors, editorRow{Version: "6000.7.0b8", Location: "/x/Unity", Platforms: m.editors[0].Platforms})
-	m.installed["6000.7.0b8"] = true
+	pretendInstalled(m, editorRow{Version: "6000.7.0b8", Location: "/x/Unity", Platforms: m.inv.editors()[0].Platforms})
 	old := selectProject(t, m, "Old Platformer")
 	m.st.SetPending(old.Path, state.Pending{Version: "6000.7.0b8", BuildTarget: "StandaloneLinux64"})
 	m.refreshProjects()
@@ -673,7 +677,7 @@ func TestNewProjectNeedsAnEditorAndTheCLI(t *testing.T) {
 	}
 	m.popups = nil
 	useFakeCLI(t, m)
-	m.editors, m.local = nil, nil
+	m.inv.setFound(nil, nil)
 	m.refreshEditors()
 	cmd := m.keymap.lookup(ctxProjects, "n").run(m)
 	_ = cmd
@@ -757,10 +761,10 @@ func TestAddPackageNeedsOpenUPM(t *testing.T) {
 
 func TestNewProjectStartsOnTheDefaultEditor(t *testing.T) {
 	m := newTestModel(t)
-	m.editors[1].Default = true // 2022.3.62f1, second in the list
+	m.inv.editors()[1].Default = true // 2022.3.62f1, second in the list
 	m.newProjectEditor(newProject{name: "G", parent: t.TempDir()})
 	menu := m.popups[len(m.popups)-1].(*menuPopup)
-	if it, _ := menu.list.Selected(); it.label != m.editors[1].Version {
+	if it, _ := menu.list.Selected(); it.label != m.inv.editors()[1].Version {
 		t.Errorf("the cursor starts on the default Editor, got %q", it.label)
 	}
 }

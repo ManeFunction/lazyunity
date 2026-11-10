@@ -234,50 +234,6 @@ func (m *Model) drawEditor(r editorRow, w int, base lipgloss.Style, cols editorC
 	return row.done(w)
 }
 
-// mergeEditors combines what a scan of the disk found with what the CLI
-// reports. The scan decides what is installed; the CLI adds the default Editor,
-// the real version of an Editor whose folder is not named after it, and the
-// Editors that live outside every root.
-func mergeEditors(local []unity.Installed, cli []unitycli.Editor, goos string) []editorRow {
-	byLoc := map[string]*editorRow{}
-	var rows []*editorRow
-	for _, e := range local {
-		r := &editorRow{
-			Version: e.Version, Arch: e.Architecture, Location: e.Location, Dir: e.Dir, LTS: e.LTS,
-			Platforms: unity.InstalledPlatforms(e.Dir, goos),
-		}
-		byLoc[e.Location] = r
-		rows = append(rows, r)
-	}
-	for _, e := range cli {
-		if r, ok := byLoc[e.Location]; ok {
-			r.Default = e.Default
-			if e.Version != "" {
-				r.Version = e.Version // the scan only knows the folder's name
-			}
-			if r.Arch == "" {
-				r.Arch = e.Architecture
-			}
-			continue
-		}
-		dir := unity.VersionDir(e.Location, goos)
-		r := &editorRow{
-			Version: e.Version, Arch: e.Architecture, Location: e.Location, Dir: dir, Default: e.Default,
-		}
-		if dir != "" {
-			r.Platforms = unity.InstalledPlatforms(dir, goos)
-		}
-		byLoc[e.Location] = r
-		rows = append(rows, r)
-	}
-	sort.SliceStable(rows, func(i, j int) bool { return unity.CompareStrings(rows[i].Version, rows[j].Version) > 0 })
-	out := make([]editorRow, len(rows))
-	for i, r := range rows {
-		out[i] = *r
-	}
-	return out
-}
-
 // ---- modules ---------------------------------------------------------------
 
 func (m *Model) drawModule(mod unitycli.Module, w int, base lipgloss.Style, cols moduleCols) string {

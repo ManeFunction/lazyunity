@@ -475,7 +475,7 @@ func TestFlowsWithoutTheCLIExplainItIsNeeded(t *testing.T) {
 			return m.createProject(newProject{name: "G", parent: t.TempDir()}, unitycli.CreateOptions{}, "", nil)
 		},
 		"remove a module": func(m *Model) tea.Cmd {
-			m.removeModuleConfirm(m.editors[0], unitycli.Module{ID: "webgl", Name: "WebGL"})
+			m.removeModuleConfirm(m.inv.editors()[0], unitycli.Module{ID: "webgl", Name: "WebGL"})
 			m.cli = nil // the CLI went away while the question was open
 			_, cmd := m.Update(keyMsg("enter"))
 			return cmd

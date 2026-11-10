@@ -72,14 +72,7 @@ func (m *Model) forgetPending(path string) {
 }
 
 // editorFor finds the installed Editor of a version.
-func (m *Model) editorFor(version string) *editorRow {
-	for i := range m.editors {
-		if m.editors[i].Version == version {
-			return &m.editors[i]
-		}
-	}
-	return nil
-}
+func (m *Model) editorFor(version string) *editorRow { return m.inv.find(version) }
 
 func (r projectRow) hasPlatform(ed *editorRow, buildTarget string) bool {
 	p, ok := unity.PlatformByBuildTarget(buildTarget)
@@ -272,7 +265,7 @@ func (m *Model) versionMenu(r projectRow) {
 			run: func(m *Model) tea.Cmd { return m.installEditorFlow(v, cs) },
 		})
 	}
-	for _, e := range m.editors {
+	for _, e := range m.inv.editors() {
 		tags := []string{}
 		if e.Version == r.Version {
 			tags = append(tags, "project's version")

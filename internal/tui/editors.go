@@ -417,7 +417,7 @@ func (m *Model) onReleaseModules(msg releaseModulesMsg) tea.Cmd {
 		}
 		return m.planInstall(unitycli.InstallOptions{
 			Version: msg.version, Changeset: msg.changeset, Modules: ids,
-			SetDefault: len(m.editors) == 0,
+			SetDefault: len(m.inv.editors()) == 0,
 		})
 	}
 	if len(mods) == 0 {

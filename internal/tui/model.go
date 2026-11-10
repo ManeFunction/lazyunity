@@ -30,8 +30,8 @@ type Options struct {
 	Env unitycli.Env
 	// host starts programs; nil means the real machine. Tests set it.
 	host host
-	GOOS   string
-	Now    func() time.Time
+	GOOS string
+	Now  func() time.Time
 
 	Projects []unitycli.Project
 	// Local are the Editors found in the Editor folders. When nil, New looks
@@ -94,11 +94,7 @@ type Model struct {
 	// data
 	rawProjects []unitycli.Project
 	missing     map[string]bool
-	local       []unity.Installed
-	cliEditors  []unitycli.Editor
-	installRoot string
-	editors     []editorRow
-	installed   map[string]bool
+	inv         *inventory
 	auth        unitycli.AuthInfo
 	authKnown   bool
 	openupm     openupmState
@@ -107,11 +103,6 @@ type Model struct {
 	toast  toast
 	filter filterState
 	quit   bool
-
-	// cliEditorsLoaded is set once the CLI has listed its Editors; registered holds
-	// the Editors lazyunity has already told the CLI about.
-	cliEditorsLoaded bool
-	registered       map[string]bool
 
 	// selectAfterLoad is a project path to put the cursor on once the list reloads.
 	selectAfterLoad string
@@ -132,8 +123,7 @@ func New(o Options) (*Model, error) {
 	m := &Model{
 		cfg: o.Config, st: o.State, th: th, configDir: o.ConfigDir, version: o.Version,
 		cliStatus: o.CLI, env: o.Env, goos: o.GOOS, now: o.Now,
-		mode: parseScreenMode(o.Config.GUI.ScreenMode), installRoot: o.InstallRoot,
-		missing: map[string]bool{}, installed: map[string]bool{}, registered: map[string]bool{},
+		mode: parseScreenMode(o.Config.GUI.ScreenMode), missing: map[string]bool{},
 	}
 	if o.Client != nil { // a nil *Client in the interface would not be nil
 		m.cli = o.Client
@@ -160,6 +150,9 @@ func New(o Options) (*Model, error) {
 	if m.st == nil {
 		m.st = state.Load("")
 	}
+	m.inv = newInventory(m.goos, homeDir(), o.InstallRoot, func() []string {
+		return append(append([]string(nil), m.st.ExtraRoots...), m.cfg.Editors.ExtraRoots...)
+	})
 	km, warnings := newKeymap(buildActions(), o.Config.Keybinding)
 	m.keymap = km
 	m.buildTabs()
@@ -168,9 +161,10 @@ func New(o Options) (*Model, error) {
 		m.focus = map[bool]int{true: panelProjects, false: panelEditors}[m.mode == modeProjects]
 	}
 
-	m.local = o.Local
-	if m.local == nil {
-		m.local = unity.Scan(m.goos, m.allRoots())
+	if o.Local != nil {
+		m.inv.setFound(withPlatforms(m.goos, o.Local), nil)
+	} else {
+		m.inv.setFound(scanEditors(m.goos, m.inv.roots()))
 	}
 	m.rawProjects = o.Projects
 	m.refreshEditors()
@@ -242,7 +236,7 @@ func (m *Model) focusedTab() tab      { return m.focusedPanel().active() }
 func (m *Model) focusCtx() ctxID      { return m.focusedTab().ctx() }
 
 // editorInstalled reports whether an Editor with this version is installed.
-func (m *Model) editorInstalled(version string) bool { return m.installed[version] }
+func (m *Model) editorInstalled(version string) bool { return m.inv.has(version) }
 
 func homeDir() string {
 	h, _ := os.UserHomeDir()

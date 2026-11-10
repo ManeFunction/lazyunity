@@ -33,7 +33,7 @@ func (m *Model) startNewProject() tea.Cmd {
 	if !m.needCLI() {
 		return nil
 	}
-	if len(m.editors) == 0 {
+	if len(m.inv.editors()) == 0 {
 		m.toastf(toastWarn, "Install a Unity Editor first")
 		return m.showReleases()
 	}
@@ -94,7 +94,7 @@ func (m *Model) newProjectLocation(w newProject) {
 func (m *Model) newProjectEditor(w newProject) {
 	var items []menuItem
 	pick := ""
-	for _, e := range m.editors {
+	for _, e := range m.inv.editors() {
 		tags := []string{}
 		if e.Default {
 			tags = append(tags, "default")

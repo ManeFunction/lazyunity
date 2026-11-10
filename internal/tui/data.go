@@ -8,7 +8,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/ManeFunction/lazyunity/internal/config"
-	"github.com/ManeFunction/lazyunity/internal/unity"
 	"github.com/ManeFunction/lazyunity/internal/unitycli"
 )
 
@@ -21,11 +20,15 @@ type projectsMsg struct {
 }
 
 type editorsMsg struct {
-	editors []unitycli.Editor
+	editors []listedEditor
 	err     error
 }
 
-type localEditorsMsg struct{ local []unity.Installed }
+// localEditorsMsg is a scan of the Editor folders.
+type localEditorsMsg struct {
+	found   []foundEditor
+	missing map[string]bool
+}
 
 type authMsg struct {
 	info unitycli.AuthInfo
@@ -71,15 +74,19 @@ func (m *Model) loadProjectsCmd() tea.Cmd {
 }
 
 func (m *Model) loadEditorsCmd() tea.Cmd {
+	goos := m.goos
 	return m.cliCmd(func(ctx context.Context, c unityCLI) tea.Msg {
 		eds, err := c.Editors(ctx)
-		return editorsMsg{editors: eds, err: err}
+		return editorsMsg{editors: listEditors(goos, eds), err: err}
 	})
 }
 
 func (m *Model) scanEditorsCmd() tea.Cmd {
-	goos, roots := m.goos, m.allRoots()
-	return func() tea.Msg { return localEditorsMsg{local: unity.Scan(goos, roots)} }
+	goos, roots := m.goos, m.inv.roots()
+	return func() tea.Msg {
+		found, missing := scanEditors(goos, roots)
+		return localEditorsMsg{found: found, missing: missing}
+	}
 }
 
 func (m *Model) loadAuthCmd() tea.Cmd {
@@ -127,11 +134,11 @@ func (m *Model) handleData(msg tea.Msg) tea.Cmd {
 			m.toastf(toastError, "Could not list editors: %v", msg.err)
 			return nil
 		}
-		m.cliEditors, m.cliEditorsLoaded = msg.editors, true
+		m.inv.setListed(msg.editors)
 		m.refreshEditors()
 		return m.registerStrays()
 	case localEditorsMsg:
-		m.local = msg.local
+		m.inv.setFound(msg.found, msg.missing)
 		m.refreshEditors()
 		return m.registerStrays()
 	case authMsg:
@@ -143,7 +150,7 @@ func (m *Model) handleData(msg tea.Msg) tea.Cmd {
 		m.refreshTools()
 	case installPathMsg:
 		if msg.err == nil && msg.path != "" {
-			m.installRoot = msg.path
+			m.inv.setInstallRoot(msg.path)
 			m.refreshRoots()
 			return m.scanEditorsCmd()
 		}
@@ -199,56 +206,22 @@ func (m *Model) refreshProjects() {
 	m.projectsTab.SetItems(rows)
 }
 
-// refreshEditors merges the scan of the disk with what the CLI reported.
+// refreshEditors shows the inventory's Editors.
 func (m *Model) refreshEditors() {
-	m.editors = mergeEditors(m.local, m.cliEditors, m.goos)
-	m.installed = map[string]bool{}
-	for _, e := range m.editors {
-		m.installed[e.Version] = true
-	}
-	m.editorsTab.SetItems(m.editors)
+	m.editorsTab.SetItems(m.inv.editors())
 	m.refreshRoots()
-}
-
-// allRoots is every folder Editors are looked for in: the install location
-// first, then the folders added in the Roots tab and in the config.
-func (m *Model) allRoots() []string {
-	var out []string
-	seen := map[string]bool{}
-	add := func(p string) {
-		if p = filepath.Clean(config.ExpandHome(p)); p != "." && !seen[p] {
-			seen[p] = true
-			out = append(out, p)
-		}
-	}
-	if m.installRoot != "" {
-		add(m.installRoot)
-	} else {
-		add(unity.DefaultInstallRoot(m.goos, homeDir()))
-	}
-	for _, r := range m.st.ExtraRoots {
-		add(r)
-	}
-	for _, r := range m.cfg.Editors.ExtraRoots {
-		add(r)
-	}
-	return out
 }
 
 // refreshRoots rebuilds the Roots tab.
 func (m *Model) refreshRoots() {
-	install := m.allRoots()[0]
-	counts := map[string]int{}
-	for _, e := range m.local {
-		counts[filepath.Clean(e.Root)]++
-	}
+	roots := m.inv.roots()
+	install := roots[0]
 	inState := map[string]bool{}
 	for _, r := range m.st.ExtraRoots {
-		inState[filepath.Clean(r)] = true
+		inState[filepath.Clean(config.ExpandHome(r))] = true
 	}
 	var rows []rootRow
-	for _, p := range m.allRoots() {
-		_, err := os.Stat(p)
+	for _, p := range roots {
 		src := "config"
 		switch {
 		case p == install:
@@ -256,7 +229,7 @@ func (m *Model) refreshRoots() {
 		case inState[p]:
 			src = "state"
 		}
-		rows = append(rows, rootRow{Path: p, Install: p == install, Source: src, Exists: err == nil, Editors: counts[p]})
+		rows = append(rows, rootRow{Path: p, Install: p == install, Source: src, Exists: m.inv.exists(p), Editors: m.inv.foundIn(p)})
 	}
 	m.rootsTab.SetItems(rows)
 }

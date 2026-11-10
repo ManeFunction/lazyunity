@@ -242,10 +242,10 @@ func TestNewScansTheEditorFoldersItself(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(m.editors) != 2 {
-		t.Errorf("both Editors of the install folder are found: %+v", m.editors)
+	if eds := m.inv.editors(); len(eds) != 2 {
+		t.Errorf("both Editors of the install folder are found: %+v", eds)
 	}
-	if got := m.allRoots(); len(got) != 2 {
+	if got := m.inv.roots(); len(got) != 2 {
 		t.Errorf("each folder is looked in once: %q", got)
 	}
 }

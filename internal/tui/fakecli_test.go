@@ -109,7 +109,7 @@ func fixture[T any](t *testing.T, name string) []T {
 // found on disk.
 func cliEditors(m *Model) []unitycli.Editor {
 	var out []unitycli.Editor
-	for _, e := range m.editors {
+	for _, e := range m.inv.editors() {
 		out = append(out, unitycli.Editor{Version: e.Version, Architecture: e.Arch, Location: e.Location, Default: e.Default})
 	}
 	return out

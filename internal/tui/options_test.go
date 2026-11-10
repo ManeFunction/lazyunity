@@ -30,7 +30,7 @@ func TestRootsListShowsInstallRootAndExtras(t *testing.T) {
 	extra := t.TempDir()
 	m.st.AddRoot(extra)
 	m.cfg.Editors.ExtraRoots = []string{"/from/config"}
-	m.refreshRoots()
+	drain(m, m.scanEditorsCmd()) // the scan finds which folders are there
 	press(m, "3", "]")
 	out := screenText(m)
 	if !strings.Contains(out, "install location") || !strings.Contains(out, "2 editors") || !strings.Contains(out, "not found") {
@@ -84,7 +84,7 @@ func TestRemoveARoot(t *testing.T) {
 	extra := t.TempDir()
 	m.st.AddRoot(extra)
 	m.cfg.Editors.ExtraRoots = []string{"/from/config"}
-	m.refreshRoots()
+	drain(m, m.scanEditorsCmd()) // the scan finds which folders are there
 	press(m, "3", "]")
 
 	selectRoot(t, m, "Editor") // the install location
@@ -125,8 +125,8 @@ func TestSetInstallLocation(t *testing.T) {
 	if !f.called("SetInstallPath", extra) || !f.called("InstallPath") {
 		t.Fatalf("calls: %v", f.Calls())
 	}
-	if m.installRoot != extra {
-		t.Errorf("the new install root should be adopted, got %q", m.installRoot)
+	if got := m.inv.roots()[0]; got != extra {
+		t.Errorf("the new install root should be adopted, got %q", got)
 	}
 	roots := m.rootsTab.Items()
 	if !roots[0].Install || roots[0].Path != extra {
@@ -144,11 +144,10 @@ func TestStrayEditorsAreRegisteredOnceAndQuietly(t *testing.T) {
 	m := newTestModel(t)
 	f := useFakeCLI(t, m)
 	f.err["AddEditors"] = cliError(1, "signature check failed")
-	m.cliEditorsLoaded = false
 	if cmd := m.registerStrays(); cmd != nil {
 		t.Error("nothing is registered before the CLI's own list is known")
 	}
-	m.cliEditorsLoaded = true
+	m.inv.setListed(nil) // the CLI lists none of them
 	cmd := m.registerStrays()
 	if cmd == nil {
 		t.Fatal("Editors the CLI does not know about should be registered")
@@ -157,7 +156,7 @@ func TestStrayEditorsAreRegisteredOnceAndQuietly(t *testing.T) {
 	if len(m.popups) != 0 || strings.Contains(screenText(m), "signature") {
 		t.Errorf("a refused registration must stay quiet:\n%s", screenText(m))
 	}
-	if calls := f.Calls(); len(calls) != 1 || !f.called("AddEditors", []string{m.editors[0].Location, m.editors[1].Location}) {
+	if calls := f.Calls(); len(calls) != 1 || !f.called("AddEditors", []string{m.inv.editors()[0].Location, m.inv.editors()[1].Location}) {
 		t.Errorf("calls: %v", calls)
 	}
 	if again := m.registerStrays(); again != nil {
@@ -166,10 +165,7 @@ func TestStrayEditorsAreRegisteredOnceAndQuietly(t *testing.T) {
 	// Editors the CLI already lists are left alone
 	m2 := newTestModel(t)
 	useFakeCLI(t, m2)
-	m2.cliEditorsLoaded = true
-	for _, e := range m2.editors {
-		m2.cliEditors = append(m2.cliEditors, unitycli.Editor{Version: e.Version, Location: e.Location})
-	}
+	m2.inv.setListed(listEditors("linux", cliEditors(m2)))
 	if cmd := m2.registerStrays(); cmd != nil {
 		t.Error("known Editors need no registering")
 	}
@@ -488,7 +484,7 @@ func TestTildeInConfiguredPathsIsExpanded(t *testing.T) {
 	m := newTestModel(t)
 	m.cfg.Editors.ExtraRoots = []string{"~/Unity-extra"}
 	m.cfg.Projects.DefaultLocation = "~/Games"
-	roots := m.allRoots()
+	roots := m.inv.roots()
 	want := filepath.Join(homeDir(), "Unity-extra")
 	found := false
 	for _, r := range roots {

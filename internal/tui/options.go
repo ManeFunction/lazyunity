@@ -97,19 +97,7 @@ func (m *Model) setInstallRoot(r rootRow) tea.Cmd {
 // user, so that its module commands and --editor-version work for them. It does
 // this once for each Editor.
 func (m *Model) registerStrays() tea.Cmd {
-	if !m.cliEditorsLoaded {
-		return nil
-	}
-	known := map[string]bool{}
-	for _, e := range m.cliEditors {
-		known[e.Location] = true
-	}
-	var paths []string
-	for _, e := range m.local {
-		if !known[e.Location] && !m.registered[e.Location] {
-			paths = append(paths, e.Location)
-		}
-	}
+	paths, goos := m.inv.strays(), m.goos
 	if len(paths) == 0 {
 		return nil
 	}
@@ -121,12 +109,10 @@ func (m *Model) registerStrays() tea.Cmd {
 			return nil
 		}
 		eds, err := c.Editors(ctx)
-		return editorsMsg{editors: eds, err: err}
+		return editorsMsg{editors: listEditors(goos, eds), err: err}
 	})
 	if cmd != nil {
-		for _, p := range paths {
-			m.registered[p] = true
-		}
+		m.inv.told(paths)
 	}
 	return cmd
 }
