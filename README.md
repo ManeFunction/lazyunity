@@ -36,7 +36,7 @@ make build        # bin/lazyunity
 make check        # vet, gofmt and the tests
 ```
 
-Go 1.27 or newer. There are no releases yet.
+Go 1.27.3 or newer (what `go.mod` requires). There are no releases yet.
 
 ## Layout
 
