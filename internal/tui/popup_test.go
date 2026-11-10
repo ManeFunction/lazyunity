@@ -706,3 +706,43 @@ func TestNewProjectOptionsManeTools(t *testing.T) {
 		t.Errorf("with OpenUPM there are two options:\n%s", out)
 	}
 }
+
+// quits reports whether cmd ends the program.
+func quits(cmd tea.Cmd) bool {
+	if cmd == nil {
+		return false
+	}
+	msg := cmd()
+	if _, ok := msg.(tea.QuitMsg); ok {
+		return true
+	}
+	for _, c := range sequenceOf(msg) {
+		if quits(c) {
+			return true
+		}
+	}
+	if b, ok := msg.(tea.BatchMsg); ok {
+		for _, c := range b {
+			if quits(c) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// Quitting from a menu with the mouse quits at once, as it does with a key.
+func TestClickingQuitInTheKeybindingsMenuQuits(t *testing.T) {
+	m := newTestModel(t)
+	press(m, "?")
+	for y, l := range screen(m) {
+		if i := strings.Index(l, " Quit "); i >= 0 && !strings.Contains(l, "Keybindings") {
+			_, cmd := m.Update(tea.MouseClickMsg{X: i + 2, Y: y, Button: tea.MouseLeft})
+			if !quits(cmd) {
+				t.Fatalf("clicking Quit should quit:\n%s", screenText(m))
+			}
+			return
+		}
+	}
+	t.Fatalf("no Quit row in the keybindings menu:\n%s", screenText(m))
+}

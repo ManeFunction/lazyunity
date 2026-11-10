@@ -16,6 +16,13 @@ type popup interface {
 	update(m *Model, msg tea.Msg) (next func(*Model) tea.Cmd, done bool)
 	// view draws the whole box, border included.
 	view(m *Model) string
+	// layers draws the box and, apart, what goes right under it (a menu
+	// item's description). reserve is the height to keep free under the box
+	// when it is placed, so that it does not move as below changes.
+	layers(m *Model) (box, below string, reserve int)
+	// click handles a click on a row of the box, 0 being the first row inside
+	// the border. It answers as update does.
+	click(m *Model, row int) (next func(*Model) tea.Cmd, done bool)
 }
 
 // wrapText wraps s to w cells, keeping its own line breaks.
@@ -256,6 +263,15 @@ func (p *menuPopup) update(m *Model, msg tea.Msg) (func(*Model) tea.Cmd, bool) {
 	return nil, false
 }
 
+// click picks the clicked row, as Enter would. A multi menu ignores clicks:
+// a click there would mean ticking, which is not what Enter does.
+func (p *menuPopup) click(m *Model, row int) (func(*Model) tea.Cmd, bool) {
+	if p.multi || !p.list.Click(row) {
+		return nil, false
+	}
+	return p.activate(m)
+}
+
 func (p *menuPopup) view(m *Model) string {
 	box, tip, _ := p.layers(m)
 	if tip != "" {
@@ -426,6 +442,9 @@ func (p *confirmPopup) update(m *Model, msg tea.Msg) (func(*Model) tea.Cmd, bool
 	return nil, false
 }
 
+func (p *confirmPopup) layers(m *Model) (string, string, int)          { return p.view(m), "", 0 }
+func (p *confirmPopup) click(*Model, int) (func(*Model) tea.Cmd, bool) { return nil, false }
+
 func (p *confirmPopup) view(m *Model) string {
 	th := m.th
 	w := m.boxWidth(64, 36)
@@ -504,6 +523,9 @@ func (p *promptPopup) update(m *Model, msg tea.Msg) (func(*Model) tea.Cmd, bool)
 	}
 	return nil, false
 }
+
+func (p *promptPopup) layers(m *Model) (string, string, int)          { return p.view(m), "", 0 }
+func (p *promptPopup) click(*Model, int) (func(*Model) tea.Cmd, bool) { return nil, false }
 
 func (p *promptPopup) view(m *Model) string {
 	th := m.th
@@ -605,6 +627,9 @@ func (p *infoPopup) update(m *Model, msg tea.Msg) (func(*Model) tea.Cmd, bool) {
 	p.offset = clamp(p.offset, 0, maxOff)
 	return nil, false
 }
+
+func (p *infoPopup) layers(m *Model) (string, string, int)          { return p.view(m), "", 0 }
+func (p *infoPopup) click(*Model, int) (func(*Model) tea.Cmd, bool) { return nil, false }
 
 func (p *infoPopup) view(m *Model) string {
 	w := m.boxWidth(80, 40)

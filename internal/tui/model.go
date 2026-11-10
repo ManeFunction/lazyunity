@@ -298,35 +298,33 @@ func (m *Model) Init() tea.Cmd {
 
 // Update handles every message.
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.w, m.h = msg.Width, msg.Height
 		m.relayout()
-		return m, nil
 	case tickMsg:
-		return m, tick()
+		cmd = tick()
 	case tea.KeyPressMsg:
-		cmd := m.handleKey(msg)
-		return m, m.finish(cmd)
+		cmd = m.handleKey(msg)
 	case tea.PasteMsg:
-		return m, m.handlePaste(msg)
+		cmd = m.handlePaste(msg)
 	case tea.MouseClickMsg:
-		return m, m.handleClick(msg)
+		cmd = m.handleClick(msg)
 	case tea.MouseWheelMsg:
-		return m, m.handleWheel(msg)
+		cmd = m.handleWheel(msg)
 	case tea.FocusMsg:
-		if m.cli != nil {
-			return m, m.loadProjectsCmd()
+		cmd = m.loadProjectsCmd()
+	default:
+		var ok bool
+		if cmd, ok = m.handleTask(msg); !ok {
+			cmd = m.handleData(msg)
 		}
-		return m, nil
 	}
-	if cmd, ok := m.handleTask(msg); ok {
-		return m, m.finish(cmd)
-	}
-	return m, m.finish(m.handleData(msg))
+	return m, m.finish(cmd)
 }
 
-// finish runs after every update that may have asked to quit.
+// finish runs after every update, any of which may have asked to quit.
 func (m *Model) finish(cmd tea.Cmd) tea.Cmd {
 	if m.quit {
 		return tea.Sequence(cmd, tea.Quit)
@@ -334,20 +332,30 @@ func (m *Model) finish(cmd tea.Cmd) tea.Cmd {
 	return cmd
 }
 
+// toPopup hands a message to the popup on top.
+func (m *Model) toPopup(msg tea.Msg) tea.Cmd {
+	return m.resolve(m.popups[len(m.popups)-1].update(m, msg))
+}
+
+// resolve acts on what a popup answered: it closes the popup when it is done,
+// then runs next, which may open another one.
+func (m *Model) resolve(next func(*Model) tea.Cmd, done bool) tea.Cmd {
+	if done {
+		m.pop()
+	}
+	if next != nil {
+		return next(m)
+	}
+	return nil
+}
+
 func (m *Model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 	key := keyString(msg)
 	if key == "ctrl+c" && len(m.popups) > 0 {
 		return m.requestQuit()
 	}
-	if n := len(m.popups); n > 0 {
-		next, done := m.popups[n-1].update(m, msg)
-		if done {
-			m.pop()
-		}
-		if next != nil {
-			return next(m)
-		}
-		return nil
+	if len(m.popups) > 0 {
+		return m.toPopup(msg)
 	}
 	if m.filter.active {
 		return m.updateFilter(msg)
@@ -360,15 +368,8 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 }
 
 func (m *Model) handlePaste(msg tea.PasteMsg) tea.Cmd {
-	if n := len(m.popups); n > 0 {
-		next, done := m.popups[n-1].update(m, msg)
-		if done {
-			m.pop()
-		}
-		if next != nil {
-			return next(m)
-		}
-		return nil
+	if len(m.popups) > 0 {
+		return m.toPopup(msg)
 	}
 	if m.filter.active {
 		m.filter.in.Paste(msg.Content)
@@ -469,15 +470,8 @@ func (m *Model) handleWheel(msg tea.MouseWheelMsg) tea.Cmd {
 	if !m.cfg.GUI.MouseEvents {
 		return nil
 	}
-	if n := len(m.popups); n > 0 {
-		next, done := m.popups[n-1].update(m, msg)
-		if done {
-			m.pop()
-		}
-		if next != nil {
-			return next(m)
-		}
-		return nil
+	if len(m.popups) > 0 {
+		return m.toPopup(msg)
 	}
 	i := m.geo.panelAt(msg.X, msg.Y)
 	if i < 0 {
@@ -492,27 +486,17 @@ func (m *Model) handleWheel(msg tea.MouseWheelMsg) tea.Cmd {
 	return nil
 }
 
-// popupClick lets a click choose a row of the top menu.
+// popupClick hands a click inside the top popup's border to it, as the row
+// of the box that was clicked.
 func (m *Model) popupClick(msg tea.MouseClickMsg) tea.Cmd {
-	menu, ok := m.popups[len(m.popups)-1].(*menuPopup)
-	if !ok || menu.multi {
-		return nil
-	}
-	pl := m.placePopup(menu)
+	p := m.popups[len(m.popups)-1]
+	pl := m.placePopup(p)
 	bw, _ := lipgloss.Size(pl.box)
-	x0, y0 := pl.x, pl.y
-	row := msg.Y - y0 - 1
-	if msg.X <= x0 || msg.X >= x0+bw-1 || row < 0 || !menu.list.Click(row) {
+	row := msg.Y - pl.y - 1
+	if msg.X <= pl.x || msg.X >= pl.x+bw-1 || row < 0 {
 		return nil
 	}
-	next, done := menu.activate(m)
-	if done {
-		m.pop()
-	}
-	if next != nil {
-		return next(m)
-	}
-	return nil
+	return m.resolve(p.click(m, row))
 }
 
 // ---- view ---------------------------------------------------------------------
@@ -582,12 +566,8 @@ type placedPopup struct {
 // box were always under it, so it does not move as the selection changes.
 func (m *Model) placePopup(p popup) placedPopup {
 	var pl placedPopup
-	reserve := 0
-	if menu, ok := p.(*menuPopup); ok {
-		pl.box, pl.below, reserve = menu.layers(m)
-	} else {
-		pl.box = p.view(m)
-	}
+	var reserve int
+	pl.box, pl.below, reserve = p.layers(m)
 	bw, bh := lipgloss.Size(pl.box)
 	pl.x = max((m.w-bw)/2, 0)
 	pl.y = max((m.h-bh-reserve)/2, 0)
