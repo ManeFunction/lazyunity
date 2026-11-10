@@ -197,3 +197,21 @@ func TestEdit(t *testing.T) {
 		}
 	}
 }
+
+func TestShellCommand(t *testing.T) {
+	noEnv := func(string) string { return "" }
+	unix := ShellCommand("linux", "/bin/zsh", "ls -la", "/p", noEnv)
+	if unix.Path != "/bin/zsh" || unix.Args[1] != "-c" || !strings.HasPrefix(unix.Args[2], "ls -la;") || !strings.Contains(unix.Args[2], "Press enter") || unix.Dir != "/p" {
+		t.Errorf("unix: %v (dir %q)", unix.Args, unix.Dir)
+	}
+	if c := ShellCommand("linux", "", "x", "/p", func(string) string { return "/usr/bin/fish" }); c.Args[0] != "/usr/bin/fish" {
+		t.Errorf("then $SHELL: %v", c.Args)
+	}
+	if c := ShellCommand("linux", "", "x", "/p", noEnv); c.Args[0] != "/bin/sh" {
+		t.Errorf("falls back to /bin/sh: %v", c.Args)
+	}
+	win := ShellCommand("windows", "", "dir", `C:\p`, noEnv)
+	if win.Args[0] != "cmd" || win.Args[1] != "/C" || !strings.Contains(win.Args[2], "pause") {
+		t.Errorf("windows: %v", win.Args)
+	}
+}

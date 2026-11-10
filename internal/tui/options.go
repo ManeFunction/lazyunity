@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -15,6 +14,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/ManeFunction/lazyunity/internal/config"
+	"github.com/ManeFunction/lazyunity/internal/launch"
 	"github.com/ManeFunction/lazyunity/internal/unitycli"
 )
 
@@ -458,24 +458,8 @@ func (m *Model) shellPrompt() {
 			return ""
 		},
 		onSubmit: func(m *Model, text string) tea.Cmd {
-			return tea.ExecProcess(shellCommand(m.goos, m.cfg.OS.Shell, text, dir), func(err error) tea.Msg { return nil })
+			cmd := launch.ShellCommand(m.goos, m.cfg.OS.Shell, text, dir, m.getenv)
+			return tea.ExecProcess(cmd, func(err error) tea.Msg { return nil })
 		},
 	})
-}
-
-func shellCommand(goos, shell, text, dir string) *exec.Cmd {
-	var cmd *exec.Cmd
-	if goos == "windows" {
-		cmd = exec.Command("cmd", "/C", text+" & echo. & pause")
-	} else {
-		if shell == "" {
-			shell = os.Getenv("SHELL")
-		}
-		if shell == "" {
-			shell = "/bin/sh"
-		}
-		cmd = exec.Command(shell, "-c", text+`; printf '\nPress enter to return to lazyunity... '; read _`)
-	}
-	cmd.Dir = dir
-	return cmd
 }

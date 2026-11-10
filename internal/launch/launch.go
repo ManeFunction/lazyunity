@@ -116,6 +116,27 @@ func Edit(tmpl, path, dir string, getenv func(string) string) (*exec.Cmd, error)
 	return cmd, nil
 }
 
+// ShellCommand runs a line of shell in dir, then waits for Enter, so that
+// its output can be read before lazyunity takes the terminal back. shell is the
+// shell to use on Unix; empty means $SHELL, as read by getenv, then /bin/sh.
+// Windows uses cmd.
+func ShellCommand(goos, shell, text, dir string, getenv func(string) string) *exec.Cmd {
+	var cmd *exec.Cmd
+	if goos == "windows" {
+		cmd = exec.Command("cmd", "/C", text+" & echo. & pause")
+	} else {
+		if shell == "" {
+			shell = getenv("SHELL")
+		}
+		if shell == "" {
+			shell = "/bin/sh"
+		}
+		cmd = exec.Command(shell, "-c", text+`; printf '\nPress enter to return to lazyunity... '; read _`)
+	}
+	cmd.Dir = dir
+	return cmd
+}
+
 // Expand splits a command line into words and puts dir where {{dir}} is. The
 // substitution happens after the splitting, so a folder with spaces in its name
 // stays one argument.

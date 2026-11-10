@@ -471,21 +471,6 @@ func TestCancelTaskActionOnlyWhenBusy(t *testing.T) {
 	}
 }
 
-func TestShellCommand(t *testing.T) {
-	unix := shellCommand("linux", "/bin/zsh", "ls -la", "/p")
-	if unix.Path != "/bin/zsh" || unix.Args[1] != "-c" || !strings.HasPrefix(unix.Args[2], "ls -la;") || !strings.Contains(unix.Args[2], "Press enter") || unix.Dir != "/p" {
-		t.Errorf("unix: %v (dir %q)", unix.Args, unix.Dir)
-	}
-	t.Setenv("SHELL", "")
-	if c := shellCommand("linux", "", "x", "/p"); c.Args[0] != "/bin/sh" {
-		t.Errorf("falls back to /bin/sh: %v", c.Args)
-	}
-	win := shellCommand("windows", "", "dir", `C:\p`)
-	if win.Args[0] != "cmd" || win.Args[1] != "/C" || !strings.Contains(win.Args[2], "pause") {
-		t.Errorf("windows: %v", win.Args)
-	}
-}
-
 func TestShellPrompt(t *testing.T) {
 	m := newTestModel(t)
 	press(m, ":")
