@@ -122,7 +122,7 @@ keybinding:                  # lazygit's notation works: <c-s>, <space>, <enter>
     quit: [q, <c-c>]
     refresh: <disabled>
   projects:
-    open: [<enter>, o]
+    open: [<enter>, O]
 os:
   edit: code {{dir}}         # for `e`; default is $VISUAL / $EDITOR
   openFolder: ''             # default is xdg-open, open or explorer

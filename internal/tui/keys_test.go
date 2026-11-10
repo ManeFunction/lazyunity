@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -173,5 +175,32 @@ func TestHintsAndTruncation(t *testing.T) {
 	cut := renderHints(th, []hintItem{{"Open", "enter"}, {"Version", "v"}, {"Keybindings", "?"}}, 20)
 	if width(cut) > 20 || !strings.HasSuffix(stripANSI(cut), "…") {
 		t.Errorf("a long line must be cut with an ellipsis: %q", stripANSI(cut))
+	}
+}
+
+// The sample config in the README must load and bind without a warning, since
+// people copy it.
+func TestReadmeSampleConfigIsClean(t *testing.T) {
+	readme, err := os.ReadFile(filepath.Join("..", "..", "README.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(readme)
+	start := strings.Index(text, "```yaml\ngui:")
+	if start < 0 {
+		t.Fatal("the README has no sample config")
+	}
+	sample := text[start+len("```yaml\n"):]
+	sample = sample[:strings.Index(sample, "```")]
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "config.yml"), []byte(sample), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := config.Load(dir)
+	if err != nil {
+		t.Fatalf("the sample config does not load: %v", err)
+	}
+	if _, warnings := newKeymap(buildActions(), cfg.Keybinding); len(warnings) > 0 {
+		t.Errorf("the sample config's keybindings warn: %q", warnings)
 	}
 }
