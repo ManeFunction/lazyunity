@@ -112,6 +112,7 @@ gui:
   sidePanelWidth: 0.45
   mouseEvents: true
   showPanelJumps: true
+  showListFooter: true       # "1 of 20" on a list's bottom border
   screenMode: full           # full, projects, editors
   theme:                     # a colour and modifiers: [brightblue, bold], '#5c9dff', ...
     activeBorderColor: [brightblue, bold]

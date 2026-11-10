@@ -167,3 +167,14 @@ func drain(m *Model, cmd tea.Cmd) {
 }
 
 func sleepMs(n int) { time.Sleep(time.Duration(n) * time.Millisecond) }
+
+func TestListFooterCanBeTurnedOff(t *testing.T) {
+	m := newTestModel(t)
+	if !strings.Contains(screenText(m), "1 of 3") {
+		t.Fatalf("the Projects panel shows where the cursor is:\n%s", screenText(m))
+	}
+	m.cfg.GUI.ShowListFooter = false
+	if strings.Contains(screenText(m), "1 of 3") {
+		t.Errorf("gui.showListFooter: false hides it:\n%s", screenText(m))
+	}
+}

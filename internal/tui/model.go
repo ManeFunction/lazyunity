@@ -652,14 +652,17 @@ func (m *Model) renderPanel(i int, r rect) string {
 		lines = append(lines, m.filterRowView(t, inner, focused))
 	}
 	names, cur := p.titles()
-	jump := ""
+	jump, footer := "", ""
 	if m.cfg.GUI.ShowPanelJumps {
 		jump = p.jump
+	}
+	if m.cfg.GUI.ShowListFooter {
+		footer = t.footer()
 	}
 	return m.th.renderFrame(frame{
 		w: r.w, h: r.h, jump: jump, tabs: names, tab: cur,
 		focused: focused, searching: focused && m.filter.active,
-		lines: lines, footer: t.footer(), scroll: t.scrollbar(),
+		lines: lines, footer: footer, scroll: t.scrollbar(),
 	})
 }
 
