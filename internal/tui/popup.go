@@ -47,6 +47,10 @@ func (m *Model) boxWidth(wanted, minW int) int {
 
 // menuItem is one row of a menu.
 type menuItem struct {
+	// id names the item: the menu selects and ticks items by it, and a multi
+	// menu's submit tells what was ticked by it. newMenu gives an item without
+	// one its label, made unique.
+	id    string
 	label string
 	// desc explains the item in a box under the menu.
 	desc string
@@ -92,8 +96,19 @@ func newMenu(title string, items []menuItem) *menuPopup {
 			}
 			return it.label + " " + it.key + " " + it.desc
 		},
-		func(it menuItem) string { return it.label },
+		func(it menuItem) string { return it.id },
 	)
+	items = append([]menuItem(nil), items...)
+	seen := map[string]bool{}
+	for i := range items {
+		if items[i].id == "" {
+			items[i].id = items[i].label
+		}
+		for base, n := items[i].id, 2; seen[items[i].id]; n++ {
+			items[i].id = fmt.Sprintf("%s#%d", base, n)
+		}
+		seen[items[i].id] = true
+	}
 	// The real height is only known when the menu is drawn. Until then the window
 	// is tall, so that moving off a first heading does not scroll it out of view.
 	p.list.SetHeight(1 << 10)
@@ -147,7 +162,7 @@ func (p *menuPopup) toggle() {
 	on := !cur.checked
 	for i := range items {
 		switch {
-		case items[i].label == cur.label:
+		case items[i].id == cur.id:
 			items[i].checked = on
 		case on && cur.group != "" && items[i].group == cur.group:
 			items[i].checked = false

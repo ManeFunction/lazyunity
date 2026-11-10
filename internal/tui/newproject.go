@@ -156,17 +156,22 @@ func (m *Model) onTemplates(msg templatesMsg) {
 }
 
 func (m *Model) newProjectOptions(w newProject, template string) {
+	const (
+		optCloud         = "cloud"
+		optRecommended   = "recommended"
+		optManetoolsFull = "manetools-full"
+		optManetoolsCore = "manetools-core"
+	)
 	items := []menuItem{
-		{label: "Link to Unity Cloud", desc: "Create a Unity Cloud project for it. Needs you to be signed in."},
-		{label: "Add Unity's recommended packages and settings", desc: "Without this, the project is just the template.", checked: true},
+		{id: optCloud, label: "Link to Unity Cloud", desc: "Create a Unity Cloud project for it. Needs you to be signed in."},
+		{id: optRecommended, label: "Add Unity's recommended packages and settings", desc: "Without this, the project is just the template.", checked: true},
 	}
-	const manetoolsFull, manetoolsCore = "Add ManeTools (full)", "Add ManeTools (w/o UI module)"
 	openupm := m.openupm.path
 	if openupm != "" {
 		items = append(items,
-			menuItem{label: manetoolsFull, group: "manetools",
+			menuItem{id: optManetoolsFull, label: "Add ManeTools (full)", group: "manetools",
 				desc: "Adds " + strings.Join(manetoolsFullPackages, " and ") + " from OpenUPM."},
-			menuItem{label: manetoolsCore, group: "manetools",
+			menuItem{id: optManetoolsCore, label: "Add ManeTools (w/o UI module)", group: "manetools",
 				desc: "Adds " + strings.Join(manetoolsCorePackages, " and ") + " from OpenUPM, without the UI module."})
 	} else {
 		items = append(items, menuItem{label: "Add ManeTools (install OpenUPM to use)", disabled: "Install the OpenUPM CLI first (Options, Tools)",
@@ -182,15 +187,15 @@ func (m *Model) newProjectOptions(w newProject, template string) {
 		}
 		var packages []string
 		for _, p := range picked {
-			switch p.label {
-			case "Link to Unity Cloud":
+			switch p.id {
+			case optCloud:
 				opts.Cloud = unitycli.CloudNew
-			case manetoolsFull:
-				packages = manetoolsFullPackages
-			case manetoolsCore:
-				packages = manetoolsCorePackages
-			default:
+			case optRecommended:
 				opts.Bare = false
+			case optManetoolsFull:
+				packages = manetoolsFullPackages
+			case optManetoolsCore:
+				packages = manetoolsCorePackages
 			}
 		}
 		return m.createProject(w, opts, openupm, packages)

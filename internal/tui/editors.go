@@ -382,11 +382,11 @@ func (m *Model) onAddModules(msg addModulesMsg) {
 
 // modulePicker is a multi-select menu of modules.
 func (m *Model) modulePicker(title string, mods []unitycli.Module, submit func(m *Model, picked []unitycli.Module) tea.Cmd) *menuPopup {
-	byName := map[string]unitycli.Module{}
+	byID := map[string]unitycli.Module{}
 	var items []menuItem
 	for _, x := range mods {
-		byName[x.Name] = x
-		items = append(items, menuItem{label: x.Name, right: humanBytes(x.DownloadBytes)})
+		byID[x.ID] = x
+		items = append(items, menuItem{id: x.ID, label: x.Name, right: humanBytes(x.DownloadBytes)})
 	}
 	menu := newMenu(title, items)
 	menu.multi = true
@@ -395,7 +395,7 @@ func (m *Model) modulePicker(title string, mods []unitycli.Module, submit func(m
 	menu.submit = func(m *Model, picked []menuItem) tea.Cmd {
 		out := make([]unitycli.Module, 0, len(picked))
 		for _, p := range picked {
-			out = append(out, byName[p.label])
+			out = append(out, byID[p.id])
 		}
 		return submit(m, out)
 	}

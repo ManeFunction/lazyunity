@@ -357,7 +357,7 @@ func (m *Model) platformMenu(r projectRow) {
 		}
 		target := p.BuildTarget
 		items = append(items, menuItem{
-			label: p.Label, right: strings.Join(tags, ", "),
+			id: p.BuildTarget, label: p.Label, right: strings.Join(tags, ", "),
 			run: func(m *Model) tea.Cmd { m.setPendingTarget(r, target); return nil },
 		})
 	}
@@ -365,11 +365,7 @@ func (m *Model) platformMenu(r projectRow) {
 	items = append(items, menuItem{label: "Add a platform module…", run: func(m *Model) tea.Cmd { return m.addModulesFlow(edCopy, true) }})
 	menu := newMenu(fmt.Sprintf("Platform for %s (Unity %s)", r.name(), ver), items)
 	menu.wanted = 48
-	for _, p := range ed.Platforms {
-		if p.BuildTarget == r.effTarget() {
-			menu.list.SelectKey(p.Label)
-		}
-	}
+	menu.list.SelectKey(r.effTarget())
 	m.push(menu)
 }
 
@@ -419,12 +415,12 @@ func (m *Model) sortMenu() {
 		return ""
 	}
 	menu := newMenu("Sort projects", []menuItem{
-		{label: "Last opened", right: mark(state.SortLastOpened), run: pick(state.SortLastOpened)},
-		{label: "Name", right: mark(state.SortName), run: pick(state.SortName)},
-		{label: "Unity version", right: mark(state.SortVersion), run: pick(state.SortVersion)},
+		{id: state.SortLastOpened, label: "Last opened", right: mark(state.SortLastOpened), run: pick(state.SortLastOpened)},
+		{id: state.SortName, label: "Name", right: mark(state.SortName), run: pick(state.SortName)},
+		{id: state.SortVersion, label: "Unity version", right: mark(state.SortVersion), run: pick(state.SortVersion)},
 	})
 	menu.wanted = 36
-	menu.list.SelectKey(map[string]string{state.SortLastOpened: "Last opened", state.SortName: "Name", state.SortVersion: "Unity version"}[cur])
+	menu.list.SelectKey(cur)
 	m.push(menu)
 }
 

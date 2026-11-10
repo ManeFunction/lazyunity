@@ -691,6 +691,33 @@ func TestMultiMenuGroupIsExclusive(t *testing.T) {
 	}
 }
 
+// Items with the same label are still told apart: ticking one ticks only it,
+// and submit knows which one it was.
+func TestMultiMenuItemsWithTheSameLabel(t *testing.T) {
+	m := newTestModel(t)
+	var got []string
+	menu := newMenu("Pick", []menuItem{{id: "a", label: "Same"}, {id: "b", label: "Same"}, {label: "Same"}})
+	menu.multi = true
+	menu.submit = func(m *Model, picked []menuItem) tea.Cmd {
+		for _, p := range picked {
+			got = append(got, p.id)
+		}
+		return nil
+	}
+	m.push(menu)
+	press(m, "j", "space")
+	if out := screenText(m); strings.Count(out, "[x] Same") != 1 {
+		t.Errorf("only the second item is ticked:\n%s", out)
+	}
+	if menu.list.Cursor() != 1 {
+		t.Errorf("the cursor stays on the ticked item, at %d", menu.list.Cursor())
+	}
+	press(m, "j", "space", "enter")
+	if strings.Join(got, ",") != "b,Same" {
+		t.Errorf("picked = %v, want b and the label-named third", got)
+	}
+}
+
 func TestNewProjectOptionsManeTools(t *testing.T) {
 	m := newTestModel(t)
 	m.newProjectOptions(newProject{name: "G", parent: t.TempDir(), version: "6000.6.8f1"}, "3d")

@@ -184,7 +184,7 @@ func TestAddModulesFromTheEditorList(t *testing.T) {
 	// tick Android and iOS, in the order they appear
 	for _, it := range menu.list.Items() {
 		if it.label == "Android Build Support" || it.label == "iOS Build Support" {
-			menu.list.SelectKey(it.label)
+			menu.list.SelectKey(it.id)
 			press(m, "space")
 		}
 	}
@@ -237,7 +237,7 @@ func TestInstallANewEditorEndToEnd(t *testing.T) {
 	if out := screenText(m); !strings.Contains(out, "Toggle: <space> | Confirm: <enter> | Cancel: <esc>") || strings.Contains(out, "│Platforms") {
 		t.Errorf("the box under the picker shows its keys, not the category:\n%s", out)
 	}
-	menu.list.SelectKey("Web Build Support")
+	menu.list.SelectKey("webgl")
 	press(m, "space")
 	_, cmd := m.Update(keyMsg("enter"))
 	drain(m, cmd) // asks the CLI for the plan
