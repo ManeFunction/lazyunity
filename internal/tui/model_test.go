@@ -55,8 +55,8 @@ func testOptions(t *testing.T) Options {
 			LookPath: func(string) (string, error) { return "", exec.ErrNotFound },
 		},
 		host: &hostRecorder{},
-		GOOS:      "linux",
-		Now:       func() time.Time { return testNow },
+		GOOS: "linux",
+		Now:  func() time.Time { return testNow },
 		Projects: []unitycli.Project{
 			{Title: "Space Shooter", Path: filepath.Join(dir, "p", "space"), Version: "6000.6.8f1", BuildTarget: "StandaloneLinux64", LastModified: ago(2 * time.Hour), IsFavorite: true},
 			{Title: "Old Platformer", Path: filepath.Join(dir, "p", "old"), Version: "2022.3.62f1", BuildTarget: "Android", LastModified: ago(3 * 24 * time.Hour)},
@@ -220,7 +220,6 @@ func drain(m *Model, cmd tea.Cmd) {
 	_, next := m.Update(msg)
 	drain(m, next)
 }
-
 
 func TestListFooterCanBeTurnedOff(t *testing.T) {
 	m := newTestModel(t)
