@@ -237,8 +237,9 @@ func (m *Model) drawEditor(r editorRow, w int, base lipgloss.Style, cols editorC
 }
 
 // mergeEditors combines what a scan of the disk found with what the CLI
-// reports. The scan decides what is installed; the CLI adds the default Editor
-// and Editors that live outside every root.
+// reports. The scan decides what is installed; the CLI adds the default Editor,
+// the real version of an Editor whose folder is not named after it, and the
+// Editors that live outside every root.
 func mergeEditors(local []unity.Installed, cli []unitycli.Editor, goos string) []editorRow {
 	byLoc := map[string]*editorRow{}
 	var rows []*editorRow
@@ -253,6 +254,9 @@ func mergeEditors(local []unity.Installed, cli []unitycli.Editor, goos string) [
 	for _, e := range cli {
 		if r, ok := byLoc[e.Location]; ok {
 			r.Default = e.Default
+			if e.Version != "" {
+				r.Version = e.Version // the scan only knows the folder's name
+			}
 			if r.Arch == "" {
 				r.Arch = e.Architecture
 			}

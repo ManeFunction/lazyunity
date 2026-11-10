@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ManeFunction/lazyunity/internal/unity"
 	"github.com/ManeFunction/lazyunity/internal/unitycli"
 )
 
@@ -576,5 +577,17 @@ func TestCleanDownloadCache(t *testing.T) {
 		if a := m.keymap.lookup(c, "C"); a == nil || a.name() != "cleanCache" {
 			t.Errorf("C in %s = %v", c.group(), a)
 		}
+	}
+}
+
+func TestMergeEditorsTakesTheVersionFromTheCLI(t *testing.T) {
+	local := []unity.Installed{{Version: "unity-2022.3", Location: "/opt/unity-2022.3/Editor/Unity", Dir: "/opt/unity-2022.3"}}
+	cli := []unitycli.Editor{{Version: "2022.3.62f1", Location: "/opt/unity-2022.3/Editor/Unity", Architecture: "x86_64", Default: true}}
+	got := mergeEditors(local, cli, "linux")
+	if len(got) != 1 {
+		t.Fatalf("one Editor, listed once: %+v", got)
+	}
+	if e := got[0]; e.Version != "2022.3.62f1" || !e.Default || e.Arch != "x86_64" {
+		t.Errorf("the CLI knows the real version of an Editor in a folder not named after it: %+v", e)
 	}
 }
