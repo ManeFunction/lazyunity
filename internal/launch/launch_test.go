@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -210,8 +211,8 @@ func TestShellCommand(t *testing.T) {
 	if c := ShellCommand("linux", "", "x", "/p", noEnv); c.Args[0] != "/bin/sh" {
 		t.Errorf("falls back to /bin/sh: %v", c.Args)
 	}
-	win := ShellCommand("windows", "", "dir", `C:\p`, noEnv)
-	if win.Args[0] != "cmd" || win.Args[1] != "/C" || !strings.Contains(win.Args[2], "pause") {
+	win := ShellCommand("windows", "", `dir "C:\Program Files"`, `C:\p`, noEnv)
+	if win.Args[0] != "cmd" || !slices.Contains(win.Args, "/C") || !strings.HasPrefix(win.Args[len(win.Args)-1], `dir "C:\Program Files" &`) {
 		t.Errorf("windows: %v", win.Args)
 	}
 }

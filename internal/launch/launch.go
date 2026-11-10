@@ -123,7 +123,11 @@ func Edit(tmpl, path, dir string, getenv func(string) string) (*exec.Cmd, error)
 func ShellCommand(goos, shell, text, dir string, getenv func(string) string) *exec.Cmd {
 	var cmd *exec.Cmd
 	if goos == "windows" {
-		cmd = exec.Command("cmd", "/C", text+" & echo. & pause")
+		line := text + " & echo. & pause"
+		cmd = exec.Command("cmd", "/S", "/C", line)
+		// cmd.exe does not read the \" that Go would quote the line with. With
+		// /S it takes off the outer quotes and runs the rest as it is.
+		setCmdLine(cmd, `cmd /S /C "`+line+`"`)
 	} else {
 		if shell == "" {
 			shell = getenv("SHELL")
