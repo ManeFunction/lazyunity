@@ -108,8 +108,6 @@ type Model struct {
 	cliEditorsLoaded bool
 	registered       map[string]bool
 
-	// drillEditor is the Editor whose modules are shown, while drilled in.
-	drillEditor *editorRow
 	// selectAfterLoad is a project path to put the cursor on once the list reloads.
 	selectAfterLoad string
 

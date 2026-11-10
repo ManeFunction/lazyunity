@@ -158,15 +158,15 @@ func (m *Model) refreshEditorsCmd() tea.Cmd {
 func moduleActions() []*action {
 	on := func(f func(m *Model, e editorRow, mod unitycli.Module) tea.Cmd) func(*Model) tea.Cmd {
 		return func(m *Model) tea.Cmd {
-			mt, ok := m.modulesTab()
-			if !ok || m.drillEditor == nil {
+			mt, e, ok := m.modulesTab()
+			if !ok {
 				return nil
 			}
 			mod, ok := mt.Selected()
 			if !ok {
 				return nil
 			}
-			return f(m, *m.drillEditor, mod)
+			return f(m, e, mod)
 		}
 	}
 	return []*action{
@@ -190,14 +190,14 @@ func moduleActions() []*action {
 	}
 }
 
-// modulesTab is the list shown while drilled into an Editor.
-func (m *Model) modulesTab() (*listTab[unitycli.Module], bool) {
+// modulesTab is the list shown while drilled into an Editor, and that Editor.
+func (m *Model) modulesTab() (*listTab[unitycli.Module], editorRow, bool) {
 	p := m.panels[panelEditors]
 	if p.drill == nil {
-		return nil, false
+		return nil, editorRow{}, false
 	}
 	t, ok := p.drill.tab.(*listTab[unitycli.Module])
-	return t, ok
+	return t, p.drill.editor, ok
 }
 
 func (m *Model) drillIntoModules(e editorRow) tea.Cmd {
@@ -217,8 +217,7 @@ func (m *Model) drillIntoModules(e editorRow) tea.Cmd {
 		t.setHeight(h)
 	}
 	p := m.panels[panelEditors]
-	p.drill = &drill{title: "Editors > " + e.Version, tab: t}
-	m.drillEditor = &e
+	p.drill = &drill{title: "Editors > " + e.Version, tab: t, editor: e}
 	c := m.cli
 	if c == nil {
 		t.empty = "The Unity CLI is needed to list modules."
@@ -231,8 +230,8 @@ func (m *Model) drillIntoModules(e editorRow) tea.Cmd {
 }
 
 func (m *Model) onModules(msg modulesMsg) {
-	t, ok := m.modulesTab()
-	if !ok || m.drillEditor == nil || m.drillEditor.Version != msg.version {
+	t, e, ok := m.modulesTab()
+	if !ok || e.Version != msg.version {
 		return
 	}
 	if msg.err != nil {
@@ -247,10 +246,11 @@ func (m *Model) onModules(msg modulesMsg) {
 
 // reloadModulesCmd refreshes the open modules list.
 func (m *Model) reloadModulesCmd() tea.Cmd {
-	if _, ok := m.modulesTab(); !ok || m.drillEditor == nil || m.cli == nil {
+	_, e, ok := m.modulesTab()
+	if !ok || m.cli == nil {
 		return nil
 	}
-	e, c := *m.drillEditor, m.cli
+	c := m.cli
 	return func() tea.Msg {
 		mods, err := c.Modules(context.Background(), e.Version, e.Arch)
 		return modulesMsg{version: e.Version, mods: mods, err: err}

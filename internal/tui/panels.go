@@ -62,11 +62,13 @@ func (t *listTab[T]) rows(m *Model, w int, focused bool) []string {
 	})
 }
 
-// drill is a list that temporarily replaces a panel's tabs, such as the modules
-// of one Editor. Esc goes back.
+// drill is a list that temporarily replaces a panel's tabs: the modules of one
+// Editor. Esc goes back.
 type drill struct {
 	title string
 	tab   tab
+	// editor is the Editor whose modules the drill shows.
+	editor editorRow
 }
 
 // panel is a frame with one or more tabs.

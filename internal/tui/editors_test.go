@@ -41,7 +41,7 @@ func TestDrillIntoModulesAndBack(t *testing.T) {
 			t.Errorf("modules should show %q:\n%s", want, out)
 		}
 	}
-	tab, ok := m.modulesTab()
+	tab, _, ok := m.modulesTab()
 	if !ok {
 		t.Fatal("no modules tab")
 	}
@@ -85,7 +85,7 @@ func TestInstallAModuleFromTheModulesList(t *testing.T) {
 	})
 	_, cmd := m.Update(keyMsg("enter"))
 	drain(m, cmd)
-	tab, _ := m.modulesTab()
+	tab, _, _ := m.modulesTab()
 	tab.SelectKey("android")
 	if sel, _ := tab.Selected(); sel.ID != "android" {
 		t.Fatalf("selected %q", sel.ID)
@@ -118,7 +118,7 @@ func TestInstallingAnInstalledModuleIsRefused(t *testing.T) {
 	_, cmd := m.Update(keyMsg("enter"))
 	drain(m, cmd)
 	// the fixture has nothing installed: mark one as installed
-	tab, _ := m.modulesTab()
+	tab, _, _ := m.modulesTab()
 	items := append(tab.Items()[:0:0], tab.Items()...)
 	items[0].IsInstalled = true
 	tab.SetItems(items)
@@ -145,7 +145,7 @@ func TestRemoveAModule(t *testing.T) {
 	})
 	_, cmd := m.Update(keyMsg("enter"))
 	drain(m, cmd)
-	tab, _ := m.modulesTab()
+	tab, _, _ := m.modulesTab()
 	items := append(tab.Items()[:0:0], tab.Items()...)
 	for i := range items {
 		if items[i].ID == "webgl" {

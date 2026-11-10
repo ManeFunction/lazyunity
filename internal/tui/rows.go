@@ -289,7 +289,7 @@ func (m *Model) drawModule(mod unitycli.Module, w int, base lipgloss.Style, cols
 	switch {
 	case mod.IsInstalled:
 		row.text("[✓] ", th.Success)
-	case m.drillEditor != nil && m.taskOn(workModule(m.drillEditor.Version, mod.ID)) != nil:
+	case m.moduleQueued(mod):
 		row.text("[↓] ", th.Pending) // in the queue
 	default:
 		row.text("[ ] ", th.Dim)
@@ -305,6 +305,13 @@ func (m *Model) drawModule(mod unitycli.Module, w int, base lipgloss.Style, cols
 	}
 	row.add(padLeft(size, cols.size), th.Dim, cols.size)
 	return row.done(w)
+}
+
+// moduleQueued reports whether a task is installing or removing a module of
+// the Editor drilled into.
+func (m *Model) moduleQueued(mod unitycli.Module) bool {
+	_, e, ok := m.modulesTab()
+	return ok && m.taskOn(workModule(e.Version, mod.ID)) != nil
 }
 
 type moduleCols struct{ category, size int }
