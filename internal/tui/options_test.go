@@ -537,3 +537,32 @@ func TestEveryToolRowDoesSomething(t *testing.T) {
 		}
 	}
 }
+
+func TestEditedConfigRelaunches(t *testing.T) {
+	m := newTestModel(t)
+	path := filepath.Join(m.configDir, "config.yml")
+	os.MkdirAll(m.configDir, 0o755)
+	before := []byte("quitAfterOpen: false\n")
+	os.WriteFile(path, before, 0o644)
+
+	// unchanged: nothing happens
+	m.Update(configEditedMsg{before: before})
+	if m.Restart() || m.quit {
+		t.Fatal("an unchanged config must not relaunch")
+	}
+
+	// broken: kept running, with the reason shown
+	os.WriteFile(path, []byte("quitAfterOpen: [\n"), 0o644)
+	m.Update(configEditedMsg{before: before})
+	if m.Restart() || m.quit || !strings.Contains(screenText(m), "Config not applied") {
+		t.Fatalf("a config that does not load must not relaunch:\n%s", screenText(m))
+	}
+	m.popups = nil
+
+	// changed and valid: quits to relaunch
+	os.WriteFile(path, []byte("quitAfterOpen: true\n"), 0o644)
+	_, cmd := m.Update(configEditedMsg{before: before})
+	if !m.Restart() || !m.quit || cmd == nil {
+		t.Error("a changed config should quit to relaunch")
+	}
+}

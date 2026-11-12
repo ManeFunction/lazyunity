@@ -211,6 +211,8 @@ func (m *Model) handleData(msg tea.Msg) tea.Cmd {
 		return m.onOpenUPMInstalled(msg)
 	case toastMsg:
 		m.toastf(msg.kind, "%s", msg.text)
+	case configEditedMsg:
+		m.onConfigEdited(msg)
 	case errorMsg:
 		m.toastf(toastError, "%s: %v", msg.what, msg.err)
 	}

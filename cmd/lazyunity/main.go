@@ -49,11 +49,6 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("finding the config folder: %w", err)
 	}
-	cfg, err := config.Load(dir)
-	if err != nil {
-		return err
-	}
-	st := state.Load(dir)
 
 	if *debugLog != "" {
 		f, err := tea.LogToFile(*debugLog, "lazyunity")
@@ -62,6 +57,24 @@ func run() error {
 		}
 		defer f.Close()
 	}
+
+	// Editing the config from the Tools tab quits to start again with it applied.
+	for {
+		restart, err := session(dir)
+		if err != nil || !restart {
+			return err
+		}
+	}
+}
+
+// session loads the config and runs the interface once; restart reports that
+// it quit to be started again.
+func session(dir string) (restart bool, err error) {
+	cfg, err := config.Load(dir)
+	if err != nil {
+		return false, err
+	}
+	st := state.Load(dir)
 
 	// What is cheap to load goes in before the first frame is drawn.
 	env := unitycli.DefaultEnv()
@@ -85,13 +98,12 @@ func run() error {
 	opts.InstallRoot = unity.DefaultInstallRoot(env.GOOS, home)
 
 	model, err := tui.New(opts) // scans the Editor folders, too
-
 	if err != nil {
-		return err
+		return false, err
 	}
 	_, err = tea.NewProgram(model).Run()
 	if saveErr := st.Save(); saveErr != nil && err == nil {
 		err = fmt.Errorf("saving state: %w", saveErr)
 	}
-	return err
+	return err == nil && model.Restart(), err
 }

@@ -104,6 +104,8 @@ type Model struct {
 	toast  toast
 	filter filterState
 	quit   bool
+	// restart asks main to start lazyunity again once it quits, to apply an edited config.
+	restart bool
 
 	// selectAfterLoad is a project path to put the cursor on once the list reloads.
 	selectAfterLoad string
@@ -292,6 +294,9 @@ type tickMsg time.Time
 func tick() tea.Cmd {
 	return tea.Tick(time.Second, func(t time.Time) tea.Msg { return tickMsg(t) })
 }
+
+// Restart reports whether lazyunity quit to be started again, with the config reloaded.
+func (m *Model) Restart() bool { return m.restart }
 
 // Init starts the slow loads; what was cheap to load is already in place.
 func (m *Model) Init() tea.Cmd {

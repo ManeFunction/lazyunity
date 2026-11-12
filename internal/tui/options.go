@@ -341,11 +341,36 @@ func (m *Model) editConfig() tea.Cmd {
 			os.WriteFile(path, []byte(configTemplate), 0o644)
 		}
 	}
+	before, _ := os.ReadFile(path)
 	return m.edit(path, m.configDir, func(m *Model) {
 		// a popup rather than a toast: the path is long and must be readable
 		m.push(&infoPopup{title: "Config file", lines: append(wrapText("Edit this file to change lazyunity's settings:", 70),
 			"", path, "", "To open it from here, set $EDITOR, or os.edit in the file itself.")})
-	}, toastMsg{kind: toastInfo, text: "Restart lazyunity to apply config changes"})
+	}, configEditedMsg{before: before})
+}
+
+// configEditedMsg comes once the terminal editor on config.yml has quit;
+// before is what the file held when it was opened.
+type configEditedMsg struct{ before []byte }
+
+// onConfigEdited relaunches lazyunity to apply a changed config, unless the
+// new one does not load or a task would be lost by it.
+func (m *Model) onConfigEdited(msg configEditedMsg) {
+	after, err := os.ReadFile(filepath.Join(m.configDir, "config.yml"))
+	if err != nil || bytes.Equal(after, msg.before) {
+		return
+	}
+	if _, err := config.Load(m.configDir); err != nil {
+		m.push(&infoPopup{title: "Config not applied", lines: append(wrapText("The edited config.yml does not load, so lazyunity keeps the settings it started with:", 70),
+			append([]string{""}, wrapText(err.Error(), 70)...)...)})
+		return
+	}
+	if m.busy() {
+		m.toastf(toastInfo, "Restart lazyunity to apply config changes once the tasks finish")
+		return
+	}
+	m.restart = true
+	m.quit = true
 }
 
 func (m *Model) aboutPopup() {
