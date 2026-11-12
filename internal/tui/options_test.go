@@ -125,6 +125,9 @@ func TestToolsTabRows(t *testing.T) {
 	if !strings.Contains(screenText(m), "outdated · press enter to update") {
 		t.Error("an old CLI is flagged")
 	}
+	if !strings.Contains(out, "· · · ·") {
+		t.Errorf("spacers draw as spaced dots:\n%s", out)
+	}
 	m.toolsTab.Bottom() // About and Donate are below the fold in this screen
 	if out := screenText(m); !strings.Contains(out, "About") || !strings.Contains(out, "lazyunity test") {
 		t.Errorf("the bottom of the tools should contain About and Donate:\n%s", out)

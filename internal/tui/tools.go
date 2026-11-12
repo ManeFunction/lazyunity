@@ -73,8 +73,8 @@ func (m *Model) refreshTools() {
 	m.toolsTab.SetItems(rows)
 }
 
-// spacerRow is a blank line that groups the rows of the Tools tab; the cursor
-// does not rest on it.
+// spacerRow is a faint line of spaced dots that groups the rows of the Tools
+// tab; the cursor does not rest on it.
 func spacerRow(id string) toolRow { return toolRow{id: id, spacer: true} }
 
 // configRow edits config.yml; once it was changed while a task ran, enter
