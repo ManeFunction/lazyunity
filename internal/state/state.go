@@ -34,6 +34,9 @@ const (
 
 // State is the contents of state.yml.
 type State struct {
+	// Warnings are what Load noticed in the file, such as remembered
+	// settings that are no longer used and go on the next save.
+	Warnings []string `yaml:"-"`
 	// Pending maps a project path to its pending change.
 	Pending map[string]Pending `yaml:"pending,omitempty"`
 	// Sort is how projects are ordered; empty means SortLastOpened.
@@ -57,6 +60,13 @@ func Load(dir string) *State {
 	}
 	if yaml.Unmarshal(b, s) != nil {
 		*s = State{path: s.path}
+		return s
+	}
+	var old struct {
+		ExtraRoots []string `yaml:"extraRoots"`
+	}
+	if yaml.Unmarshal(b, &old) == nil && len(old.ExtraRoots) > 0 {
+		s.Warnings = append(s.Warnings, "the extra Editor folders added before are no longer used; Editors are looked for only in the Editors folder (Tools tab)")
 	}
 	return s
 }

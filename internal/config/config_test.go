@@ -211,3 +211,16 @@ func TestOpenUPMFromRegistry(t *testing.T) {
 		t.Error("a ref without a repo is refused")
 	}
 }
+
+func TestRetiredSettingsWarn(t *testing.T) {
+	cfg, err := Load(writeConfig(t, "editors:\n  extraRoots: [/opt/unity]\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.Warnings) != 1 || !strings.Contains(cfg.Warnings[0], "editors.extraRoots") {
+		t.Errorf("warnings: %v", cfg.Warnings)
+	}
+	if cfg, _ := Load(writeConfig(t, "quitAfterOpen: true\n")); len(cfg.Warnings) != 0 {
+		t.Errorf("a current config must not warn: %v", cfg.Warnings)
+	}
+}

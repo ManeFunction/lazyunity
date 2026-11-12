@@ -85,6 +85,7 @@ func session(dir string) (restart bool, err error) {
 	opts := tui.Options{
 		Config: cfg, State: st, ConfigDir: dir, Version: version,
 		CLI: status, Env: env, GOOS: env.GOOS,
+		Warnings: append(append([]string(nil), cfg.Warnings...), st.Warnings...),
 	}
 	if status.State == unitycli.Ready {
 		opts.Client = unitycli.New(status.Path)

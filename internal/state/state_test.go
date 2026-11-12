@@ -96,3 +96,18 @@ func TestSaveWithoutPath(t *testing.T) {
 		t.Error("saving a state with no path must fail, not write to the working directory")
 	}
 }
+
+func TestRetiredExtraRootsWarnOnceThenGo(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "state.yml"), []byte("extraRoots: [/opt/unity]\nsort: name\n"), 0o644)
+	s := Load(dir)
+	if len(s.Warnings) != 1 || s.Sort != SortName {
+		t.Fatalf("load: %+v", s)
+	}
+	if err := s.Save(); err != nil {
+		t.Fatal(err)
+	}
+	if again := Load(dir); len(again.Warnings) != 0 {
+		t.Errorf("the next save drops them, and the warning with them: %v", again.Warnings)
+	}
+}

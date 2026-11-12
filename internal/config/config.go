@@ -24,6 +24,30 @@ type Config struct {
 	OpenUPM    OpenUPM             `yaml:"openupm"`
 	// QuitAfterOpen exits lazyunity once a project has been opened.
 	QuitAfterOpen bool `yaml:"quitAfterOpen"`
+
+	// Warnings are what Load noticed in the file without refusing it, such
+	// as settings that are no longer used.
+	Warnings []string `yaml:"-"`
+}
+
+// retired is the settings lazyunity no longer reads, to warn about them.
+type retired struct {
+	Editors struct {
+		ExtraRoots []string `yaml:"extraRoots"`
+	} `yaml:"editors"`
+}
+
+// retiredWarnings lists the settings in b that are no longer used.
+func retiredWarnings(b []byte) []string {
+	var r retired
+	if yaml.Unmarshal(b, &r) != nil {
+		return nil
+	}
+	var out []string
+	if len(r.Editors.ExtraRoots) > 0 {
+		out = append(out, "config.yml: editors.extraRoots is no longer used; Editors are looked for only in the Editors folder (Tools tab)")
+	}
+	return out
 }
 
 // GUI is the look of the interface.
@@ -200,6 +224,7 @@ func Load(dir string) (Config, error) {
 	if err := cfg.validate(); err != nil {
 		return Default(), fmt.Errorf("%s: %w", path, err)
 	}
+	cfg.Warnings = retiredWarnings(b)
 	return cfg, nil
 }
 
