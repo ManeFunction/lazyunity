@@ -202,9 +202,6 @@ func TestConfigTemplateListsEverySettingAtItsDefault(t *testing.T) {
 		}
 	}
 	cfg.Keybinding = nil
-	if len(cfg.Editors.ExtraRoots) == 0 {
-		cfg.Editors.ExtraRoots = nil
-	}
 	if !reflect.DeepEqual(cfg, config.Default()) {
 		t.Errorf("the template's values are not the defaults:\n%+v\n%+v", cfg, config.Default())
 	}

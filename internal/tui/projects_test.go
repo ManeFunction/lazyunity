@@ -681,7 +681,7 @@ func TestNewProjectNeedsAnEditorAndTheCLI(t *testing.T) {
 	}
 	m.popups = nil
 	useFakeCLI(t, m)
-	m.inv.setFound(nil, nil)
+	m.inv.setFound(nil)
 	m.refreshEditors()
 	cmd := m.keymap.lookup(ctxProjects, "n").run(m)
 	_ = cmd
@@ -733,11 +733,6 @@ func TestSelectedPath(t *testing.T) {
 	if _, ok := m.selectedPath(); ok {
 		t.Error("the Tools tab has no paths")
 	}
-	press(m, "]")
-	if p, ok := m.selectedPath(); !ok || p == "" {
-		t.Errorf("roots: %q %v", p, ok)
-	}
-	press(m, "]")
 	if cmd := m.copySelectedPath(); cmd != nil || !strings.Contains(screenText(m), "Nothing here has a path") {
 		t.Error("copying nothing says so")
 	}

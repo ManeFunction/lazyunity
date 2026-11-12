@@ -232,20 +232,14 @@ func TestListFooterCanBeTurnedOff(t *testing.T) {
 	}
 }
 
-func TestNewScansTheEditorFoldersItself(t *testing.T) {
+func TestNewScansTheEditorsFolderItself(t *testing.T) {
 	o := testOptions(t)
-	extra := t.TempDir()
-	o.State.ExtraRoots = []string{extra, extra + string(filepath.Separator)} // the same folder twice
-	o.Config.Editors.ExtraRoots = []string{extra}
 	o.Local = nil
 	m, err := New(o)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if eds := m.inv.editors(); len(eds) != 2 {
-		t.Errorf("both Editors of the install folder are found: %+v", eds)
-	}
-	if got := m.inv.roots(); len(got) != 2 {
-		t.Errorf("each folder is looked in once: %q", got)
+		t.Errorf("both Editors of the Editors folder are found: %+v", eds)
 	}
 }

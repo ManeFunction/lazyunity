@@ -10,16 +10,15 @@ import (
 	"github.com/ManeFunction/lazyunity/internal/unitycli"
 )
 
-func TestInventoryRoots(t *testing.T) {
-	extra := []string{"/opt/unity", "/opt/unity/", "", "/srv/editors"}
-	inv := newInventory("linux", "/home/u", "", func() []string { return extra })
-	want := []string{filepath.Clean("/home/u/Unity/Hub/Editor"), "/opt/unity", "/srv/editors"}
-	if got := inv.roots(); !reflect.DeepEqual(got, want) {
-		t.Errorf("the default install folder, then each extra folder once: %q", got)
+func TestInventoryRoot(t *testing.T) {
+	inv := newInventory("linux", "/home/u", "")
+	want := filepath.Clean("/home/u/Unity/Hub/Editor")
+	if got := inv.installRoot(); got != want {
+		t.Errorf("the default install folder: %q", got)
 	}
 	inv.setInstallRoot("/srv/editors")
-	if got := inv.roots(); !reflect.DeepEqual(got, []string{"/srv/editors", "/opt/unity"}) {
-		t.Errorf("the CLI's install folder comes first, and only once: %q", got)
+	if got := inv.installRoot(); got != "/srv/editors" {
+		t.Errorf("the CLI's install folder takes over: %q", got)
 	}
 }
 
@@ -28,15 +27,11 @@ func TestInventoryScanAndMerge(t *testing.T) {
 	exe := filepath.Join(root, "6000.6.8f1", unity.ExecutableRel("linux"))
 	os.MkdirAll(filepath.Dir(exe), 0o755)
 	os.WriteFile(exe, nil, 0o755)
-	gone := filepath.Join(root, "gone")
-	inv := newInventory("linux", "", root, func() []string { return []string{gone} })
+	inv := newInventory("linux", "", root)
 
-	inv.setFound(scanEditors("linux", inv.roots()))
-	if !inv.has("6000.6.8f1") || inv.find("6000.6.8f1").Location != exe || inv.foundIn(root) != 1 {
+	inv.setFound(scanEditors("linux", inv.installRoot()))
+	if !inv.has("6000.6.8f1") || inv.find("6000.6.8f1").Location != exe {
 		t.Errorf("the scan finds the Editor: %+v", inv.editors())
-	}
-	if !inv.exists(root) || inv.exists(gone) {
-		t.Error("the scan knows which folders are there")
 	}
 	inv.setListed(listEditors("linux", []unitycli.Editor{
 		{Version: "6000.6.8f1", Location: exe, Default: true},
@@ -48,12 +43,34 @@ func TestInventoryScanAndMerge(t *testing.T) {
 	}
 }
 
+func TestInventoryMergeDarwinAppLocations(t *testing.T) {
+	// The macOS CLI reports the app bundle as the Editor's location, while a
+	// scan finds the executable inside it: the two are one Editor.
+	root := t.TempDir()
+	exe := filepath.Join(root, "6000.6.8f1", unity.ExecutableRel("darwin"))
+	os.MkdirAll(filepath.Dir(exe), 0o755)
+	os.WriteFile(exe, nil, 0o755)
+	inv := newInventory("darwin", "", root)
+
+	inv.setFound(scanEditors("darwin", inv.installRoot()))
+	inv.setListed(listEditors("darwin", []unitycli.Editor{
+		{Version: "6000.6.8f1", Architecture: "x86_64", Location: filepath.Join(root, "6000.6.8f1", "Unity.app"), Default: true},
+	}))
+	eds := inv.editors()
+	if len(eds) != 1 || eds[0].Location != exe || !eds[0].Default || eds[0].Arch != "x86_64" {
+		t.Errorf("the bundle and the executable merge into one Editor: %+v", eds)
+	}
+	if got := inv.strays(); got != nil {
+		t.Errorf("an Editor the CLI lists is not a stray: %q", got)
+	}
+}
+
 func TestInventoryStraysAreToldOnce(t *testing.T) {
-	inv := newInventory("linux", "", "/r", nil)
+	inv := newInventory("linux", "", "/r")
 	inv.setFound([]foundEditor{
 		{Installed: unity.Installed{Version: "a", Location: "/r/a/Editor/Unity"}},
 		{Installed: unity.Installed{Version: "b", Location: "/r/b/Editor/Unity"}},
-	}, nil)
+	})
 	if got := inv.strays(); got != nil {
 		t.Errorf("before the CLI listed its Editors there is nothing to tell it: %q", got)
 	}

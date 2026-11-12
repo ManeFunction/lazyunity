@@ -13,11 +13,12 @@ lazyunity is a thin, fast front end for the official [Unity CLI](https://docs.un
 │                                             ││                                                       │
 │                                             ││                                                       │
 │                                             │╰────────────────────────────────────────────────1 of 2─╯
-│                                             │╭─[3]─Tools - Editor locations──────────────────────────╮
+│                                             │╭─[3]─Tools───────────────────────────────────────────────╮
 │                                             ││Unity CLI                ready · 1.0.0-beta.16         │
 │                                             ││Account                  signed in                     │
 │                                             ││License                  press enter to check          │
-╰──────────────────────────────────────1 of 3─╯╰────────────────────────────────────────────────1 of 8─╯
+│                                             ││Editors folder           ~/Unity/Hub/Editor            │
+╰──────────────────────────────────────1 of 3─╯╰────────────────────────────────────────────────1 of 9─╯
 ╭─Tasks────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ ⠋ Installing 6000.7.0b8 + Web Build Support [■■■■■■■·········]  42% download · Downloading Web Buil… │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────╯
@@ -44,7 +45,7 @@ Go 1.27.3 or newer (what `go.mod` requires). There are no releases yet.
 |---|---|
 | **[1] Projects** | Your projects with the last time each was opened, its Unity version and its build platform. |
 | **[2] Editors** | **Installed Editors** with their platforms, and **Releases** you can install. `enter` on an Editor shows its modules. |
-| **[3] Options** | **Tools**: the Unity CLI, your account, the license, the OpenUPM CLI, the default project folder, the config file, About and Donate. **Editor locations**: the folders Editors are looked for in. |
+| **[3] Options** | **Tools**: the Unity CLI, your account, the license, the OpenUPM CLI, the editors folder, the default project folder, the config file, About and Donate. |
 | **Tasks** (bottom) | A progress frame that appears **only while something is installing**, then goes away. Tasks run one at a time; the same Editor or module cannot be queued twice. |
 
 `+` and `_` switch the screen mode: **full** (every panel), **projects** (only Projects) and **editors** (Editors and Options). Jumping to a panel that is not on screen (`1`, `2`, `3`) switches to the mode that shows it.
@@ -99,12 +100,12 @@ Everything follows lazygit where lazygit has an equivalent. `?` shows the keys t
 **Modules of an Editor**: `space`, `a` or `enter` install · `d` remove.
 **Releases**: `enter` or `space` install · `/` filter by version, in the filter row at the bottom of the tab (every page of releases is searched, not only the ones loaded) · `ctrl+s` release stream: Supported (the default), LTS, Beta, Alpha or All · `o` release notes.
 **Anywhere in the Editors panel**: `C` cleans the download cache, where installers and the partial downloads of interrupted installs are kept (asks first, with its size; not while a task runs).
-**Editor locations**: `a` add a folder · `d` remove · `space` install new Editors here · `o` open.
-**Tools**: `enter` runs the selected tool, and `e` edits `config.yml` from any row. When the editor quits with the config changed, lazyunity restarts to apply it; if a task is running, the Config file row says a restart is required instead, and `enter` on it restarts (asking first while a task would be cancelled). **OpenUPM CLI** installs [openupm-cli](https://github.com/openupm/openupm-cli) with npm (Node.js is needed): the official release from the npm registry, unless `openupm.repo` is set in `config.yml`: then that repository (the official one or a fork) is cloned and built, and git is needed too. **Donate** opens the GitHub Sponsors page. The bottom line ends with the lazyunity version.
+
+**Tools**: `enter` runs the selected tool, and `e` edits `config.yml` from any row. The **Editors folder** row is where new Editors install and installed Editors are looked for; `enter` on it changes it through the CLI. When the editor quits with the config changed, lazyunity restarts to apply it; if a task is running, the Config file row says a restart is required instead, and `enter` on it restarts (asking first while a task would be cancelled). **OpenUPM CLI** installs [openupm-cli](https://github.com/openupm/openupm-cli) with npm (Node.js is needed): the official release from the npm registry, unless `openupm.repo` is set in `config.yml`: then that repository (the official one or a fork) is cloned and built, and git is needed too. **Donate** opens the GitHub Sponsors page. The bottom line ends with the lazyunity version.
 
 ## Configuration
 
-`config.yml` lives in `~/.config/lazyunity/` (`~/Library/Application Support/lazyunity/` on macOS, `%AppData%\lazyunity\` on Windows), or wherever `--config-dir` or `$LAZYUNITY_CONFIG_DIR` points. lazyunity only reads it. What the interface remembers (pending choices, extra roots, sort order) goes in `state.yml` next to it. The first time you edit it from the Tools tab, lazyunity writes every setting into it, commented out and set to its default, keybindings included.
+`config.yml` lives in `~/.config/lazyunity/` (`~/Library/Application Support/lazyunity/` on macOS, `%AppData%\lazyunity\` on Windows), or wherever `--config-dir` or `$LAZYUNITY_CONFIG_DIR` points. lazyunity only reads it. What the interface remembers (pending choices, sort order) goes in `state.yml` next to it. The first time you edit it from the Tools tab, lazyunity writes every setting into it, commented out and set to its default, keybindings included.
 
 ```yaml
 gui:
@@ -128,8 +129,6 @@ os:
   openFolder: ''             # default is xdg-open, open or explorer
 unity:
   cliPath: ''                # default: found automatically
-editors:
-  extraRoots: [/opt/unity]
 projects:
   defaultLocation: ~/Projects
 # openupm:                   # commented out: the Tools tab installs the official npm release

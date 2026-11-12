@@ -3,12 +3,10 @@ package tui
 import (
 	"context"
 	"os"
-	"path/filepath"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/ManeFunction/lazyunity/internal/config"
 	"github.com/ManeFunction/lazyunity/internal/unitycli"
 )
 
@@ -25,10 +23,9 @@ type editorsMsg struct {
 	err     error
 }
 
-// localEditorsMsg is a scan of the Editor folders.
+// localEditorsMsg is a scan of the Editors folder.
 type localEditorsMsg struct {
-	found   []foundEditor
-	missing map[string]bool
+	found []foundEditor
 }
 
 type authMsg struct {
@@ -89,10 +86,9 @@ func (m *Model) loadEditorsCmd() tea.Cmd {
 }
 
 func (m *Model) scanEditorsCmd() tea.Cmd {
-	goos, roots := m.goos, m.inv.roots()
+	goos, root := m.goos, m.inv.installRoot()
 	return func() tea.Msg {
-		found, missing := scanEditors(goos, roots)
-		return localEditorsMsg{found: found, missing: missing}
+		return localEditorsMsg{found: scanEditors(goos, root)}
 	}
 }
 
@@ -155,7 +151,7 @@ func (m *Model) handleData(msg tea.Msg) tea.Cmd {
 		m.refreshEditors()
 		return m.registerStrays()
 	case localEditorsMsg:
-		m.inv.setFound(msg.found, msg.missing)
+		m.inv.setFound(msg.found)
 		m.refreshEditors()
 		return m.registerStrays()
 	case authMsg:
@@ -174,7 +170,6 @@ func (m *Model) handleData(msg tea.Msg) tea.Cmd {
 	case installPathMsg:
 		if msg.err == nil && msg.path != "" {
 			m.inv.setInstallRoot(msg.path)
-			m.refreshRoots()
 			return m.scanEditorsCmd()
 		}
 	case releasesMsg:
@@ -234,27 +229,4 @@ func (m *Model) refreshProjects() {
 // refreshEditors shows the inventory's Editors.
 func (m *Model) refreshEditors() {
 	m.editorsTab.SetItems(m.inv.editors())
-	m.refreshRoots()
-}
-
-// refreshRoots rebuilds the Roots tab.
-func (m *Model) refreshRoots() {
-	roots := m.inv.roots()
-	install := roots[0]
-	inState := map[string]bool{}
-	for _, r := range m.st.ExtraRoots {
-		inState[filepath.Clean(config.ExpandHome(r))] = true
-	}
-	var rows []rootRow
-	for _, p := range roots {
-		src := "config"
-		switch {
-		case p == install:
-			src = "cli"
-		case inState[p]:
-			src = "state"
-		}
-		rows = append(rows, rootRow{Path: p, Install: p == install, Source: src, Exists: m.inv.exists(p), Editors: m.inv.foundIn(p)})
-	}
-	m.rootsTab.SetItems(rows)
 }

@@ -20,14 +20,13 @@ const (
 	ctxEditors // the Installed tab
 	ctxModules // inside an Editor
 	ctxReleases
-	ctxRoots
 	ctxTools
 	numContexts
 )
 
 // group is the name of the context in config.yml and in the ? menu.
 func (c ctxID) group() string {
-	return [...]string{"universal", "projects", "editors", "modules", "releases", "roots", "tools"}[c]
+	return [...]string{"universal", "projects", "editors", "modules", "releases", "tools"}[c]
 }
 
 // action is something the user can do with a key.

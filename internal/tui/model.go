@@ -88,7 +88,6 @@ type Model struct {
 	projectsTab *listTab[projectRow]
 	editorsTab  *listTab[editorRow]
 	releasesTab *releasesTab
-	rootsTab    *listTab[rootRow]
 	toolsTab    *listTab[toolRow]
 
 	// data
@@ -155,9 +154,7 @@ func New(o Options) (*Model, error) {
 	if m.st == nil {
 		m.st = state.Load("")
 	}
-	m.inv = newInventory(m.goos, homeDir(), o.InstallRoot, func() []string {
-		return append(append([]string(nil), m.st.ExtraRoots...), m.cfg.Editors.ExtraRoots...)
-	})
+	m.inv = newInventory(m.goos, homeDir(), o.InstallRoot)
 	km, warnings := newKeymap(buildActions(), o.Config.Keybinding)
 	m.keymap = km
 	m.buildTabs()
@@ -167,14 +164,13 @@ func New(o Options) (*Model, error) {
 	}
 
 	if o.Local != nil {
-		m.inv.setFound(withPlatforms(m.goos, o.Local), nil)
+		m.inv.setFound(withPlatforms(m.goos, o.Local))
 	} else {
-		m.inv.setFound(scanEditors(m.goos, m.inv.roots()))
+		m.inv.setFound(scanEditors(m.goos, m.inv.installRoot()))
 	}
 	m.rawProjects = o.Projects
 	m.refreshEditors()
 	m.refreshProjects()
-	m.refreshRoots()
 	m.refreshTools()
 
 	all := append(append([]string(nil), o.Warnings...), warnings...)
@@ -212,14 +208,6 @@ func (m *Model) buildTabs() {
 
 	m.releasesTab = newReleasesTab(m.st.Stream())
 
-	m.rootsTab = &listTab[rootRow]{
-		list:    newList(func(r rootRow) string { return r.Path }, func(r rootRow) string { return r.Path }),
-		name:    "Editor locations",
-		context: ctxRoots,
-		empty:   "No editor folders. Press a to add one.",
-	}
-	m.rootsTab.draw = func(m *Model, r rootRow, w int, base lipgloss.Style) string { return m.drawRoot(r, w, base) }
-
 	m.toolsTab = &listTab[toolRow]{
 		list:    newList(func(r toolRow) string { return r.label }, func(r toolRow) string { return r.id }),
 		name:    "Tools",
@@ -230,7 +218,7 @@ func (m *Model) buildTabs() {
 	m.panels = [numPanels]*panel{
 		panelProjects: {jump: "1", tabs: []tab{m.projectsTab}},
 		panelEditors:  {jump: "2", tabs: []tab{m.editorsTab, m.releasesTab}},
-		panelOptions:  {jump: "3", tabs: []tab{m.toolsTab, m.rootsTab}},
+		panelOptions:  {jump: "3", tabs: []tab{m.toolsTab}},
 	}
 }
 

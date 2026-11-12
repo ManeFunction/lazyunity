@@ -20,7 +20,6 @@ type Config struct {
 	Keybinding map[string]KeyGroup `yaml:"keybinding"`
 	OS         OS                  `yaml:"os"`
 	Unity      Unity               `yaml:"unity"`
-	Editors    Editors             `yaml:"editors"`
 	Projects   Projects            `yaml:"projects"`
 	OpenUPM    OpenUPM             `yaml:"openupm"`
 	// QuitAfterOpen exits lazyunity once a project has been opened.
@@ -106,12 +105,6 @@ type OS struct {
 type Unity struct {
 	// CLIPath is the CLI to use. Empty: look for it.
 	CLIPath string `yaml:"cliPath"`
-}
-
-// Editors is about Editor discovery.
-type Editors struct {
-	// ExtraRoots are folders with Editors in them, besides the CLI's install path.
-	ExtraRoots []string `yaml:"extraRoots"`
 }
 
 // Projects is about projects.

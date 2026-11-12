@@ -17,7 +17,6 @@ func buildActions() []*action {
 	for _, c := range []ctxID{ctxEditors, ctxModules, ctxReleases} {
 		all = append(all, cleanCacheAction(c))
 	}
-	all = append(all, rootActions()...)
 	all = append(all, toolActions()...)
 	return all
 }

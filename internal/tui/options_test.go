@@ -14,130 +14,49 @@ import (
 	"github.com/ManeFunction/lazyunity/internal/unitycli"
 )
 
-func selectRoot(t *testing.T, m *Model, suffix string) rootRow {
-	t.Helper()
-	for _, r := range m.rootsTab.Items() {
-		if strings.HasSuffix(r.Path, suffix) {
-			m.rootsTab.SelectKey(r.Path)
-			return r
-		}
-	}
-	t.Fatalf("no root ending in %q among %v", suffix, m.rootsTab.Items())
-	return rootRow{}
-}
-
-func TestRootsListShowsInstallRootAndExtras(t *testing.T) {
+func TestEditorsFolderRowAndPrompt(t *testing.T) {
 	m := newTestModel(t)
-	extra := t.TempDir()
-	m.st.AddRoot(extra)
-	m.cfg.Editors.ExtraRoots = []string{"/from/config"}
-	drain(m, m.scanEditorsCmd()) // the scan finds which folders are there
-	press(m, "3", "]")
+	f := useFakeCLI(t, m)
+	press(m, "3")
+	m.toolsTab.SelectKey("editorsdir")
 	out := screenText(m)
-	if !strings.Contains(out, "install location") || !strings.Contains(out, "2 editors") || !strings.Contains(out, "not found") {
-		t.Errorf("roots:\n%s", out)
+	if !strings.Contains(out, "Editors folder") {
+		t.Errorf("the tools should show the Editors folder:\n%s", out)
 	}
-	roots := m.rootsTab.Items()
-	if len(roots) != 3 || !roots[0].Install || roots[0].Source != "cli" || roots[1].Source != "state" || roots[2].Source != "config" {
-		t.Errorf("roots = %+v", roots)
+	if row, ok := m.toolsTab.Selected(); !ok || row.status != displayPath(m.inv.installRoot())+" · enter to change" {
+		t.Errorf("the row shows the folder: %+v", row)
 	}
-	if roots[2].Exists {
-		t.Error("/from/config does not exist")
-	}
-}
 
-func TestAddARoot(t *testing.T) {
-	m := newTestModel(t)
-	press(m, "3", "]")
-	dir := t.TempDir()
-	press(m, "a")
+	// enter opens the prompt; a missing folder is refused
+	press(m, "enter")
 	pp := m.popups[0].(*promptPopup)
-	pp.in.Set(filepath.Join(dir, "nope"))
+	pp.in.Set(filepath.Join(m.inv.installRoot(), "nope"))
 	press(m, "enter")
 	if len(m.popups) != 1 || !strings.Contains(screenText(m), "That folder does not exist") {
-		t.Error("a missing folder is refused")
+		t.Errorf("a missing folder is refused:\n%s", screenText(m))
 	}
-	pp.in.Set(dir)
-	_, cmd := m.Update(keyMsg("enter"))
-	if len(m.st.ExtraRoots) != 1 || m.st.ExtraRoots[0] != dir {
-		t.Fatalf("roots = %v", m.st.ExtraRoots)
-	}
-	if cmd == nil {
-		t.Error("adding a root rescans for Editors")
-	}
-	if _, err := os.Stat(m.st.Path()); err != nil {
-		t.Error("the new root must be saved at once")
-	}
-	if !strings.Contains(screenText(m), "Added") {
-		t.Error("the user should be told")
-	}
-	// adding it again is noticed
-	press(m, "a")
-	m.popups[0].(*promptPopup).in.Set(dir)
+
+	// the current folder is a no-op
+	pp.in.Set(m.inv.installRoot())
 	press(m, "enter")
-	if len(m.st.ExtraRoots) != 1 || !strings.Contains(screenText(m), "already in the list") {
-		t.Error("duplicates are refused")
+	if !strings.Contains(m.toast.text, "already install into") {
+		t.Errorf("choosing the current folder is a no-op, toast: %q", m.toast.text)
 	}
-}
 
-func TestRemoveARoot(t *testing.T) {
-	m := newTestModel(t)
-	extra := t.TempDir()
-	m.st.AddRoot(extra)
-	m.cfg.Editors.ExtraRoots = []string{"/from/config"}
-	drain(m, m.scanEditorsCmd()) // the scan finds which folders are there
-	press(m, "3", "]")
-
-	selectRoot(t, m, "Editor") // the install location
-	press(m, "d")
-	if len(m.popups) != 0 || !strings.Contains(screenText(m), "where new Editors are installed") {
-		t.Errorf("the install location cannot be removed:\n%s", screenText(m))
-	}
-	selectRoot(t, m, "/from/config")
-	press(m, "d")
-	if len(m.popups) != 0 || !strings.Contains(screenText(m), "set in config.yml") {
-		t.Errorf("a root from config.yml cannot be removed here:\n%s", screenText(m))
-	}
-	selectRoot(t, m, filepath.Base(extra))
-	press(m, "d")
-	if len(m.popups) != 1 || !strings.Contains(screenText(m), "stay installed") {
-		t.Fatalf("a confirmation that says the Editors stay:\n%s", screenText(m))
-	}
+	// a different folder is set through the CLI
+	other := t.TempDir()
+	press(m, "enter")
+	m.popups[0].(*promptPopup).in.Set(other)
 	_, cmd := m.Update(keyMsg("enter"))
-	if len(m.st.ExtraRoots) != 0 || cmd == nil {
-		t.Errorf("roots = %v", m.st.ExtraRoots)
+	drain(m, cmd)
+	if !f.called("SetInstallPath", other) || !f.called("InstallPath") {
+		t.Errorf("calls: %v", f.Calls())
 	}
-}
-
-func TestSetInstallLocation(t *testing.T) {
-	m := newTestModel(t)
-	extra := t.TempDir()
-	m.st.AddRoot(extra)
-	m.refreshRoots()
-	press(m, "3", "]")
-	f := useFakeCLI(t, m)
-	selectRoot(t, m, "Editor")
-	press(m, "space")
-	if !strings.Contains(screenText(m), "already installed there") {
-		t.Error("choosing the current location is a no-op")
+	if got := m.inv.installRoot(); got != other {
+		t.Errorf("the new Editors folder should be adopted, got %q", got)
 	}
-	selectRoot(t, m, filepath.Base(extra))
-	drain(m, m.keymap.lookup(ctxRoots, "space").run(m))
-	if !f.called("SetInstallPath", extra) || !f.called("InstallPath") {
-		t.Fatalf("calls: %v", f.Calls())
-	}
-	if got := m.inv.roots()[0]; got != extra {
-		t.Errorf("the new install root should be adopted, got %q", got)
-	}
-	roots := m.rootsTab.Items()
-	if !roots[0].Install || roots[0].Path != extra {
-		t.Errorf("the install root comes first: %+v", roots)
-	}
-	// a folder that is not there cannot be the install location
-	m.rootsTab.SetItems([]rootRow{{Path: "/gone", Exists: false}})
-	press(m, "space")
-	if !strings.Contains(screenText(m), "does not exist") {
-		t.Error("a missing folder is refused")
+	if !strings.Contains(m.toast.text, "New Editors now install into") {
+		t.Errorf("the user should be told: %q", m.toast.text)
 	}
 }
 
@@ -491,17 +410,7 @@ func TestShellPrompt(t *testing.T) {
 
 func TestTildeInConfiguredPathsIsExpanded(t *testing.T) {
 	m := newTestModel(t)
-	m.cfg.Editors.ExtraRoots = []string{"~/Unity-extra"}
 	m.cfg.Projects.DefaultLocation = "~/Games"
-	roots := m.inv.roots()
-	want := filepath.Join(homeDir(), "Unity-extra")
-	found := false
-	for _, r := range roots {
-		found = found || r == want
-	}
-	if !found {
-		t.Errorf("roots = %v, want one to be %s", roots, want)
-	}
 	if m.projectsDir() != filepath.Join(homeDir(), "Games") {
 		t.Errorf("projectsDir = %q", m.projectsDir())
 	}

@@ -77,9 +77,10 @@ func TestTabsSwitchWithBracketsAndRepeatedJump(t *testing.T) {
 	if m.focusCtx() != ctxTools {
 		t.Errorf("context = %v, want tools", m.focusCtx())
 	}
+	// the Tools panel has one tab, so brackets stay
 	press(m, "]")
-	if m.focusCtx() != ctxRoots {
-		t.Errorf("context = %v, want roots", m.focusCtx())
+	if m.focusCtx() != ctxTools {
+		t.Errorf("context = %v, want tools", m.focusCtx())
 	}
 }
 
@@ -151,22 +152,24 @@ func TestFilterKeys(t *testing.T) {
 	if !m.filter.active {
 		t.Fatal("/ starts the filter")
 	}
-	press(m, "o", "l", "d")
-	if m.projectsTab.Len() != 1 || selectedProject(t, m).name() != "Old Platformer" {
-		t.Errorf("filter 'old' gave %d projects", m.projectsTab.Len())
+	// 'ancient' matches only Ancient Thing; it must not be a substring of the
+	// temp folder the fixture lives in, which differs per platform.
+	press(m, "a", "n", "c")
+	if m.projectsTab.Len() != 1 || selectedProject(t, m).name() != "Ancient Thing" {
+		t.Errorf("filter 'anc' gave %d projects", m.projectsTab.Len())
 	}
-	if !strings.Contains(screenText(m), "Filter: old") {
+	if !strings.Contains(screenText(m), "Filter: anc") {
 		t.Error("the filter prompt should be on the bottom line while typing")
 	}
 	press(m, "backspace")
-	if m.projectsTab.Filter() != "ol" {
+	if m.projectsTab.Filter() != "an" {
 		t.Errorf("backspace: %q", m.projectsTab.Filter())
 	}
-	press(m, "d", "enter") // enter keeps the filter but leaves the prompt
-	if m.filter.active || m.projectsTab.Filter() != "old" {
+	press(m, "c", "enter") // enter keeps the filter but leaves the prompt
+	if m.filter.active || m.projectsTab.Filter() != "anc" {
 		t.Errorf("enter: active=%v filter=%q", m.filter.active, m.projectsTab.Filter())
 	}
-	if !strings.Contains(screenText(m), "filter: old") {
+	if !strings.Contains(screenText(m), "filter: anc") {
 		t.Error("an applied filter is shown at the bottom right")
 	}
 	press(m, "esc") // esc clears an applied filter

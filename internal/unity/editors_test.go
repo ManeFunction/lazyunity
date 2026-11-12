@@ -55,9 +55,38 @@ func TestVersionDir(t *testing.T) {
 		if got := VersionDir(exe, goos); got != dir {
 			t.Errorf("%s: VersionDir(%q) = %q, want %q", goos, exe, got, dir)
 		}
+		if goos == "darwin" {
+			app := filepath.Join(dir, appRel)
+			if got := VersionDir(app, goos); got != dir {
+				t.Errorf("%s: VersionDir(%q) = %q, want %q", goos, app, got, dir)
+			}
+			if got := VersionDir(filepath.Join(dir, "Other.app"), goos); got != "" {
+				t.Errorf("%s: VersionDir(%q) = %q, want \"\"", goos, filepath.Join(dir, "Other.app"), got)
+			}
+		}
 	}
 	if got := VersionDir(filepath.Join("opt", "somewhere", "unity"), "linux"); got != "" {
 		t.Errorf("a path that is not an Editor executable gave %q", got)
+	}
+}
+
+func TestNormalizeLocation(t *testing.T) {
+	dir := filepath.Join("/Editors", "6000.6.8f1")
+	app := filepath.Join(dir, appRel)
+	exe := filepath.Join(app, "Contents", "MacOS", "Unity")
+	if got := NormalizeLocation(app, "darwin"); got != exe {
+		t.Errorf("darwin: NormalizeLocation(%q) = %q, want %q", app, got, exe)
+	}
+	if got := NormalizeLocation(exe, "darwin"); got != exe {
+		t.Errorf("an executable comes back as it is: %q", got)
+	}
+	if got := NormalizeLocation(dir, "darwin"); got != dir {
+		t.Errorf("a version folder comes back as it is: %q", got)
+	}
+	for _, goos := range []string{"linux", "windows"} {
+		if got := NormalizeLocation(app, goos); got != app {
+			t.Errorf("%s: NormalizeLocation(%q) = %q", goos, app, got)
+		}
 	}
 }
 

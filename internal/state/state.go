@@ -34,8 +34,6 @@ const (
 
 // State is the contents of state.yml.
 type State struct {
-	// ExtraRoots are Editor folders the user added in the Roots tab.
-	ExtraRoots []string `yaml:"extraRoots,omitempty"`
 	// Pending maps a project path to its pending change.
 	Pending map[string]Pending `yaml:"pending,omitempty"`
 	// Sort is how projects are ordered; empty means SortLastOpened.
@@ -111,28 +109,6 @@ func (s *State) SetPending(project string, p Pending) {
 		s.Pending = map[string]Pending{}
 	}
 	s.Pending[project] = p
-}
-
-// AddRoot remembers an Editor folder. It reports false if it was already known.
-func (s *State) AddRoot(path string) bool {
-	for _, r := range s.ExtraRoots {
-		if r == path {
-			return false
-		}
-	}
-	s.ExtraRoots = append(s.ExtraRoots, path)
-	return true
-}
-
-// RemoveRoot forgets an Editor folder. It reports whether it was known.
-func (s *State) RemoveRoot(path string) bool {
-	for i, r := range s.ExtraRoots {
-		if r == path {
-			s.ExtraRoots = append(s.ExtraRoots[:i], s.ExtraRoots[i+1:]...)
-			return true
-		}
-	}
-	return false
 }
 
 // Release streams are stored as the value `unity releases --stream` takes

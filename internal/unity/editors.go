@@ -18,16 +18,31 @@ type Installed struct {
 	LTS          bool
 }
 
+// appRel is the macOS app bundle folder inside a version folder. The CLI
+// reports it as an Editor's location; the executable sits inside it.
+const appRel = "Unity.app"
+
 // ExecutableRel is the Editor executable's path inside a version folder.
 func ExecutableRel(goos string) string {
 	switch goos {
 	case "windows":
 		return filepath.Join("Editor", "Unity.exe")
 	case "darwin":
-		return filepath.Join("Unity.app", "Contents", "MacOS", "Unity")
+		return filepath.Join(appRel, "Contents", "MacOS", "Unity")
 	default:
 		return filepath.Join("Editor", "Unity")
 	}
+}
+
+// NormalizeLocation rewrites a location into the path of the Editor
+// executable. On darwin the CLI reports the app bundle, while a scan finds the
+// executable inside it; the two have to agree for the lists to merge, and only
+// the executable can be run. Anything else comes back unchanged.
+func NormalizeLocation(location, goos string) string {
+	if goos == "darwin" && strings.HasSuffix(location, string(filepath.Separator)+appRel) {
+		return location + string(filepath.Separator) + filepath.Join("Contents", "MacOS", "Unity")
+	}
+	return location
 }
 
 // DefaultInstallRoot is where Unity's tools install Editors unless told
@@ -45,13 +60,20 @@ func DefaultInstallRoot(goos, home string) string {
 
 // VersionDir returns the version folder that contains an Editor executable
 // (the folder that also holds modules.json), or "" if location is not an
-// Editor executable for goos. location must use the host's path separator.
+// Editor executable for goos. On darwin the app bundle counts too, since the
+// CLI reports it instead of the executable inside. location must use the
+// host's path separator.
 func VersionDir(location, goos string) string {
-	rel := ExecutableRel(goos)
-	if !strings.HasSuffix(location, string(filepath.Separator)+rel) {
-		return ""
+	rels := []string{ExecutableRel(goos)}
+	if goos == "darwin" {
+		rels = append(rels, appRel)
 	}
-	return strings.TrimSuffix(location, string(filepath.Separator)+rel)
+	for _, rel := range rels {
+		if suffix := string(filepath.Separator) + rel; strings.HasSuffix(location, suffix) {
+			return strings.TrimSuffix(location, suffix)
+		}
+	}
+	return ""
 }
 
 // Scan finds the Editors installed under the given roots: every folder that

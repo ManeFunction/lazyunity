@@ -49,6 +49,15 @@ func (m *Model) refreshTools() {
 		run: func(m *Model) tea.Cmd { m.licenseMenu(); return nil }})
 	rows = append(rows, m.openupmRow())
 
+	editors := toolRow{id: "editorsdir", label: "Editors folder",
+		run: func(m *Model) tea.Cmd { m.editorsFolderPrompt(); return nil }}
+	if m.cliStatus.State != unitycli.Ready {
+		editors.status = "needs the Unity CLI"
+	} else {
+		editors.status = displayPath(m.inv.installRoot()) + " · enter to change"
+	}
+	rows = append(rows, editors)
+
 	dir := m.projectsDir()
 	rows = append(rows,
 		toolRow{id: "projectdir", label: "Default project folder", status: displayPath(dir) + " · enter to change",

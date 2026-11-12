@@ -301,44 +301,7 @@ func sortModules(mods []unitycli.Module) {
 	})
 }
 
-// ---- roots and tools -------------------------------------------------------
-
-// rootRow is a folder Editors are looked for in.
-type rootRow struct {
-	Path    string
-	Install bool   // where new Editors are installed
-	Source  string // "cli", "state" or "config"
-	Exists  bool
-	Editors int
-}
-
-func (m *Model) drawRoot(r rootRow, w int, base lipgloss.Style) string {
-	th := m.th
-	row := newRow(base)
-	if r.Install {
-		row.text("★ ", th.Pinned)
-	} else {
-		row.gap(2)
-	}
-	var tag string
-	switch {
-	case !r.Exists:
-		tag = "not found"
-	case r.Install:
-		tag = plural(r.Editors, "editor") + " · install location"
-	default:
-		tag = plural(r.Editors, "editor")
-	}
-	tagW := min(width(tag), max(w/2, 10))
-	pathW := max(w-2-tagW-1, 1)
-	pathStyle := th.Text
-	if !r.Exists {
-		pathStyle = th.Missing
-	}
-	row.add(displayPath(r.Path), pathStyle, pathW).gap(1)
-	row.add(padLeft(tag, tagW), th.Dim, tagW)
-	return row.done(w)
-}
+// ---- tools -----------------------------------------------------------------
 
 // displayPath shortens the home folder to ~.
 func displayPath(p string) string {

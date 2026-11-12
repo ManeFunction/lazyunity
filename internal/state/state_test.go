@@ -3,14 +3,12 @@ package state
 import (
 	"os"
 	"path/filepath"
-	"reflect"
 	"testing"
 )
 
 func TestRoundTrip(t *testing.T) {
 	dir := t.TempDir()
 	s := Load(dir)
-	s.AddRoot("/opt/unity")
 	s.SetPending("/p/game", Pending{Version: "6000.6.8f1", BuildTarget: "Android"})
 	s.Sort = SortName
 	s.DefaultProjectDir = "/games"
@@ -19,8 +17,7 @@ func TestRoundTrip(t *testing.T) {
 	}
 
 	got := Load(dir)
-	if !reflect.DeepEqual(got.ExtraRoots, []string{"/opt/unity"}) ||
-		got.PendingFor("/p/game") != (Pending{Version: "6000.6.8f1", BuildTarget: "Android"}) ||
+	if got.PendingFor("/p/game") != (Pending{Version: "6000.6.8f1", BuildTarget: "Android"}) ||
 		got.Sort != SortName || got.DefaultProjectDir != "/games" {
 		t.Errorf("state did not survive a round trip: %+v", got)
 	}
@@ -46,14 +43,14 @@ func TestSaveCreatesDirAndLeavesNoTempFiles(t *testing.T) {
 
 func TestLoadNeverFails(t *testing.T) {
 	// missing
-	if s := Load(t.TempDir()); s == nil || len(s.ExtraRoots) != 0 {
+	if s := Load(t.TempDir()); s == nil {
 		t.Error("a missing file must give an empty state")
 	}
 	// corrupt: starts fresh, but still knows where to save
 	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, "state.yml"), []byte("extraRoots: [unclosed"), 0o644)
+	os.WriteFile(filepath.Join(dir, "state.yml"), []byte("sort: [unclosed"), 0o644)
 	s := Load(dir)
-	if len(s.ExtraRoots) != 0 || s.Path() != filepath.Join(dir, "state.yml") {
+	if s.Sort != "" || s.Path() != filepath.Join(dir, "state.yml") {
 		t.Errorf("corrupt file: %+v", s)
 	}
 	if err := s.Save(); err != nil {
@@ -75,22 +72,6 @@ func TestPending(t *testing.T) {
 		t.Error("an empty pending must delete the entry")
 	}
 	s.SetPending("/never-set", Pending{}) // clearing something unknown is fine
-}
-
-func TestRoots(t *testing.T) {
-	s := Load(t.TempDir())
-	if !s.AddRoot("/a") || !s.AddRoot("/b") {
-		t.Fatal("adding new roots must succeed")
-	}
-	if s.AddRoot("/a") {
-		t.Error("a duplicate root must be refused")
-	}
-	if !s.RemoveRoot("/a") || s.RemoveRoot("/a") {
-		t.Error("RemoveRoot must report whether it removed something")
-	}
-	if !reflect.DeepEqual(s.ExtraRoots, []string{"/b"}) {
-		t.Errorf("roots = %v", s.ExtraRoots)
-	}
 }
 
 func TestSortOrder(t *testing.T) {

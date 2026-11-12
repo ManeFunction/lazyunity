@@ -18,26 +18,17 @@ import (
 	"github.com/ManeFunction/lazyunity/internal/unitycli"
 )
 
-// ---- roots ------------------------------------------------------------------------
+// ---- editors folder ----------------------------------------------------------------
 
-func rootActions() []*action {
-	on := onSelected(func(m *Model) (rootRow, bool) { return m.rootsTab.Selected() })
-	return []*action{
-		{id: "roots.add", ctx: ctxRoots, keys: []string{"a"}, desc: "Add a folder to look for Editors in", hint: "Add",
-			run: func(m *Model) tea.Cmd { m.addRootPrompt(); return nil }},
-		on(&action{id: "roots.remove", ctx: ctxRoots, keys: []string{"d"}, desc: "Stop looking for Editors in this folder", hint: "Remove"},
-			func(m *Model, r rootRow) tea.Cmd { m.removeRoot(r); return nil }),
-		on(&action{id: "roots.setInstall", ctx: ctxRoots, keys: []string{"space"}, desc: "Install new Editors into this folder", hint: "Install here"},
-			func(m *Model, r rootRow) tea.Cmd { return m.setInstallRoot(r) }),
-		on(&action{id: "roots.openFolder", ctx: ctxRoots, keys: []string{"o"}, desc: "Open the folder in the file manager"},
-			func(m *Model, r rootRow) tea.Cmd { return m.openFolder(r.Path) }),
+// editorsFolderPrompt changes the Editors folder: the one folder new Editors
+// are installed into and looked for in, which the Unity CLI keeps.
+func (m *Model) editorsFolderPrompt() {
+	if !m.needCLI() {
+		return
 	}
-}
-
-func (m *Model) addRootPrompt() {
 	m.push(&promptPopup{
-		title: "Add an Editor folder", label: "A folder that contains Unity Editor folders, such as ~/Unity/Hub/Editor:",
-		in: newInput(displayPath(homeDir()) + string(filepath.Separator)), complete: completeDir,
+		title: "Editors folder", label: "New Editors install into this folder, and installed Editors are looked for here:",
+		in: newInput(displayPath(m.inv.installRoot()) + string(filepath.Separator)), complete: completeDir,
 		validate: func(text string) string {
 			if st, err := os.Stat(config.ExpandHome(text)); err != nil || !st.IsDir() {
 				return "That folder does not exist"
@@ -46,56 +37,20 @@ func (m *Model) addRootPrompt() {
 		},
 		onSubmit: func(m *Model, text string) tea.Cmd {
 			path := filepath.Clean(config.ExpandHome(text))
-			if !m.st.AddRoot(path) {
-				m.toastf(toastInfo, "%s is already in the list", displayPath(path))
+			if path == m.inv.installRoot() {
+				m.toastf(toastInfo, "Editors already install into that folder")
 				return nil
 			}
-			m.saveState()
-			m.refreshRoots()
-			m.toastf(toastOK, "Added %s", displayPath(path))
-			return m.scanEditorsCmd()
+			return m.runCLI("Setting the Editors folder", "New Editors now install into "+displayPath(path),
+				func(ctx context.Context, c unityCLI) error { return c.SetInstallPath(ctx, path) },
+				func(m *Model) tea.Cmd { return m.loadInstallPathCmd() })
 		},
 	})
 }
 
-func (m *Model) removeRoot(r rootRow) {
-	switch {
-	case r.Install:
-		m.toastf(toastWarn, "That is where new Editors are installed: pick another folder with space first")
-		return
-	case r.Source == "config":
-		m.toastf(toastWarn, "That folder is set in config.yml (editors.extraRoots): remove it there")
-		return
-	}
-	m.push(&confirmPopup{
-		title: "Remove folder", yes: "Remove",
-		message: fmt.Sprintf("Stop looking for Editors in %s?\n\nThe Editors in it stay installed and stay known to the Unity CLI.", displayPath(r.Path)),
-		onYes: func(m *Model) tea.Cmd {
-			m.st.RemoveRoot(r.Path)
-			m.saveState()
-			m.refreshRoots()
-			return m.scanEditorsCmd()
-		},
-	})
-}
-
-func (m *Model) setInstallRoot(r rootRow) tea.Cmd {
-	if r.Install {
-		m.toastf(toastInfo, "New Editors are already installed there")
-		return nil
-	}
-	if !r.Exists {
-		m.toastf(toastError, "%s does not exist", displayPath(r.Path))
-		return nil
-	}
-	return m.runCLI("Setting the install location", "New Editors now install into "+displayPath(r.Path),
-		func(ctx context.Context, c unityCLI) error { return c.SetInstallPath(ctx, r.Path) },
-		func(m *Model) tea.Cmd { return m.loadInstallPathCmd() })
-}
-
-// registerStrays tells the CLI about Editors found in the folders added by the
-// user, so that its module commands and --editor-version work for them. It does
-// this once for each Editor.
+// registerStrays tells the CLI about Editors it found on disk but does not
+// list, so that its module commands and --editor-version work for them. It
+// does this once for each Editor.
 func (m *Model) registerStrays() tea.Cmd {
 	paths, goos := m.inv.strays(), m.goos
 	if len(paths) == 0 {
@@ -458,10 +413,6 @@ func (m *Model) selectedPath() (string, bool) {
 	case ctxEditors:
 		if r, ok := m.editorsTab.Selected(); ok {
 			return editorDir(r), true
-		}
-	case ctxRoots:
-		if r, ok := m.rootsTab.Selected(); ok {
-			return r.Path, true
 		}
 	}
 	return "", false

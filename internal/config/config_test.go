@@ -46,8 +46,6 @@ os:
   edit: code {{dir}}
 unity:
   cliPath: /opt/unity
-editors:
-  extraRoots: [/a, /b]
 projects:
   defaultLocation: /games
 quitAfterOpen: true
@@ -68,7 +66,7 @@ quitAfterOpen: true
 		t.Errorf("defaults were lost: %+v", cfg.GUI)
 	}
 	if cfg.OS.Edit != "code {{dir}}" || cfg.Unity.CLIPath != "/opt/unity" || !cfg.QuitAfterOpen ||
-		cfg.Projects.DefaultLocation != "/games" || !reflect.DeepEqual(cfg.Editors.ExtraRoots, []string{"/a", "/b"}) {
+		cfg.Projects.DefaultLocation != "/games" {
 		t.Errorf("config: %+v", cfg)
 	}
 }
