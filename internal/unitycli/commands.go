@@ -475,3 +475,30 @@ func (c *Client) SelfUpdate(ctx context.Context, channel string) error {
 	_, err := c.Run(ctx, args...)
 	return err
 }
+
+// UpdateInfo is what `self-update --check` reports.
+type UpdateInfo struct {
+	Current string `json:"currentVersion"`
+	Latest  string `json:"latestVersion"`
+}
+
+// Available reports whether Latest is newer than Current.
+func (u UpdateInfo) Available() bool {
+	cur, ok1 := ParseVersion(u.Current)
+	lat, ok2 := ParseVersion(u.Latest)
+	if ok1 && ok2 {
+		return lat.Compare(cur) > 0
+	}
+	return u.Latest != "" && u.Latest != u.Current
+}
+
+// CheckUpdate asks whether a newer CLI is out, without installing it.
+func (c *Client) CheckUpdate(ctx context.Context) (UpdateInfo, error) {
+	var u UpdateInfo
+	env, err := c.Run(ctx, "self-update", "--check")
+	if err != nil {
+		return u, err
+	}
+	err = env.decodeData(&u)
+	return u, err
+}

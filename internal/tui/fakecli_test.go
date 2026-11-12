@@ -34,6 +34,7 @@ type fakeCLI struct {
 	frames         []unitycli.Frame // what an install reports before it ends
 	cache          unitycli.CacheInfo
 	auth           unitycli.AuthInfo
+	update         unitycli.UpdateInfo
 	license        json.RawMessage
 	log            []unitycli.LogEntry
 	err            map[string]error
@@ -260,6 +261,10 @@ func (f *fakeCLI) ReturnLicense(context.Context) error { return f.record("Return
 
 func (f *fakeCLI) SelfUpdate(_ context.Context, channel string) error {
 	return f.record("SelfUpdate", channel)
+}
+
+func (f *fakeCLI) CheckUpdate(context.Context) (unitycli.UpdateInfo, error) {
+	return f.update, f.record("CheckUpdate")
 }
 
 func (f *fakeCLI) Log() []unitycli.LogEntry { return f.log }

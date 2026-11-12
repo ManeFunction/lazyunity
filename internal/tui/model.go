@@ -97,6 +97,7 @@ type Model struct {
 	inv         *inventory
 	auth        unitycli.AuthInfo
 	authKnown   bool
+	cliUpdate   unitycli.UpdateInfo // what the launch check found; empty until it answers
 	openupm     openupmState
 
 	popups []popup
@@ -294,7 +295,7 @@ func tick() tea.Cmd {
 
 // Init starts the slow loads; what was cheap to load is already in place.
 func (m *Model) Init() tea.Cmd {
-	return tea.Batch(tick(), m.probeOpenUPMCmd(), m.loadEditorsCmd(), m.loadAuthCmd(), m.loadInstallPathCmd())
+	return tea.Batch(tick(), m.probeOpenUPMCmd(), m.loadEditorsCmd(), m.loadAuthCmd(), m.loadInstallPathCmd(), m.checkCLIUpdateCmd())
 }
 
 // Update handles every message.

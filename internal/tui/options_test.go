@@ -2,6 +2,7 @@ package tui
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -186,6 +187,14 @@ func TestToolsTabRows(t *testing.T) {
 	}{Email: "me@example.com"}}})
 	if !strings.Contains(screenText(m), "signed in as me@example.com") {
 		t.Error("the account is shown")
+	}
+	m.Update(cliUpdateMsg{info: unitycli.UpdateInfo{Current: "1.0.0-beta.16", Latest: "1.0.0-beta.17"}})
+	if !strings.Contains(screenText(m), "update available: 1.0.0-beta.17") {
+		t.Errorf("a newer CLI is announced:\n%s", screenText(m))
+	}
+	m.Update(cliUpdateMsg{err: errors.New("offline")})
+	if !strings.Contains(screenText(m), "update available: 1.0.0-beta.17") {
+		t.Error("a failed check keeps what was known")
 	}
 	m.cliStatus.State = unitycli.Missing
 	m.refreshTools()

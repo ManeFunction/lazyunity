@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -32,6 +33,12 @@ type localEditorsMsg struct {
 
 type authMsg struct {
 	info unitycli.AuthInfo
+	err  error
+}
+
+// cliUpdateMsg is the answer of the CLI update check.
+type cliUpdateMsg struct {
+	info unitycli.UpdateInfo
 	err  error
 }
 
@@ -96,6 +103,16 @@ func (m *Model) loadAuthCmd() tea.Cmd {
 	})
 }
 
+// checkCLIUpdateCmd asks whether a newer Unity CLI is out.
+func (m *Model) checkCLIUpdateCmd() tea.Cmd {
+	return m.cliCmd(func(ctx context.Context, c unityCLI) tea.Msg {
+		ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		defer cancel()
+		info, err := c.CheckUpdate(ctx)
+		return cliUpdateMsg{info: info, err: err}
+	})
+}
+
 func (m *Model) loadInstallPathCmd() tea.Cmd {
 	return m.cliCmd(func(ctx context.Context, c unityCLI) tea.Msg {
 		p, err := c.InstallPath(ctx)
@@ -148,6 +165,12 @@ func (m *Model) handleData(msg tea.Msg) tea.Cmd {
 		}
 		m.auth, m.authKnown = msg.info, true
 		m.refreshTools()
+	case cliUpdateMsg:
+		// a failed check (offline, say) is not worth a word: the row stays as it was
+		if msg.err == nil {
+			m.cliUpdate = msg.info
+			m.refreshTools()
+		}
 	case installPathMsg:
 		if msg.err == nil && msg.path != "" {
 			m.inv.setInstallRoot(msg.path)

@@ -157,8 +157,12 @@ func (m *Model) cliTool() tea.Cmd {
 	if m.cliStatus.State != unitycli.Ready {
 		return install(m)
 	}
+	updateDesc := "Asks the CLI to update itself to the newest release."
+	if m.cliUpdate.Available() {
+		updateDesc = "Updates the CLI to " + m.cliUpdate.Latest + "."
+	}
 	menu := newMenu("Unity CLI "+m.cliStatus.Version.String(), []menuItem{
-		{label: "Update (self-update)", desc: "Asks the CLI to update itself to the newest release.", run: func(m *Model) tea.Cmd {
+		{label: "Update (self-update)", desc: updateDesc, run: func(m *Model) tea.Cmd {
 			return m.withCLI(func(c unityCLI) tea.Cmd {
 				return m.enqueue(&task{
 					title: "Updating the Unity CLI",
@@ -195,9 +199,10 @@ func (m *Model) onCLIStatus(msg cliStatusMsg) tea.Cmd {
 		return nil
 	}
 	m.cli = unitycli.New(msg.st.Path)
+	m.cliUpdate = unitycli.UpdateInfo{}
 	m.refreshTools()
 	m.toastf(toastOK, "Unity CLI %s is ready", msg.st.Version)
-	return tea.Batch(m.loadProjectsCmd(), m.loadEditorsCmd(), m.loadAuthCmd(), m.loadInstallPathCmd())
+	return tea.Batch(m.loadProjectsCmd(), m.loadEditorsCmd(), m.loadAuthCmd(), m.loadInstallPathCmd(), m.checkCLIUpdateCmd())
 }
 
 func (m *Model) accountTool() tea.Cmd {

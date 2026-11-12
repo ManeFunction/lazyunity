@@ -18,6 +18,9 @@ func (m *Model) refreshTools() {
 	switch m.cliStatus.State {
 	case unitycli.Ready:
 		cli.status, cli.tone = "ready · "+m.cliStatus.Version.String(), toneGood
+		if m.cliUpdate.Available() {
+			cli.status, cli.tone = "update available: "+m.cliUpdate.Latest+" · enter to update", toneWarn
+		}
 	case unitycli.Outdated:
 		cli.status, cli.tone = "outdated · press enter to update", toneWarn
 	default:

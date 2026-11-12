@@ -127,6 +127,27 @@ func TestAuthStatus(t *testing.T) {
 	}
 }
 
+func TestCheckUpdate(t *testing.T) {
+	c := fakeClient(t, map[string]fakeResp{"self-update --check": {File: "self-update-check.json"}})
+	u, err := c.CheckUpdate(ctx5(t))
+	if err != nil || u.Current != "1.0.0-beta.16" || u.Latest != "1.0.0-beta.17" || !u.Available() {
+		t.Errorf("check: %+v %v", u, err)
+	}
+	for _, tc := range []struct {
+		u    UpdateInfo
+		want bool
+	}{
+		{UpdateInfo{Current: "1.0.0", Latest: "1.0.0"}, false},
+		{UpdateInfo{Current: "1.0.0", Latest: "1.0.0-rc.1"}, false},
+		{UpdateInfo{Current: "1.0.0-rc.1", Latest: "1.0.0"}, true},
+		{UpdateInfo{}, false},
+	} {
+		if got := tc.u.Available(); got != tc.want {
+			t.Errorf("%+v: Available = %v", tc.u, got)
+		}
+	}
+}
+
 func TestErrorMapping(t *testing.T) {
 	notAProject := `{"success":false,"command":"projects info","data":null,"errors":[{"code":"NOT_A_PROJECT","message":"Not a Unity project."}],"warnings":[]}`
 	c := fakeClient(t, map[string]fakeResp{
