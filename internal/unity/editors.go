@@ -60,20 +60,15 @@ func DefaultInstallRoot(goos, home string) string {
 
 // VersionDir returns the version folder that contains an Editor executable
 // (the folder that also holds modules.json), or "" if location is not an
-// Editor executable for goos. On darwin the app bundle counts too, since the
-// CLI reports it instead of the executable inside. location must use the
-// host's path separator.
+// Editor executable for goos. A darwin app bundle, as the CLI reports it, goes
+// through NormalizeLocation first. location must use the host's path
+// separator.
 func VersionDir(location, goos string) string {
-	rels := []string{ExecutableRel(goos)}
-	if goos == "darwin" {
-		rels = append(rels, appRel)
+	suffix := string(filepath.Separator) + ExecutableRel(goos)
+	if !strings.HasSuffix(location, suffix) {
+		return ""
 	}
-	for _, rel := range rels {
-		if suffix := string(filepath.Separator) + rel; strings.HasSuffix(location, suffix) {
-			return strings.TrimSuffix(location, suffix)
-		}
-	}
-	return ""
+	return strings.TrimSuffix(location, suffix)
 }
 
 // Scan finds the Editors installed under the given roots: every folder that

@@ -57,11 +57,8 @@ func TestVersionDir(t *testing.T) {
 		}
 		if goos == "darwin" {
 			app := filepath.Join(dir, appRel)
-			if got := VersionDir(app, goos); got != dir {
-				t.Errorf("%s: VersionDir(%q) = %q, want %q", goos, app, got, dir)
-			}
-			if got := VersionDir(filepath.Join(dir, "Other.app"), goos); got != "" {
-				t.Errorf("%s: VersionDir(%q) = %q, want \"\"", goos, filepath.Join(dir, "Other.app"), got)
+			if got := VersionDir(NormalizeLocation(app, goos), goos); got != dir {
+				t.Errorf("%s: VersionDir of the normalized %q = %q, want %q", goos, app, got, dir)
 			}
 		}
 	}
