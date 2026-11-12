@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -211,7 +212,7 @@ func TestProgressFramesShow(t *testing.T) {
 
 	m.Update(taskFrameMsg{id: tk.id, frame: unitycli.Frame{Type: "progress", Pct: pct(42), Phase: "download", Message: "Downloading Web Build Support..."}})
 	out := screenText(m)
-	for _, want := range []string{"─Tasks─", "Installing 6000.7.0b8", " 42%", "download · Downloading Web Build Support...", "[####"} {
+	for _, want := range []string{"─Tasks─", "Installing 6000.7.0b8", " 42%", "download · Downloading Web Build Support...", "[■■■■"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("the task frame should contain %q:\n%s", want, out)
 		}
@@ -252,13 +253,13 @@ func TestBars(t *testing.T) {
 			t.Errorf("bar(%v) = %q, want %q", c.pct, got, want)
 		}
 	}
-	// unknown progress: a run of # that moves, always the full width
+	// unknown progress: a run of squares that moves, always the full width
 	seen := map[string]bool{}
 	for i := 0; i < 40; i++ {
 		m.spin = i
 		b := stripANSI(m.bar(&task{pct: -1, status: taskRunning}, 20))
 		inner := strings.TrimSuffix(strings.TrimPrefix(b, "["), "]")
-		if width(b) != 20 || len(inner) != 18 || strings.Trim(inner, barDone+barTodo) != "" || !strings.Contains(inner, barDone) {
+		if width(b) != 20 || utf8.RuneCountInString(inner) != 18 || strings.Trim(inner, barDone+barTodo) != "" || !strings.Contains(inner, barDone) {
 			t.Errorf("sliding bar = %q", b)
 		}
 		seen[b] = true

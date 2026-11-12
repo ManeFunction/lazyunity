@@ -458,11 +458,12 @@ func (m *Model) taskLine(t *task, w int, labelW int) string {
 	return icon + " " + strings.Join(parts, " ")
 }
 
-// Progress bars are plain ASCII, so they read without color: [####------].
+// Progress bars are black squares (U+25A0) for what is done and middle dots
+// (U+00B7) for the rest, so they read without color: [■■■■······].
 // The brackets count toward the width.
 const (
-	barDone = "#"
-	barTodo = "-"
+	barDone = "■"
+	barTodo = "·"
 )
 
 // barCells is how many of w cells are done at pct percent.
@@ -471,7 +472,7 @@ func barCells(pct float64, w int) int {
 }
 
 // bar draws a task's progress bar, w cells wide with its brackets. When the
-// progress cannot be told, a short run of # slides back and forth instead.
+// progress cannot be told, a short run of lit squares slides back and forth instead.
 func (m *Model) bar(t *task, w int) string {
 	on, off := m.th.ActiveBorder, m.th.Dim
 	if t.status == taskDone {

@@ -19,7 +19,7 @@ lazyunity is a thin, fast front end for the official [Unity CLI](https://docs.un
 │                                             ││License                  press enter to check          │
 ╰──────────────────────────────────────1 of 3─╯╰────────────────────────────────────────────────1 of 8─╯
 ╭─Tasks────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ ⠋ Installing 6000.7.0b8 + Web Build Support [#######---------]  42% download · Downloading Web Buil… │
+│ ⠋ Installing 6000.7.0b8 + Web Build Support [■■■■■■■·········]  42% download · Downloading Web Buil… │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────╯
 Open: <enter> | Version: v | Platform: p | Pin: f | New: n | Add: a | Remove: d      ● signed in · 0.1.0
 ```
