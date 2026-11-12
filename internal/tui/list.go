@@ -165,11 +165,23 @@ func (l *list[T]) Click(row int) bool {
 }
 
 // Scroll moves the window by rows without moving the cursor off the screen.
+// When the cursor lands on a row it may not rest on, it moves to the nearest
+// one in the window; only if the window has none does the window follow it.
 func (l *list[T]) Scroll(delta int) {
 	maxOff := max(len(l.vis)-l.height, 0)
 	l.offset = clamp(l.offset+delta, 0, maxOff)
-	l.cursor = clamp(l.cursor, l.offset, min(l.offset+l.height-1, len(l.vis)-1))
-	l.rest()
+	lo, hi := l.offset, min(l.offset+l.height-1, len(l.vis)-1)
+	l.cursor = clamp(l.cursor, lo, hi)
+	if l.skipped(l.cursor) {
+		step := 1
+		if delta < 0 {
+			step = -1
+		}
+		if at := l.nearest(l.cursor, step, lo, hi); at >= 0 {
+			l.cursor = at
+		}
+	}
+	l.clamp()
 }
 
 // skipped reports whether the cursor may not rest on the visible row i.

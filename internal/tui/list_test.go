@@ -203,6 +203,16 @@ func TestListSkipsRunsOfSkippedRows(t *testing.T) {
 	}
 }
 
+func TestListScrollKeepsTheCursorOnScreen(t *testing.T) {
+	l := strList().skipping(func(s string) bool { return s == " " })
+	l.SetItems([]string{"a", "b", " ", "c", "d", "e"})
+	l.Bottom()
+	l.Scroll(-3) // window a, b, spacer: dragged onto the spacer, the cursor goes to b, not off screen to c
+	if got, _ := l.Selected(); got != "b" || !reflect.DeepEqual(window(l), []string{"a", "b", " "}) {
+		t.Errorf("scroll up: %q in %v", got, window(l))
+	}
+}
+
 func TestListClickAndScroll(t *testing.T) {
 	l := strList("a", "b", "c", "d", "e", "f")
 	if !l.Click(2) {
