@@ -78,7 +78,12 @@ func toolActions() []*action {
 	on := onSelected(func(m *Model) (toolRow, bool) { return m.toolsTab.Selected() })
 	return []*action{
 		on(&action{id: "tools.run", ctx: ctxTools, keys: []string{"enter", "space"}, desc: "Run the selected tool", hint: "Run"},
-			func(m *Model, r toolRow) tea.Cmd { return r.run(m) }),
+			func(m *Model, r toolRow) tea.Cmd {
+				if r.run == nil { // a spacer
+					return nil
+				}
+				return r.run(m)
+			}),
 		{id: "tools.editConfig", ctx: ctxTools, keys: []string{"e"}, desc: "Edit the config file", hint: "Edit config",
 			run: (*Model).editConfig},
 	}
