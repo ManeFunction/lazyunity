@@ -4,6 +4,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -129,19 +131,19 @@ func TestOpenUPMInstallAsks(t *testing.T) {
 
 func TestConfigTemplateOffersTheForkCommentedOut(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "config.yml"), []byte(configTemplate), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "config.yml"), []byte(configTemplate()), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	cfg, err := config.Load(dir)
 	if err != nil || !cfg.OpenUPM.FromRegistry() {
 		t.Errorf("as written, the template installs from npm: %+v %v", cfg.OpenUPM, err)
 	}
-	if !strings.Contains(configTemplate, "#   repo: "+config.ForkOpenUPMRepo+"\n#   ref: "+config.ForkOpenUPMRef+"\n") ||
-		!strings.Contains(configTemplate, config.OfficialOpenUPMRepo) || !strings.Contains(configTemplate, "pull/430") {
-		t.Errorf("the template suggests the fork, says why, and names the official repository:\n%s", configTemplate)
+	if !strings.Contains(configTemplate(), "#   repo: "+config.ForkOpenUPMRepo+"\n#   ref: "+config.ForkOpenUPMRef+"\n") ||
+		!strings.Contains(configTemplate(), config.OfficialOpenUPMRepo) || !strings.Contains(configTemplate(), "pull/430") {
+		t.Errorf("the template suggests the fork, says why, and names the official repository:\n%s", configTemplate())
 	}
 	// uncommenting it builds the fork's branch from git
-	uncommented := strings.NewReplacer("# openupm:", "openupm:", "#   repo:", "  repo:", "#   ref:", "  ref:").Replace(configTemplate)
+	uncommented := strings.NewReplacer("# openupm:", "openupm:", "#   repo:", "  repo:", "#   ref:", "  ref:").Replace(configTemplate())
 	os.WriteFile(filepath.Join(dir, "config.yml"), []byte(uncommented), 0o644)
 	cfg, err = config.Load(dir)
 	if err != nil || cfg.OpenUPM.FromRegistry() || cfg.OpenUPM.Repo != config.ForkOpenUPMRepo || cfg.OpenUPM.Ref != config.ForkOpenUPMRef {
@@ -157,5 +159,53 @@ func TestReleaseNotesOpenInTheBrowser(t *testing.T) {
 	press(m, "o")
 	if len(*opened) != 1 || (*opened)[0] != "https://unity.com/releases/editor/whats-new/6000.5.1f1" {
 		t.Errorf("o opens the release notes: %v", *opened)
+	}
+}
+
+func TestConfigTemplateListsEverySettingAtItsDefault(t *testing.T) {
+	// uncomment every setting line, leaving the explanations and the openupm
+	// block (which has no default to restore) commented
+	var out []string
+	setting := regexp.MustCompile(`^# ( *[a-z][A-Za-z]*:.*)$`)
+	for _, l := range strings.Split(configTemplate(), "\n") {
+		if m := setting.FindStringSubmatch(l); m != nil && !strings.HasPrefix(m[1], "openupm:") && !strings.HasPrefix(m[1], "  repo:") && !strings.HasPrefix(m[1], "  ref:") {
+			l = m[1]
+		}
+		out = append(out, l)
+	}
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "config.yml"), []byte(strings.Join(out, "\n")), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := config.Load(dir)
+	if err != nil {
+		t.Fatalf("uncommented, the template does not load: %v\n%s", err, strings.Join(out, "\n"))
+	}
+	km, warnings := newKeymap(buildActions(), cfg.Keybinding)
+	if len(warnings) > 0 {
+		t.Errorf("the template's keybindings warn: %q", warnings)
+	}
+	def, _ := newKeymap(buildActions(), nil)
+	for _, a := range buildActions() {
+		if cfg.Keybinding[a.ctx.group()][a.name()] == nil {
+			t.Errorf("the template misses %s", a.id)
+		}
+	}
+	for i := range km.bound {
+		if len(km.bound[i]) != len(def.bound[i]) {
+			t.Errorf("context %d: %d keys bound, %d by default", i, len(km.bound[i]), len(def.bound[i]))
+		}
+		for k, a := range def.bound[i] {
+			if got := km.bound[i][k]; got == nil || got.id != a.id {
+				t.Errorf("context %d: key %q is not bound to %s", i, k, a.id)
+			}
+		}
+	}
+	cfg.Keybinding = nil
+	if len(cfg.Editors.ExtraRoots) == 0 {
+		cfg.Editors.ExtraRoots = nil
+	}
+	if !reflect.DeepEqual(cfg, config.Default()) {
+		t.Errorf("the template's values are not the defaults:\n%+v\n%+v", cfg, config.Default())
 	}
 }

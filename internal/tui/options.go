@@ -314,33 +314,12 @@ func (m *Model) projectDirPrompt() {
 	})
 }
 
-const configTemplate = "# lazyunity configuration. Every key is optional; see the README for the list.\n" +
-	"# gui:\n#   sidePanelWidth: 0.45\n#   theme:\n#     activeBorderColor: [brightblue, bold]\n" +
-	"\n" +
-	"# The OpenUPM CLI, installed from the Tools tab. While this stays commented out,\n" +
-	"# the official release is installed from npm. Uncomment openupm to clone, build\n" +
-	"# and install it from a git repository instead; ref picks a branch or tag, the\n" +
-	"# default branch otherwise.\n" +
-	"#\n" +
-	"# Recommended: the fork below, until its pull request is merged upstream\n" +
-	"# (https://github.com/openupm/openupm-cli/pull/430, not accepted yet). It drops\n" +
-	"# deprecated dependencies (npmlog, rimraf, old npm registry libraries), so npm\n" +
-	"# no longer floods the install with deprecation warnings, and cuts the npm audit\n" +
-	"# findings from 19 vulnerable production packages (one critical) to 5. It also\n" +
-	"# fixes `openupm login` with a username and password, which sent the email as\n" +
-	"# the password and logged in to registry.npmjs.org instead of the requested\n" +
-	"# registry. It needs Node.js 20.17+ or 22.9+ (Node 18 is dropped).\n" +
-	"# For the official repository: repo: " + config.OfficialOpenUPMRepo + "\n" +
-	"# openupm:\n" +
-	"#   repo: " + config.ForkOpenUPMRepo + "\n" +
-	"#   ref: " + config.ForkOpenUPMRef + "\n"
-
 func (m *Model) editConfig() tea.Cmd {
 	path := filepath.Join(m.configDir, "config.yml")
 	if _, err := os.Stat(path); err != nil {
 		// give the editor something to open; a failure here only means it opens empty
 		if os.MkdirAll(m.configDir, 0o755) == nil {
-			os.WriteFile(path, []byte(configTemplate), 0o644)
+			os.WriteFile(path, []byte(configTemplate()), 0o644)
 		}
 	}
 	before, _ := os.ReadFile(path)
