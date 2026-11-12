@@ -135,7 +135,7 @@ func ShellCommand(goos, shell, text, dir string, getenv func(string) string) *ex
 		if shell == "" {
 			shell = "/bin/sh"
 		}
-		cmd = exec.Command(shell, "-c", text+`; printf '\nPress enter to return to lazyunity... '; read _`)
+		cmd = exec.Command(shell, "-c", text+`; printf '\n\033[34mPress enter to return to lazyunity...\033[0m '; read _`)
 	}
 	cmd.Dir = dir
 	return cmd

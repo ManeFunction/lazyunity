@@ -107,7 +107,7 @@ install
 status=$?
 echo
 if [ $status -eq 0 ]; then echo "OpenUPM CLI installed."; else echo "The install failed (exit code $status)."; fi
-printf 'Press enter to return to lazyunity... '
+printf '\033[34mPress enter to return to lazyunity...\033[0m '
 read _
 exit $status
 `
@@ -143,6 +143,7 @@ try {
   Write-Host "The install failed: $_"
   $code = 1
 }
-Read-Host 'Press enter to return to lazyunity' | Out-Null
+Write-Host 'Press enter to return to lazyunity... ' -ForegroundColor Blue -NoNewline
+Read-Host | Out-Null
 exit $code
 `
