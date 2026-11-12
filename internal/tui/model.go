@@ -209,11 +209,11 @@ func (m *Model) buildTabs() {
 	m.releasesTab = newReleasesTab(m.st.Stream())
 
 	m.toolsTab = &listTab[toolRow]{
-		list:    newList(func(r toolRow) string { return r.label }, func(r toolRow) string { return r.id }),
+		list: newList(func(r toolRow) string { return r.label }, func(r toolRow) string { return r.id }).
+			skipping(func(r toolRow) bool { return r.spacer }),
 		name:    "Tools",
 		context: ctxTools,
 	}
-	m.toolsTab.list.skip = func(r toolRow) bool { return r.spacer }
 	m.toolsTab.draw = func(m *Model, r toolRow, w int, base lipgloss.Style) string { return m.drawTool(r, w, base) }
 
 	m.panels = [numPanels]*panel{

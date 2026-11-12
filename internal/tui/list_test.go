@@ -124,8 +124,7 @@ func TestListSelectedIsConsistentWithFilterAndRefresh(t *testing.T) {
 }
 
 func TestListSkipsSkippedRows(t *testing.T) {
-	l := strList("a", "b", "c", "d", "e", "f")
-	l.skip = func(s string) bool { return s == " " }
+	l := strList("a", "b", "c", "d", "e", "f").skipping(func(s string) bool { return s == " " })
 	l.SetItems([]string{" ", "a", "b", " ", "c", "d", "e", " "})
 	l.Top() // the leading spacer does not take the cursor
 	if got, _ := l.Selected(); got != "a" {

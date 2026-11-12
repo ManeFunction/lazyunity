@@ -35,6 +35,13 @@ func newList[T any](text, key func(T) string) *list[T] {
 	return &list[T]{text: text, key: key, height: 1}
 }
 
+// skipping sets the rows the cursor does not rest on, such as spacers.
+func (l *list[T]) skipping(skip func(T) bool) *list[T] {
+	l.skip = skip
+	l.clamp()
+	return l
+}
+
 // SetItems replaces the items. The cursor stays on the same item when it is
 // still there, and the filter is kept.
 func (l *list[T]) SetItems(items []T) {
