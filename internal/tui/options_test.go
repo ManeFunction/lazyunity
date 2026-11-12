@@ -134,15 +134,6 @@ func TestToolsTabRows(t *testing.T) {
 	}
 }
 
-func toolIndex(m *Model, id string) int {
-	for i, r := range m.toolsTab.Items() {
-		if r.id == id {
-			return i
-		}
-	}
-	return -1
-}
-
 func runToolRow(m *Model, id string) tea.Cmd {
 	m.toolsTab.Top()
 	m.toolsTab.SelectKey(id)
@@ -498,7 +489,8 @@ func TestConfigEditedWhileBusyAsksToRestartFromTheRow(t *testing.T) {
 	if m.Restart() || m.quit {
 		t.Fatal("must not relaunch while a task runs")
 	}
-	r := m.toolsTab.Items()[toolIndex(m, "config")]
+	m.toolsTab.SelectKey("config")
+	r, _ := m.toolsTab.Selected()
 	if !strings.Contains(r.status, "restart required") {
 		t.Fatalf("the config row should ask for a restart: %q", r.status)
 	}
