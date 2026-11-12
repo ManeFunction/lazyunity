@@ -203,6 +203,23 @@ func TestListSkipsRunsOfSkippedRows(t *testing.T) {
 	}
 }
 
+func TestListFooterCountsOnlyRowsTheCursorRestsOn(t *testing.T) {
+	l := strList().skipping(func(s string) bool { return s == " " })
+	l.SetItems([]string{"a", " ", "b", " ", "c"})
+	l.Top()
+	if got := l.footer(); got != "1 of 3" {
+		t.Errorf("top: %q", got)
+	}
+	l.Move(1)
+	if got := l.footer(); got != "2 of 3" {
+		t.Errorf("over a spacer: %q", got)
+	}
+	l.SetItems([]string{" "})
+	if got := l.footer(); got != "" {
+		t.Errorf("only spacers: %q", got)
+	}
+}
+
 func TestListScrollKeepsTheCursorOnScreen(t *testing.T) {
 	l := strList().skipping(func(s string) bool { return s == " " })
 	l.SetItems([]string{"a", "b", " ", "c", "d", "e"})

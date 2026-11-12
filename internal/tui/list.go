@@ -229,6 +229,20 @@ func (l *list[T]) clamp() {
 	l.offset = clamp(l.offset, 0, max(n-l.height, 0))
 }
 
+// selectable counts the rows the cursor may rest on, and those of them up to
+// and including the cursor.
+func (l *list[T]) selectable() (upTo, total int) {
+	for i := range l.vis {
+		if !l.skipped(i) {
+			total++
+			if i <= l.cursor {
+				upTo++
+			}
+		}
+	}
+	return upTo, total
+}
+
 // Window returns the items currently on screen and the row (among the filtered
 // items) of the first one.
 func (l *list[T]) Window() (items []T, first int) {
@@ -244,8 +258,12 @@ func (l *list[T]) scrollbar() scrollbar {
 	return scrollbar{offset: l.offset, visible: l.height, total: len(l.vis)}
 }
 
-// footer is the "3 of 20" text.
-func (l *list[T]) footer() string { return footerText(l.cursor, len(l.vis)) }
+// footer is the "3 of 20" text. Rows the cursor does not rest on, such as
+// spacers, are not counted.
+func (l *list[T]) footer() string {
+	upTo, total := l.selectable()
+	return footerText(upTo-1, total)
+}
 
 // renderRows draws the visible rows. draw receives the item, the width, and the
 // base style for the row (the cursor style for the cursor row).
