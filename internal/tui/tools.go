@@ -53,8 +53,7 @@ func (m *Model) refreshTools() {
 	rows = append(rows,
 		toolRow{id: "projectdir", label: "Default project folder", status: displayPath(dir) + " · enter to change",
 			run: func(m *Model) tea.Cmd { m.projectDirPrompt(); return nil }},
-		toolRow{id: "config", label: "Config file", status: displayPath(filepath.Join(m.configDir, "config.yml")) + " · enter to edit",
-			run: (*Model).editConfig},
+		m.configRow(),
 		toolRow{id: "about", label: "About", status: "lazyunity " + m.version + " · by Mane Function",
 			run: func(m *Model) tea.Cmd { m.aboutPopup(); return nil }},
 		toolRow{id: "donate", label: "Donate", status: "support lazyunity on GitHub Sponsors · enter to open",
@@ -62,6 +61,17 @@ func (m *Model) refreshTools() {
 	)
 
 	m.toolsTab.SetItems(rows)
+}
+
+// configRow edits config.yml; once it was changed while a task ran, enter
+// restarts to apply it instead, and e still edits it.
+func (m *Model) configRow() toolRow {
+	path := displayPath(filepath.Join(m.configDir, "config.yml"))
+	if m.configPending {
+		return toolRow{id: "config", label: "Config file", status: "restart required · enter to restart, e to edit",
+			tone: toneWarn, run: (*Model).restartForConfig}
+	}
+	return toolRow{id: "config", label: "Config file", status: path + " · enter to edit", run: (*Model).editConfig}
 }
 
 // projectsDir is where new projects are created: the choice made in the Tools

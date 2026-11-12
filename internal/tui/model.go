@@ -106,6 +106,8 @@ type Model struct {
 	quit   bool
 	// restart asks main to start lazyunity again once it quits, to apply an edited config.
 	restart bool
+	// configPending is a config edited while a task ran, applied by a restart from the Tools tab.
+	configPending bool
 
 	// selectAfterLoad is a project path to put the cursor on once the list reloads.
 	selectAfterLoad string

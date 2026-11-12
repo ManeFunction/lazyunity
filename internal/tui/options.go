@@ -124,6 +124,8 @@ func toolActions() []*action {
 	return []*action{
 		on(&action{id: "tools.run", ctx: ctxTools, keys: []string{"enter", "space"}, desc: "Run the selected tool", hint: "Run"},
 			func(m *Model, r toolRow) tea.Cmd { return r.run(m) }),
+		{id: "tools.editConfig", ctx: ctxTools, keys: []string{"e"}, desc: "Edit the config file", hint: "Edit config",
+			run: (*Model).editConfig},
 	}
 }
 
@@ -353,22 +355,60 @@ func (m *Model) editConfig() tea.Cmd {
 // before is what the file held when it was opened.
 type configEditedMsg struct{ before []byte }
 
-// onConfigEdited relaunches lazyunity to apply a changed config, unless the
-// new one does not load or a task would be lost by it.
-func (m *Model) onConfigEdited(msg configEditedMsg) {
+// onConfigEdited relaunches lazyunity to apply a changed config. While a task
+// runs it only marks the Config file row, which then restarts on enter.
+func (m *Model) onConfigEdited(msg configEditedMsg) tea.Cmd {
 	after, err := os.ReadFile(filepath.Join(m.configDir, "config.yml"))
 	if err != nil || bytes.Equal(after, msg.before) {
-		return
+		return nil
 	}
-	if _, err := config.Load(m.configDir); err != nil {
-		m.push(&infoPopup{title: "Config not applied", lines: append(wrapText("The edited config.yml does not load, so lazyunity keeps the settings it started with:", 70),
-			append([]string{""}, wrapText(err.Error(), 70)...)...)})
-		return
+	if !m.configLoads() {
+		return nil
 	}
 	if m.busy() {
-		m.toastf(toastInfo, "Restart lazyunity to apply config changes once the tasks finish")
-		return
+		m.configPending = true
+		m.refreshTools()
+		m.toastf(toastInfo, "Config changed: restart from Tools › Config file to apply it")
+		return nil
 	}
+	m.relaunch()
+	return nil
+}
+
+// configLoads reports whether config.yml loads, showing why when it does not.
+func (m *Model) configLoads() bool {
+	_, err := config.Load(m.configDir)
+	if err != nil {
+		m.push(&infoPopup{title: "Config not applied", lines: append(wrapText("The edited config.yml does not load, so lazyunity keeps the settings it started with:", 70),
+			append([]string{""}, wrapText(err.Error(), 70)...)...)})
+	}
+	return err == nil
+}
+
+// restartForConfig applies a config changed while a task ran, asking first
+// when a task would still be cancelled by it.
+func (m *Model) restartForConfig() tea.Cmd {
+	if !m.configLoads() {
+		return nil
+	}
+	if m.busy() {
+		m.push(&confirmPopup{
+			title: "Restart", yes: "Restart", danger: true,
+			message: "A task is still running. Restarting to apply the config cancels it.",
+			onYes: func(m *Model) tea.Cmd {
+				m.cancelTasks()
+				m.relaunch()
+				return nil
+			},
+		})
+		return nil
+	}
+	m.relaunch()
+	return nil
+}
+
+// relaunch quits for main to start lazyunity again with the config reloaded.
+func (m *Model) relaunch() {
 	m.restart = true
 	m.quit = true
 }

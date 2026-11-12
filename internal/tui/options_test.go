@@ -566,3 +566,48 @@ func TestEditedConfigRelaunches(t *testing.T) {
 		t.Error("a changed config should quit to relaunch")
 	}
 }
+
+func TestConfigEditedWhileBusyAsksToRestartFromTheRow(t *testing.T) {
+	m := newTestModel(t)
+	path := filepath.Join(m.configDir, "config.yml")
+	os.MkdirAll(m.configDir, 0o755)
+	before := []byte("quitAfterOpen: false\n")
+	os.WriteFile(path, []byte("quitAfterOpen: true\n"), 0o644)
+	m.tasks = []*task{{title: "Installing 6000.7.0b8", status: taskRunning}}
+
+	m.Update(configEditedMsg{before: before})
+	if m.Restart() || m.quit {
+		t.Fatal("must not relaunch while a task runs")
+	}
+	r := m.toolsTab.Items()[toolIndex(m, "config")]
+	if !strings.Contains(r.status, "restart required") {
+		t.Fatalf("the config row should ask for a restart: %q", r.status)
+	}
+
+	// enter on the row asks first, as the task would be cancelled
+	runToolRow(m, "config")
+	if m.Restart() || len(m.popups) != 1 || !strings.Contains(screenText(m), "cancels it") {
+		t.Fatalf("restarting over a task should be confirmed:\n%s", screenText(m))
+	}
+	m.popups = nil
+
+	// once idle, enter restarts straight away
+	m.tasks = nil
+	runToolRow(m, "config")
+	if !m.Restart() || !m.quit {
+		t.Error("enter on the row should restart once nothing runs")
+	}
+}
+
+func TestEEditsTheConfigFromTheToolsTab(t *testing.T) {
+	m := newTestModel(t)
+	t.Setenv("VISUAL", "")
+	t.Setenv("EDITOR", "")
+	m.toolsTab.Top() // on the CLI row, not the config one
+	press(m, "3")
+	m.panels[panelOptions].cur = 0
+	m.keymap.lookup(ctxTools, "e").run(m)
+	if !strings.Contains(screenText(m), "Config file") {
+		t.Errorf("e should open the config from any row:\n%s", screenText(m))
+	}
+}
