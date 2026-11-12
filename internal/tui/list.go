@@ -132,18 +132,14 @@ func (l *list[T]) SetHeight(h int) {
 // Move moves the cursor, stopping at the ends. It steps over rows the cursor
 // may not rest on.
 func (l *list[T]) Move(delta int) {
+	if len(l.vis) == 0 {
+		return
+	}
 	step := 1
 	if delta < 0 {
 		step = -1
 	}
-	l.cursor += delta
-	for l.skipped(l.cursor) {
-		if at := l.cursor + step; at >= 0 && at < len(l.vis) {
-			l.cursor = at
-		} else {
-			l.cursor -= step // the end: back onto the nearest row it may rest on
-		}
-	}
+	l.cursor = l.nearest(clamp(l.cursor+delta, 0, len(l.vis)-1), step, 0, len(l.vis)-1)
 	l.clamp()
 }
 
@@ -151,22 +147,10 @@ func (l *list[T]) Move(delta int) {
 func (l *list[T]) Page(delta int) { l.Move(delta * max(l.height-1, 1)) }
 
 // Top moves the cursor to the first row it may rest on.
-func (l *list[T]) Top() {
-	l.cursor = 0
-	for l.skipped(l.cursor) {
-		l.cursor++
-	}
-	l.clamp()
-}
+func (l *list[T]) Top() { l.cursor = l.nearest(0, 1, 0, len(l.vis)-1); l.clamp() }
 
 // Bottom moves the cursor to the last row it may rest on.
-func (l *list[T]) Bottom() {
-	l.cursor = len(l.vis) - 1
-	for l.skipped(l.cursor) {
-		l.cursor--
-	}
-	l.clamp()
-}
+func (l *list[T]) Bottom() { l.cursor = l.nearest(len(l.vis)-1, -1, 0, len(l.vis)-1); l.clamp() }
 
 // Click moves the cursor to a row of the window (0 is the first row shown).
 // Clicking a row the cursor may not rest on does nothing.
@@ -193,16 +177,29 @@ func (l *list[T]) skipped(i int) bool {
 	return i >= 0 && i < len(l.vis) && l.skip != nil && l.skip(l.items[l.vis[i]])
 }
 
-// rest moves the cursor onto the nearest row it may rest on, forward first.
-// It runs after the visible rows change under the cursor, such as when a
-// filter clears or a wheel scroll drags it along.
-func (l *list[T]) rest() {
-	for i := 0; i < len(l.vis) && l.skipped(l.cursor); i++ {
-		if l.cursor+1 < len(l.vis) {
-			l.cursor++
-		} else {
-			l.cursor--
+// nearest is the first row from `from` going `step` (1 or -1) that the cursor
+// may rest on, else the first one going the other way, all within [lo, hi].
+// It is -1 when there is none.
+func (l *list[T]) nearest(from, step, lo, hi int) int {
+	for i := from; i >= lo && i <= hi; i += step {
+		if !l.skipped(i) {
+			return i
 		}
+	}
+	for i := from - step; i >= lo && i <= hi; i -= step {
+		if !l.skipped(i) {
+			return i
+		}
+	}
+	return -1
+}
+
+// rest moves the cursor onto the nearest row it may rest on, forward first,
+// or to -1 (no selection) when there is none. It runs after the visible rows
+// change under the cursor, such as when a filter clears.
+func (l *list[T]) rest() {
+	if l.skipped(l.cursor) {
+		l.cursor = l.nearest(l.cursor, 1, 0, len(l.vis)-1)
 	}
 }
 

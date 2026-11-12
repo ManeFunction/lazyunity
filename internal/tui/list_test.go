@@ -176,6 +176,33 @@ func TestListSkipsSkippedRows(t *testing.T) {
 	}
 }
 
+func TestListSkipsRunsOfSkippedRows(t *testing.T) {
+	sp := func(s string) bool { return s == " " }
+	l := strList().skipping(sp)
+	l.SetItems([]string{"a", " ", " "})
+	l.Top()
+	l.Move(1) // two spacers at the end: the cursor stays, it does not spin
+	if got, _ := l.Selected(); got != "a" {
+		t.Errorf("past trailing spacers: %q", got)
+	}
+	l.SetItems([]string{" ", " ", "a"})
+	l.Bottom()
+	l.Move(-1)
+	if got, _ := l.Selected(); got != "a" {
+		t.Errorf("past leading spacers: %q", got)
+	}
+	l.Page(-1)
+	if got, _ := l.Selected(); got != "a" {
+		t.Errorf("a page up over leading spacers: %q", got)
+	}
+	l.SetItems([]string{"a", " ", " "})
+	l.cursor = 1
+	l.rest() // forward finds nothing: it looks back
+	if got, _ := l.Selected(); got != "a" {
+		t.Errorf("rest: %q", got)
+	}
+}
+
 func TestListClickAndScroll(t *testing.T) {
 	l := strList("a", "b", "c", "d", "e", "f")
 	if !l.Click(2) {
