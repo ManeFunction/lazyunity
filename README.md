@@ -17,7 +17,7 @@ lazyunity is a thin, fast front end for the official [Unity CLI](https://docs.un
 │                                             ││Unity CLI                ready · 1.0.0-beta.16         │
 │                                             ││Account                  signed in                     │
 │                                             ││License                  press enter to check          │
-│                                             ││Editors folder           ~/Unity/Hub/Editor            │
+│                                             ││Default project folder   ~                             │
 ╰──────────────────────────────────────1 of 3─╯╰────────────────────────────────────────────────1 of 9─╯
 ╭─Tasks────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ ⠋ Installing 6000.7.0b8 + Web Build Support [■■■■■■■·········]  42% download · Downloading Web Buil… │
@@ -45,7 +45,7 @@ Go 1.27.3 or newer (what `go.mod` requires). There are no releases yet.
 |---|---|
 | **[1] Projects** | Your projects with the last time each was opened, its Unity version and its build platform. |
 | **[2] Editors** | **Installed Editors** with their platforms, and **Releases** you can install. `enter` on an Editor shows its modules. |
-| **[3] Options** | **Tools**: the Unity CLI, your account, the license, the OpenUPM CLI, the editors folder, the default project folder, the config file, About and Donate. |
+| **[3] Options** | **Tools**: the Unity CLI, your account, the license, the editors folder, the default project folder, the config file, the OpenUPM CLI, About and Donate. |
 | **Tasks** (bottom) | A progress frame that appears **only while something is installing**, then goes away. Tasks run one at a time; the same Editor or module cannot be queued twice. |
 
 `+` and `_` switch the screen mode: **full** (every panel), **projects** (only Projects) and **editors** (Editors and Options). Jumping to a panel that is not on screen (`1`, `2`, `3`) switches to the mode that shows it.

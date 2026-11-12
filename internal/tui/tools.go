@@ -46,8 +46,11 @@ func (m *Model) refreshTools() {
 	rows = append(rows, acct)
 
 	rows = append(rows, toolRow{id: "license", label: "License", status: "press enter to check",
-		run: func(m *Model) tea.Cmd { m.licenseMenu(); return nil }})
-	rows = append(rows, m.openupmRow())
+		run: func(m *Model) tea.Cmd { m.licenseMenu(); return nil }}, spacerRow("spacer.license"))
+
+	dir := m.projectsDir()
+	rows = append(rows, toolRow{id: "projectdir", label: "Default project folder", status: displayPath(dir) + " · enter to change",
+		run: func(m *Model) tea.Cmd { m.projectDirPrompt(); return nil }})
 
 	editors := toolRow{id: "editorsdir", label: "Editors folder",
 		run: func(m *Model) tea.Cmd { m.editorsFolderPrompt(); return nil }}
@@ -56,13 +59,11 @@ func (m *Model) refreshTools() {
 	} else {
 		editors.status = displayPath(m.inv.installRoot()) + " · enter to change"
 	}
-	rows = append(rows, editors)
-
-	dir := m.projectsDir()
-	rows = append(rows,
-		toolRow{id: "projectdir", label: "Default project folder", status: displayPath(dir) + " · enter to change",
-			run: func(m *Model) tea.Cmd { m.projectDirPrompt(); return nil }},
+	rows = append(rows, editors,
 		m.configRow(),
+		spacerRow("spacer.config"),
+		m.openupmRow(),
+		spacerRow("spacer.openupm"),
 		toolRow{id: "about", label: "About", status: "lazyunity " + m.version + " · by Mane Function",
 			run: func(m *Model) tea.Cmd { m.aboutPopup(); return nil }},
 		toolRow{id: "donate", label: "Donate", status: "support lazyunity on GitHub Sponsors · enter to open",
@@ -71,6 +72,10 @@ func (m *Model) refreshTools() {
 
 	m.toolsTab.SetItems(rows)
 }
+
+// spacerRow is a blank line that groups the rows of the Tools tab; the cursor
+// does not rest on it.
+func spacerRow(id string) toolRow { return toolRow{id: id, spacer: true} }
 
 // configRow edits config.yml; once it was changed while a task ran, enter
 // restarts to apply it instead, and e still edits it.

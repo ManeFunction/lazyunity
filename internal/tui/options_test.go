@@ -95,7 +95,7 @@ func TestToolsTabRows(t *testing.T) {
 	m := newTestModel(t)
 	press(m, "3")
 	out := screenText(m)
-	for _, want := range []string{"Unity CLI", "ready · 1.0.0-beta.16", "Account", "checking…", "License", "Default project folder", "Config file", "About", "lazyunity test"} {
+	for _, want := range []string{"Unity CLI", "ready · 1.0.0-beta.16", "Account", "checking…", "License", "Default project folder", "Config file", "OpenUPM CLI"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("the tools should contain %q:\n%s", want, out)
 		}
@@ -125,6 +125,10 @@ func TestToolsTabRows(t *testing.T) {
 	if !strings.Contains(screenText(m), "outdated · press enter to update") {
 		t.Error("an old CLI is flagged")
 	}
+	m.toolsTab.Bottom() // About and Donate are below the fold in this screen
+	if out := screenText(m); !strings.Contains(out, "About") || !strings.Contains(out, "lazyunity test") {
+		t.Errorf("the bottom of the tools should contain About and Donate:\n%s", out)
+	}
 }
 
 func toolIndex(m *Model, id string) int {
@@ -138,7 +142,7 @@ func toolIndex(m *Model, id string) int {
 
 func runToolRow(m *Model, id string) tea.Cmd {
 	m.toolsTab.Top()
-	m.toolsTab.Move(toolIndex(m, id))
+	m.toolsTab.SelectKey(id)
 	press(m, "3")
 	m.panels[panelOptions].cur = 0
 	return m.keymap.lookup(ctxTools, "enter").run(m)
@@ -441,6 +445,9 @@ func TestInstallersWaitForRunningTasks(t *testing.T) {
 func TestEveryToolRowDoesSomething(t *testing.T) {
 	m := newTestModel(t)
 	for _, r := range m.toolsTab.Items() {
+		if r.spacer {
+			continue // spacers group the rows; enter does nothing on them
+		}
 		if r.run == nil {
 			t.Errorf("the %s row does nothing on enter", r.label)
 		}

@@ -123,6 +123,60 @@ func TestListSelectedIsConsistentWithFilterAndRefresh(t *testing.T) {
 	}
 }
 
+func TestListSkipsSkippedRows(t *testing.T) {
+	l := strList("a", "b", "c", "d", "e", "f")
+	l.skip = func(s string) bool { return s == " " }
+	l.SetItems([]string{" ", "a", "b", " ", "c", "d", "e", " "})
+	l.Top() // the leading spacer does not take the cursor
+	if got, _ := l.Selected(); got != "a" {
+		t.Errorf("top: %q", got)
+	}
+	l.Bottom() // the trailing spacer does not either
+	if got, _ := l.Selected(); got != "e" {
+		t.Errorf("bottom: %q", got)
+	}
+	l.Move(1)
+	if got, _ := l.Selected(); got != "e" {
+		t.Errorf("past the end: %q", got)
+	}
+	l.Top()
+	l.Move(1)
+	l.Move(1) // over the spacer between b and c
+	if got, _ := l.Selected(); got != "c" {
+		t.Errorf("two moves from the top: %q", got)
+	}
+	l.Move(-1) // back over the same spacer
+	if got, _ := l.Selected(); got != "b" {
+		t.Errorf("one move back: %q", got)
+	}
+	l.Bottom()
+	if got, _ := l.Selected(); got != "e" {
+		t.Fatalf("bottom: %q", got)
+	}
+	l.Scroll(1) // the window is now on d, e and the spacer
+	if l.Click(2) {
+		t.Error("clicking a spacer must do nothing")
+	}
+	if got, _ := l.Selected(); got != "e" {
+		t.Errorf("a click on a spacer leaves the cursor alone: %q", got)
+	}
+	if !l.Click(0) {
+		t.Error("clicking a real row still works")
+	}
+	if got, _ := l.Selected(); got != "d" {
+		t.Errorf("clicked %q", got)
+	}
+	l.Top()
+	l.Scroll(2) // the wheel drags the cursor onto the spacer: it moves on
+	if got, _ := l.Selected(); got != "c" {
+		t.Errorf("after a scroll: %q", got)
+	}
+	l.SetItems([]string{" "}) // nothing to rest on
+	if _, ok := l.Selected(); ok {
+		t.Error("a list of only spacers has no selection")
+	}
+}
+
 func TestListClickAndScroll(t *testing.T) {
 	l := strList("a", "b", "c", "d", "e", "f")
 	if !l.Click(2) {

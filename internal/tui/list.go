@@ -26,6 +26,9 @@ type list[T any] struct {
 	filter string
 	text   func(T) string // what the filter matches against
 	key    func(T) string // identity, to keep the cursor on an item across refreshes
+	// skip, when set, marks rows such as spacers that the cursor does not
+	// rest on.
+	skip func(T) bool
 }
 
 func newList[T any](text, key func(T) string) *list[T] {
@@ -119,25 +122,50 @@ func (l *list[T]) SetHeight(h int) {
 	l.clamp()
 }
 
-// Move moves the cursor, stopping at the ends.
+// Move moves the cursor, stopping at the ends. It steps over rows the cursor
+// may not rest on.
 func (l *list[T]) Move(delta int) {
+	step := 1
+	if delta < 0 {
+		step = -1
+	}
 	l.cursor += delta
+	for l.skipped(l.cursor) {
+		if at := l.cursor + step; at >= 0 && at < len(l.vis) {
+			l.cursor = at
+		} else {
+			l.cursor -= step // the end: back onto the nearest row it may rest on
+		}
+	}
 	l.clamp()
 }
 
 // Page moves the cursor by a screenful.
 func (l *list[T]) Page(delta int) { l.Move(delta * max(l.height-1, 1)) }
 
-// Top moves the cursor to the first row.
-func (l *list[T]) Top() { l.cursor = 0; l.clamp() }
+// Top moves the cursor to the first row it may rest on.
+func (l *list[T]) Top() {
+	l.cursor = 0
+	for l.skipped(l.cursor) {
+		l.cursor++
+	}
+	l.clamp()
+}
 
-// Bottom moves the cursor to the last row.
-func (l *list[T]) Bottom() { l.cursor = len(l.vis) - 1; l.clamp() }
+// Bottom moves the cursor to the last row it may rest on.
+func (l *list[T]) Bottom() {
+	l.cursor = len(l.vis) - 1
+	for l.skipped(l.cursor) {
+		l.cursor--
+	}
+	l.clamp()
+}
 
 // Click moves the cursor to a row of the window (0 is the first row shown).
+// Clicking a row the cursor may not rest on does nothing.
 func (l *list[T]) Click(row int) bool {
 	i := l.offset + row
-	if row < 0 || i >= len(l.vis) {
+	if row < 0 || i >= len(l.vis) || l.skipped(i) {
 		return false
 	}
 	l.cursor = i
@@ -150,12 +178,32 @@ func (l *list[T]) Scroll(delta int) {
 	maxOff := max(len(l.vis)-l.height, 0)
 	l.offset = clamp(l.offset+delta, 0, maxOff)
 	l.cursor = clamp(l.cursor, l.offset, min(l.offset+l.height-1, len(l.vis)-1))
+	l.rest()
+}
+
+// skipped reports whether the cursor may not rest on the visible row i.
+func (l *list[T]) skipped(i int) bool {
+	return i >= 0 && i < len(l.vis) && l.skip != nil && l.skip(l.items[l.vis[i]])
+}
+
+// rest moves the cursor onto the nearest row it may rest on, forward first.
+// It runs after the visible rows change under the cursor, such as when a
+// filter clears or a wheel scroll drags it along.
+func (l *list[T]) rest() {
+	for i := 0; i < len(l.vis) && l.skipped(l.cursor); i++ {
+		if l.cursor+1 < len(l.vis) {
+			l.cursor++
+		} else {
+			l.cursor--
+		}
+	}
 }
 
 // clamp keeps the cursor in range and the window around it.
 func (l *list[T]) clamp() {
 	n := len(l.vis)
 	l.cursor = clamp(l.cursor, 0, max(n-1, 0))
+	l.rest()
 	if l.cursor < l.offset {
 		l.offset = l.cursor
 	}

@@ -328,9 +328,15 @@ type toolRow struct {
 	tone   tone
 	// run is what enter does on the row.
 	run func(m *Model) tea.Cmd
+	// spacer draws as a blank line that groups the rows; the cursor does not
+	// rest on it.
+	spacer bool
 }
 
 func (m *Model) drawTool(r toolRow, w int, base lipgloss.Style) string {
+	if r.spacer {
+		return strings.Repeat(" ", w)
+	}
 	th := m.th
 	row := newRow(base)
 	labelW := 24

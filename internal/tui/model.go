@@ -213,6 +213,7 @@ func (m *Model) buildTabs() {
 		name:    "Tools",
 		context: ctxTools,
 	}
+	m.toolsTab.list.skip = func(r toolRow) bool { return r.spacer }
 	m.toolsTab.draw = func(m *Model, r toolRow, w int, base lipgloss.Style) string { return m.drawTool(r, w, base) }
 
 	m.panels = [numPanels]*panel{
