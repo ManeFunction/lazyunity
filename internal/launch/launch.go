@@ -116,6 +116,10 @@ func Edit(tmpl, path, dir string, getenv func(string) string) (*exec.Cmd, error)
 	return cmd, nil
 }
 
+// returnPrompt is the blue line that waits for the user before lazyunity takes
+// the terminal back.
+const returnPrompt = "\x1b[34mPress enter to return to lazyunity...\x1b[0m "
+
 // ShellCommand runs a line of shell in dir, then waits for Enter, so that
 // its output can be read before lazyunity takes the terminal back. shell is the
 // shell to use on Unix; empty means $SHELL, as read by getenv, then /bin/sh.
@@ -123,7 +127,8 @@ func Edit(tmpl, path, dir string, getenv func(string) string) (*exec.Cmd, error)
 func ShellCommand(goos, shell, text, dir string, getenv func(string) string) *exec.Cmd {
 	var cmd *exec.Cmd
 	if goos == "windows" {
-		line := text + " & echo. & pause"
+		// set /p prints the prompt without a newline; pause waits silently.
+		line := text + ` & echo. & <nul set /p "=` + returnPrompt + `" & pause >nul`
 		cmd = exec.Command("cmd", "/S", "/C", line)
 		// cmd.exe does not read the \" that Go would quote the line with. With
 		// /S it takes off the outer quotes and runs the rest as it is.
@@ -135,7 +140,7 @@ func ShellCommand(goos, shell, text, dir string, getenv func(string) string) *ex
 		if shell == "" {
 			shell = "/bin/sh"
 		}
-		cmd = exec.Command(shell, "-c", text+`; printf '\n\033[34mPress enter to return to lazyunity...\033[0m '; read _`)
+		cmd = exec.Command(shell, "-c", text+`; printf '\n%s' '`+returnPrompt+`'; read _`)
 	}
 	cmd.Dir = dir
 	return cmd
