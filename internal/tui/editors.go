@@ -230,7 +230,7 @@ func (m *Model) reloadModulesCmd() tea.Cmd {
 func (m *Model) removeModuleConfirm(e editorRow, mod unitycli.Module) {
 	m.push(&confirmPopup{
 		title: "Remove " + mod.Name, yes: "Remove", danger: true,
-		message: fmt.Sprintf("Remove %s from Unity %s? Projects set to build for it will need it installed again.", mod.Name, e.Version),
+		message: fmt.Sprintf("Remove %s from Unity %s?", mod.Name, e.Version),
 		onYes: func(m *Model) tea.Cmd {
 			return m.withCLI(func(c unityCLI) tea.Cmd {
 				return m.enqueue(&task{

@@ -239,11 +239,14 @@ func (m *Model) drawEditor(r editorRow, w int, base lipgloss.Style, cols editorC
 func (m *Model) drawModule(mod unitycli.Module, w int, base lipgloss.Style, cols moduleCols) string {
 	th := m.th
 	row := newRow(base)
+	queued := m.moduleQueued(mod)
 	switch {
+	case queued && mod.IsInstalled:
+		row.text("[✗] ", th.Missing) // being removed
+	case queued:
+		row.text("[↓] ", th.Pending) // being installed
 	case mod.IsInstalled:
 		row.text("[✓] ", th.Success)
-	case m.moduleQueued(mod):
-		row.text("[↓] ", th.Pending) // in the queue
 	default:
 		row.text("[ ] ", th.Dim)
 	}
