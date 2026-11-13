@@ -328,20 +328,20 @@ type toolRow struct {
 	tone   tone
 	// run is what enter does on the row.
 	run func(m *Model) tea.Cmd
-	// spacer draws as a faint line of spaced dots that groups the rows; the
-	// cursor does not rest on it.
+	// spacer draws as a faint dashed rule that groups the rows; the cursor
+	// does not rest on it.
 	spacer bool
 }
 
-// spacerRule is the pattern a spacer row repeats: spaced dots.
-const spacerRule = "· "
+// spacerRule is the pattern a spacer row repeats: light dashes with gaps.
+const spacerRule = "╌ "
 
 func (m *Model) drawTool(r toolRow, w int, base lipgloss.Style) string {
 	if r.spacer {
 		row := newRow(base).gap(1)
 		n := max(w-2, 0)
-		dots := strings.TrimRight(strings.Repeat(spacerRule, (n+1)/2), " ")
-		row.add(dots, m.th.InactiveBorder.Faint(true), n)
+		dashes := strings.TrimRight(strings.Repeat(spacerRule, (n+1)/2), " ")
+		row.add(dashes, m.th.InactiveBorder.Faint(true), n)
 		return row.gap(1).done(w)
 	}
 	th := m.th
