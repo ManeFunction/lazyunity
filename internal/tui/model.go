@@ -8,6 +8,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	uv "github.com/charmbracelet/ultraviolet"
 
 	"github.com/ManeFunction/lazyunity/internal/config"
 	"github.com/ManeFunction/lazyunity/internal/state"
@@ -291,7 +292,7 @@ func (m *Model) Restart() bool { return m.restart }
 
 // Init starts the slow loads; what was cheap to load is already in place.
 func (m *Model) Init() tea.Cmd {
-	return tea.Batch(tick(), m.probeOpenUPMCmd(), m.loadEditorsCmd(), m.loadAuthCmd(), m.loadInstallPathCmd(), m.checkCLIUpdateCmd())
+	return tea.Batch(tick(), m.probeOpenUPMCmd(), m.loadEditorsCmd(), m.loadAuthCmd(), m.loadInstallPathCmd(), m.checkCLIUpdateCmd(), queryPaletteCmd())
 }
 
 // Update handles every message.
@@ -313,6 +314,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmd = m.handleWheel(msg)
 	case tea.FocusMsg:
 		cmd = m.loadProjectsCmd()
+	case uv.UnknownOscEvent:
+		m.th.setPaletteFromOSC(string(msg))
 	default:
 		var ok bool
 		if cmd, ok = m.handleTask(msg); !ok {

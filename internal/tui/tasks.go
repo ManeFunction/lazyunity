@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"image/color"
 	"math"
 	"strings"
 	"time"
@@ -90,7 +91,10 @@ type cliDoneMsg struct {
 // ---- the queue -----------------------------------------------------------------
 
 const (
-	spinInterval  = 120 * time.Millisecond
+	// spinInterval is one frame of the progress scanner; the spinner icon
+	// steps every spinnerStep, whatever the scanner's pace.
+	spinInterval  = 45 * time.Millisecond
+	spinnerStep   = 60 * time.Millisecond
 	doneLinger    = 2 * time.Second
 	maxTaskLines  = 3
 	spinnerFrames = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
@@ -197,7 +201,8 @@ func (m *Model) startSpinner() tea.Cmd {
 
 func (m *Model) spinnerFrame() string {
 	frames := []rune(spinnerFrames)
-	return string(frames[m.spin%len(frames)])
+	step := m.spin * int(spinInterval) / int(spinnerStep)
+	return string(frames[step%len(frames)])
 }
 
 // startNext starts the first queued task when none is running.
@@ -480,6 +485,12 @@ func (m *Model) taskLine(t *task, w int, labelW int) string {
 const (
 	barDone = "■"
 	barTodo = "·"
+
+	// barTrail is how many cells the scanner's bright head and fading trail
+	// can take. barHold is how many frames it rests at each end while the
+	// trail fades before it turns back.
+	barTrail = 7
+	barHold  = 3
 )
 
 // barCells is how many of w cells are done at pct percent.
@@ -488,19 +499,14 @@ func barCells(pct float64, w int) int {
 }
 
 // bar draws a task's progress bar, w cells wide with its brackets. When the
-// progress cannot be told, a short run of lit squares slides back and forth instead.
+// progress cannot be told, a scanner sweeps back and forth instead: a bright
+// head with a trail that fades to black, like opencode's progress bar.
 func (m *Model) bar(t *task, w int) string {
 	on, off := m.th.ActiveBorder, m.th.Dim
 	in := max(w-2, 1)
 	var body string
 	if t.indeterminate() && t.status != taskDone {
-		seg := max(in/4, 2)
-		span := max(in-seg, 0)
-		pos := m.spin % max(2*span, 1)
-		if pos > span {
-			pos = 2*span - pos
-		}
-		body = barRun(off, barTodo, pos) + barRun(on, barDone, seg) + barRun(off, barTodo, in-seg-pos)
+		body = m.scannerBar(in, off)
 	} else {
 		pct := t.pct
 		if t.status == taskDone {
@@ -510,6 +516,89 @@ func (m *Model) bar(t *task, w int) string {
 		body = barRun(on, barDone, n) + barRun(off, barTodo, in-n)
 	}
 	return m.th.BarEdge.Render("[") + body + m.th.BarEdge.Render("]")
+}
+
+// scannerState places the scanner's head for a frame: it sweeps right, holds
+// while the trail fades, sweeps left, and holds again. fade is how many frames
+// of the hold have passed; it darkens the head and trail one step at a time.
+func scannerState(frame, w int) (pos, dir, fade int) {
+	if w <= 1 {
+		return 0, 1, 0
+	}
+	cycle := w + barHold + (w - 1) + barHold
+	f := frame % cycle
+	switch {
+	case f < w:
+		return f, 1, 0
+	case f < w+barHold:
+		return w - 1, 1, f - w + 1
+	case f < cycle-barHold:
+		return w - 2 - (f - w - barHold), -1, 0
+	default:
+		return 0, -1, f - (cycle - barHold) + 1
+	}
+}
+
+// scannerDistance is how many cells i trails the head, or -1 when i is ahead
+// of it (where a trail cannot be).
+func scannerDistance(i, pos, dir int) int {
+	if dir > 0 {
+		return pos - i
+	}
+	return i - pos
+}
+
+// scannerBar draws the indeterminate bar: the head lit in the active colour,
+// then a run of squares behind it fading to black.
+func (m *Model) scannerBar(w int, off lipgloss.Style) string {
+	pos, dir, fade := scannerState(m.spin, w)
+	trail := m.barTrail()
+	var b strings.Builder
+	for i := 0; i < w; {
+		d := scannerDistance(i, pos, dir)
+		if d >= 0 && d+fade < len(trail) {
+			b.WriteString(trail[d+fade].Render(barDone))
+			i++
+			continue
+		}
+		j := i + 1
+		for j < w {
+			if d := scannerDistance(j, pos, dir); d >= 0 && d+fade < len(trail) {
+				break
+			}
+			j++
+		}
+		b.WriteString(barRun(off, barTodo, j-i))
+		i = j
+	}
+	return b.String()
+}
+
+// barTrail is the scanner's palette: the head in the active colour, then the
+// steps behind it. Every step is 65% of the one before it, so no two cells
+// share a colour and the trail runs smoothly toward black.
+func (m *Model) barTrail() []lipgloss.Style {
+	head := m.th.ActiveBorder
+	c := head.GetForeground()
+	if _, none := c.(lipgloss.NoColor); none {
+		c = m.th.BarEdge.GetForeground()
+		head = head.Foreground(c).Bold(true)
+	}
+	trail := make([]lipgloss.Style, barTrail)
+	trail[0] = head
+	for i := 1; i < barTrail; i++ {
+		trail[i] = lipgloss.NewStyle().Foreground(fadeToBlack(m.th.shownColor(c), math.Pow(0.65, float64(i))))
+	}
+	return trail
+}
+
+// fadeToBlack scales a colour toward black; 1 is the colour, 0 is black.
+func fadeToBlack(c color.Color, f float64) color.RGBA {
+	r, g, b, _ := c.RGBA()
+	cell := func(v uint32) uint8 {
+		return uint8(clampF(math.Round(float64(v)/257*f), 0, 255))
+	}
+	return color.RGBA{R: cell(r), G: cell(g), B: cell(b), A: 0xff}
 }
 
 // barRun is n cells of one bar character in a style.

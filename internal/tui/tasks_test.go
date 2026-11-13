@@ -253,7 +253,7 @@ func TestBars(t *testing.T) {
 			t.Errorf("bar(%v) = %q, want %q", c.pct, got, want)
 		}
 	}
-	// unknown progress: a run of squares that moves, always the full width
+	// unknown progress: a scanner that moves, always the full width
 	seen := map[string]bool{}
 	for i := 0; i < 40; i++ {
 		m.spin = i
@@ -266,6 +266,31 @@ func TestBars(t *testing.T) {
 	}
 	if len(seen) < 5 {
 		t.Errorf("the segment does not move: %d positions", len(seen))
+	}
+}
+
+func TestScannerTrailFadesToBlack(t *testing.T) {
+	m := newTestModel(t)
+	trail := m.barTrail()
+	if len(trail) != barTrail {
+		t.Fatalf("trail has %d steps, want %d", len(trail), barTrail)
+	}
+	brightness := func(i int) uint32 {
+		r, g, b, _ := trail[i].GetForeground().RGBA()
+		return r + g + b
+	}
+	head := brightness(0)
+	if head == 0 {
+		t.Fatal("the head has no colour")
+	}
+	// every step is darker than the one before, with no repeated colour
+	for i := 1; i < len(trail); i++ {
+		if brightness(i) >= brightness(i-1) {
+			t.Errorf("trail step %d is not darker than step %d", i, i-1)
+		}
+	}
+	if tail := brightness(len(trail) - 1); tail > head/5 {
+		t.Errorf("the trail ends at %d, want near black (head is %d)", tail, head)
 	}
 }
 

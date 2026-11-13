@@ -55,6 +55,10 @@ type Theme struct {
 	Success lipgloss.Style
 	Warning lipgloss.Style
 	BarEdge lipgloss.Style // the brackets of a progress bar
+
+	// palette is the terminal's own RGB for the 16 ANSI colours, as far as it
+	// answered the query at start; nil entries were not reported.
+	palette [16]color.Color
 }
 
 var colorNames = map[string]int{
