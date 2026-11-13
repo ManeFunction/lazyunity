@@ -491,9 +491,6 @@ func barCells(pct float64, w int) int {
 // progress cannot be told, a short run of lit squares slides back and forth instead.
 func (m *Model) bar(t *task, w int) string {
 	on, off := m.th.ActiveBorder, m.th.Dim
-	if t.status == taskDone {
-		on = m.th.Success
-	}
 	in := max(w-2, 1)
 	var body string
 	if t.indeterminate() && t.status != taskDone {
