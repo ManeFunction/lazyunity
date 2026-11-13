@@ -234,11 +234,12 @@ func (m *Model) removeModuleConfirm(e editorRow, mod unitycli.Module) {
 		onYes: func(m *Model) tea.Cmd {
 			return m.withCLI(func(c unityCLI) tea.Cmd {
 				return m.enqueue(&task{
-					title: fmt.Sprintf("Removing %s from Unity %s", mod.Name, e.Version),
-					label: e.Version + ": remove " + mod.Name,
-					works: []string{workModule(e.Version, mod.ID)},
-					do:    func(ctx context.Context) error { return c.RemoveModules(ctx, e.Version, e.Arch, []string{mod.ID}) },
-					after: func(m *Model, err error) tea.Cmd { return tea.Batch(m.scanEditorsCmd(), m.reloadModulesCmd()) },
+					title:    fmt.Sprintf("Removing %s from Unity %s", mod.Name, e.Version),
+					label:    e.Version + ": remove " + mod.Name,
+					works:    []string{workModule(e.Version, mod.ID)},
+					removing: true,
+					do:       func(ctx context.Context) error { return c.RemoveModules(ctx, e.Version, e.Arch, []string{mod.ID}) },
+					after:    func(m *Model, err error) tea.Cmd { return tea.Batch(m.scanEditorsCmd(), m.reloadModulesCmd()) },
 				})
 			})
 		},

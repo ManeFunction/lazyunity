@@ -239,11 +239,13 @@ func (m *Model) drawEditor(r editorRow, w int, base lipgloss.Style, cols editorC
 func (m *Model) drawModule(mod unitycli.Module, w int, base lipgloss.Style, cols moduleCols) string {
 	th := m.th
 	row := newRow(base)
-	queued := m.moduleQueued(mod)
+	// A finished task lingers in the list after the modules reload, so the
+	// icon follows what the task does, not only whether there is one.
+	t := m.moduleTask(mod)
 	switch {
-	case queued && mod.IsInstalled:
+	case t != nil && t.removing && mod.IsInstalled:
 		row.text("[✗] ", th.Missing) // being removed
-	case queued:
+	case t != nil && !t.removing && !mod.IsInstalled:
 		row.text("[↓] ", th.Pending) // being installed
 	case mod.IsInstalled:
 		row.text("[✓] ", th.Success)
@@ -263,11 +265,14 @@ func (m *Model) drawModule(mod unitycli.Module, w int, base lipgloss.Style, cols
 	return row.done(w)
 }
 
-// moduleQueued reports whether a task is installing or removing a module of
-// the Editor drilled into.
-func (m *Model) moduleQueued(mod unitycli.Module) bool {
+// moduleTask returns the task installing or removing a module of the Editor
+// drilled into, or nil.
+func (m *Model) moduleTask(mod unitycli.Module) *task {
 	_, e, ok := m.modulesTab()
-	return ok && m.taskOn(workModule(e.Version, mod.ID)) != nil
+	if !ok {
+		return nil
+	}
+	return m.taskOn(workModule(e.Version, mod.ID))
 }
 
 type moduleCols struct{ category, size int }

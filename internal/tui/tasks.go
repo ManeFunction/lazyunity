@@ -32,8 +32,11 @@ type task struct {
 	label string
 	// works are what the task works on, such as "module:6000.3.28f1:android".
 	// A task is refused while another one works on any of the same things.
-	works  []string
-	status taskStatus
+	works []string
+	// removing marks a task that removes what it works on, such as a module,
+	// so its rows show a cross instead of a download arrow.
+	removing bool
+	status   taskStatus
 	// pct is the progress of the current phase, 0 to 100; negative when unknown.
 	pct   float64
 	phase string
