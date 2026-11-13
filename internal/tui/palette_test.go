@@ -3,6 +3,7 @@ package tui
 import (
 	"image/color"
 	"strconv"
+	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -27,13 +28,16 @@ func TestPaletteAnswersAreRecorded(t *testing.T) {
 		3:  {0xff, 0xff, 0x00, 0xff},
 	}
 	for i, w := range want {
-		if got := th.shownColor(lipgloss.Color(strconv.Itoa(i))); !sameRGB(got, w) {
+		if got, ok := th.shownRGB(lipgloss.Color(strconv.Itoa(i))); !ok || !sameRGB(got, w) {
 			t.Errorf("colour %d is shown as %v, want %v", i, got, w)
 		}
 	}
-	// what the terminal did not report keeps xterm's value
-	if got := th.shownColor(lipgloss.Color("4")); !sameRGB(got, color.RGBA{0, 0, 0x80, 0xff}) {
-		t.Errorf("unreported colour 4 is %v", got)
+	// what the terminal did not report is not known
+	if _, ok := th.shownRGB(lipgloss.Color("4")); ok {
+		t.Error("unreported colour 4 is taken as known")
+	}
+	if _, ok := th.shownRGB(lipgloss.Color("#5c9dff")); !ok {
+		t.Error("a hex colour is not taken as known")
 	}
 	for _, seq := range []string{"\x1b]11;rgb:0000/0000/0000\x07", "\x1b]4;99;rgb:ff/ff/ff\x07", "junk"} {
 		if th.setPaletteFromOSC(seq) {
@@ -50,6 +54,38 @@ func TestScannerTrailFollowsTheTerminalPalette(t *testing.T) {
 	want := fadeTo(color.RGBA{0x5c, 0x9d, 0xff, 0xff}, color.Black, 0.65)
 	if !sameRGB(got, want) {
 		t.Errorf("first trail step is %v, want %v (faded from the terminal's brightblue)", got, want)
+	}
+}
+
+// Warp reports its background but not its palette: the trail must not mix a
+// guessed RGB for the head's colour, only shade the terminal's own colour.
+func TestScannerTrailWithoutThePalette(t *testing.T) {
+	m := newTestModel(t)
+	m.th.ActiveBorder = lipgloss.NewStyle().Foreground(lipgloss.Color("12")).Bold(true)
+	m.Update(tea.BackgroundColorMsg{Color: color.RGBA{0x19, 0x16, 0x22, 0xff}})
+	trail := m.barTrail()
+	if len(trail) != 3 {
+		t.Fatalf("trail has %d steps, want 3 (bold, plain, faint)", len(trail))
+	}
+	for i, st := range trail {
+		if st.GetForeground() != lipgloss.Color("12") {
+			t.Errorf("step %d is %v, want the terminal's own colour 12", i, st.GetForeground())
+		}
+	}
+	if !trail[0].GetBold() || trail[1].GetBold() || trail[1].GetFaint() || !trail[2].GetFaint() {
+		t.Errorf("steps are not bold, plain, faint: %v %v %v", trail[0].GetBold(), trail[1].GetFaint(), trail[2].GetFaint())
+	}
+	// the scanner never goes dark, even holding at an end with so short a trail
+	for i := 0; i < 80; i++ {
+		m.spin = i
+		if b := stripANSI(m.bar(&task{pct: -1, status: taskRunning}, 20)); !strings.Contains(b, barDone) {
+			t.Errorf("frame %d has no lit cell: %q", i, b)
+		}
+	}
+	// once the terminal does report the colour, the full gradient comes back
+	m.th.setPaletteFromOSC("\x1b]4;12;rgb:5c/9d/ff\x07")
+	if got := len(m.barTrail()); got != barTrail {
+		t.Errorf("with the palette the trail has %d steps, want %d", got, barTrail)
 	}
 }
 

@@ -271,12 +271,14 @@ func TestBars(t *testing.T) {
 
 func TestScannerTrailFadesToBlack(t *testing.T) {
 	m := newTestModel(t)
+	m.th.setPaletteFromOSC("\x1b]4;12;rgb:5c/9d/ff\x07") // the terminal's brightblue
 	trail := m.barTrail()
 	if len(trail) != barTrail {
 		t.Fatalf("trail has %d steps, want %d", len(trail), barTrail)
 	}
 	brightness := func(i int) uint32 {
-		r, g, b, _ := trail[i].GetForeground().RGBA()
+		shown, _ := m.th.shownRGB(trail[i].GetForeground())
+		r, g, b, _ := shown.RGBA()
 		return r + g + b
 	}
 	head := brightness(0)

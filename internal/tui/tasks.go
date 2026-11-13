@@ -553,6 +553,8 @@ func scannerDistance(i, pos, dir int) int {
 func (m *Model) scannerBar(w int, off lipgloss.Style) string {
 	pos, dir, fade := scannerState(m.spin, w)
 	trail := m.barTrail()
+	// a short trail must not fade out entirely while it holds at an end
+	fade = min(fade, len(trail)-1)
 	var b strings.Builder
 	for i := 0; i < w; {
 		d := scannerDistance(i, pos, dir)
@@ -577,6 +579,12 @@ func (m *Model) scannerBar(w int, off lipgloss.Style) string {
 // barTrail is the scanner's palette: the head in the active colour, then the
 // steps behind it. Each step keeps 65% of the one before it, so no two cells
 // share a colour and the trail melts smoothly into the terminal's background.
+//
+// That takes the RGB the terminal really paints the head with. When the head
+// is an ANSI colour the terminal would not report (Warp does not answer the
+// palette query), any mix would start from a guessed RGB and show a different
+// hue behind the head, so the trail only uses the shades the terminal draws
+// itself: the head, the same colour without bold, then faint.
 func (m *Model) barTrail() []lipgloss.Style {
 	head := m.th.ActiveBorder
 	c := head.GetForeground()
@@ -584,7 +592,15 @@ func (m *Model) barTrail() []lipgloss.Style {
 		c = m.th.BarEdge.GetForeground()
 		head = head.Foreground(c).Bold(true)
 	}
-	from, to := m.th.shownColor(c), m.th.shownBackground()
+	from, ok := m.th.shownRGB(c)
+	if !ok {
+		trail := []lipgloss.Style{head}
+		if head.GetBold() {
+			trail = append(trail, head.Bold(false))
+		}
+		return append(trail, head.Bold(false).Faint(true))
+	}
+	to := m.th.shownBackground()
 	trail := make([]lipgloss.Style, barTrail)
 	trail[0] = head
 	for i := 1; i < barTrail; i++ {

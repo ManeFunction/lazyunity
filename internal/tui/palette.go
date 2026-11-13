@@ -15,9 +15,10 @@ import (
 // fading trail, needs the colour the terminal really shows, so lazyunity asks
 // for the palette at start (OSC 4) and keeps whatever the terminal answers.
 // The background is asked for too (OSC 11), so the trail can fade into it.
+// Some terminals answer only the background (Warp), so the two are used apart.
 
 // queryPaletteCmd asks the terminal for its 16 ANSI colours. Terminals that
-// cannot answer stay silent, and the xterm values are used instead.
+// cannot answer stay silent, and those colours stay unknown.
 func queryPaletteCmd() tea.Cmd {
 	var b strings.Builder
 	for i := 0; i < 16; i++ {
@@ -76,11 +77,15 @@ func (th *Theme) shownBackground() color.Color {
 	return color.Black
 }
 
-// shownColor is the colour the terminal paints c as: the palette it reported
-// for an ANSI colour, or c itself.
-func (th *Theme) shownColor(c color.Color) color.Color {
-	if b, ok := c.(ansi.BasicColor); ok && int(b) < len(th.palette) && th.palette[b] != nil {
-		return th.palette[b]
+// shownRGB is the colour the terminal paints c as, and whether that is known:
+// an ANSI colour is only known once the terminal has reported its palette
+// entry, since every terminal paints those its own way.
+func (th *Theme) shownRGB(c color.Color) (color.Color, bool) {
+	if b, ok := c.(ansi.BasicColor); ok {
+		if int(b) < len(th.palette) && th.palette[b] != nil {
+			return th.palette[b], true
+		}
+		return c, false
 	}
-	return c
+	return c, true
 }
