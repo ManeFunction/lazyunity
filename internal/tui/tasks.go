@@ -500,7 +500,7 @@ func barCells(pct float64, w int) int {
 
 // bar draws a task's progress bar, w cells wide with its brackets. When the
 // progress cannot be told, a scanner sweeps back and forth instead: a bright
-// head with a trail that fades to black, like opencode's progress bar.
+// head with a trail that fades into the terminal background, like opencode's progress bar.
 func (m *Model) bar(t *task, w int) string {
 	on, off := m.th.ActiveBorder, m.th.Dim
 	in := max(w-2, 1)
@@ -549,7 +549,7 @@ func scannerDistance(i, pos, dir int) int {
 }
 
 // scannerBar draws the indeterminate bar: the head lit in the active colour,
-// then a run of squares behind it fading to black.
+// then a run of squares behind it fading into the background.
 func (m *Model) scannerBar(w int, off lipgloss.Style) string {
 	pos, dir, fade := scannerState(m.spin, w)
 	trail := m.barTrail()
@@ -575,8 +575,8 @@ func (m *Model) scannerBar(w int, off lipgloss.Style) string {
 }
 
 // barTrail is the scanner's palette: the head in the active colour, then the
-// steps behind it. Every step is 65% of the one before it, so no two cells
-// share a colour and the trail runs smoothly toward black.
+// steps behind it. Each step keeps 65% of the one before it, so no two cells
+// share a colour and the trail melts smoothly into the terminal's background.
 func (m *Model) barTrail() []lipgloss.Style {
 	head := m.th.ActiveBorder
 	c := head.GetForeground()
@@ -584,21 +584,24 @@ func (m *Model) barTrail() []lipgloss.Style {
 		c = m.th.BarEdge.GetForeground()
 		head = head.Foreground(c).Bold(true)
 	}
+	from, to := m.th.shownColor(c), m.th.shownBackground()
 	trail := make([]lipgloss.Style, barTrail)
 	trail[0] = head
 	for i := 1; i < barTrail; i++ {
-		trail[i] = lipgloss.NewStyle().Foreground(fadeToBlack(m.th.shownColor(c), math.Pow(0.65, float64(i))))
+		trail[i] = lipgloss.NewStyle().Foreground(fadeTo(from, to, math.Pow(0.65, float64(i))))
 	}
 	return trail
 }
 
-// fadeToBlack scales a colour toward black; 1 is the colour, 0 is black.
-func fadeToBlack(c color.Color, f float64) color.RGBA {
+// fadeTo mixes colour c into bg; 1 is c, 0 is bg.
+func fadeTo(c, bg color.Color, f float64) color.RGBA {
 	r, g, b, _ := c.RGBA()
-	cell := func(v uint32) uint8 {
-		return uint8(clampF(math.Round(float64(v)/257*f), 0, 255))
+	br, bgg, bb, _ := bg.RGBA()
+	cell := func(v, base uint32) uint8 {
+		mixed := float64(base)/257 + (float64(v)-float64(base))/257*f
+		return uint8(clampF(math.Round(mixed), 0, 255))
 	}
-	return color.RGBA{R: cell(r), G: cell(g), B: cell(b), A: 0xff}
+	return color.RGBA{R: cell(r, br), G: cell(g, bgg), B: cell(b, bb), A: 0xff}
 }
 
 // barRun is n cells of one bar character in a style.

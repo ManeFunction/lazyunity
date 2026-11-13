@@ -14,6 +14,7 @@ import (
 // (brightblue is #0000ff). Anything that does colour maths, like the scanner's
 // fading trail, needs the colour the terminal really shows, so lazyunity asks
 // for the palette at start (OSC 4) and keeps whatever the terminal answers.
+// The background is asked for too (OSC 11), so the trail can fade into it.
 
 // queryPaletteCmd asks the terminal for its 16 ANSI colours. Terminals that
 // cannot answer stay silent, and the xterm values are used instead.
@@ -64,6 +65,15 @@ func oscData(seq string) (string, bool) {
 		}
 	}
 	return seq, true
+}
+
+// shownBackground is the terminal's background colour, or black when it did
+// not say.
+func (th *Theme) shownBackground() color.Color {
+	if th.background != nil {
+		return th.background
+	}
+	return color.Black
 }
 
 // shownColor is the colour the terminal paints c as: the palette it reported

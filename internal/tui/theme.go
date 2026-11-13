@@ -59,6 +59,8 @@ type Theme struct {
 	// palette is the terminal's own RGB for the 16 ANSI colours, as far as it
 	// answered the query at start; nil entries were not reported.
 	palette [16]color.Color
+	// background is the terminal's background colour, nil until it answers.
+	background color.Color
 }
 
 var colorNames = map[string]int{
