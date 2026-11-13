@@ -163,7 +163,7 @@ func TestCancelledTaskFailingAnyWayIsNotAnError(t *testing.T) {
 		tk := &task{title: "Long job", do: func(ctx context.Context) error { close(started); <-ctx.Done(); return err }}
 		msgs := background(m.enqueue(tk))
 		<-started
-		press(m, "X")
+		press(m, "X", "enter")
 		_, next := m.Update(<-msgs)
 		drain(m, next)
 		if len(m.popups) != 0 {
@@ -182,7 +182,7 @@ func TestCancelKeyKeepsTheQueue(t *testing.T) {
 	m.enqueue(&task{title: "b", do: func(ctx context.Context) error { <-ctx.Done(); return ctx.Err() }})
 	m.enqueue(quick("c", nil, nil))
 	<-started
-	press(m, "X")
+	press(m, "X", "enter")
 	if len(m.tasks) != 3 {
 		t.Fatalf("X leaves the queued tasks alone: %d tasks", len(m.tasks))
 	}
@@ -497,4 +497,44 @@ func TestFlowsWithoutTheCLIExplainItIsNeeded(t *testing.T) {
 			t.Errorf("%s without the CLI queued a task", name)
 		}
 	}
+}
+
+func TestCancelKeyAsksFirst(t *testing.T) {
+	m := newTestModel(t)
+	enqueueForever(m)
+	tk := m.running()
+	press(m, "X")
+	if len(m.popups) != 1 || !strings.Contains(screenText(m), "Keep running") {
+		t.Fatalf("X asks before cancelling:\n%s", screenText(m))
+	}
+	press(m, "esc")
+	if len(m.popups) != 0 || tk.cancelled {
+		t.Fatal("esc keeps the task running")
+	}
+	press(m, "X", "enter")
+	if !tk.cancelled {
+		t.Error("enter cancels the task")
+	}
+	m.cancelTasks()
+}
+
+// The answer only stops the task it was asked about: if that one ended while
+// the popup was open, the task that started after it keeps running.
+func TestCancelConfirmSparesTheNextTask(t *testing.T) {
+	m := newTestModel(t)
+	enqueueForever(m)
+	first := m.running()
+	press(m, "X")
+	first.stop()
+	m.removeTask(first) // it ended while the popup was open
+	enqueueForever(m)
+	second := m.running()
+	if second == nil || second == first {
+		t.Fatal("a second task should be running")
+	}
+	press(m, "enter")
+	if second.cancelled {
+		t.Error("the confirmation reached a task it was not asked about")
+	}
+	m.cancelTasks()
 }

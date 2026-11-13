@@ -61,7 +61,7 @@ func globalActions() []*action {
 			run: func(m *Model) tea.Cmd { return m.copySelectedPath() }},
 		{id: "universal.cancelTask", ctx: ctxGlobal, keys: []string{"X"}, desc: "Cancel the running task", hint: "Cancel task",
 			enabled: func(m *Model) bool { return m.busy() },
-			run:     func(m *Model) tea.Cmd { m.cancelRunning(); return nil }},
+			run:     func(m *Model) tea.Cmd { m.confirmCancelRunning(); return nil }},
 		{id: "universal.suspend", ctx: ctxGlobal, keys: []string{"ctrl+z"}, desc: "Suspend to the shell",
 			run: func(m *Model) tea.Cmd { return tea.Suspend }},
 

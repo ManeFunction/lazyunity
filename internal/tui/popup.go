@@ -459,6 +459,7 @@ type confirmPopup struct {
 	title   string
 	message string
 	yes     string // label of the yes answer, "Yes" by default
+	no      string // label of the no answer, "Cancel" by default
 	danger  bool
 	onYes   func(m *Model) tea.Cmd
 	onNo    func(m *Model) tea.Cmd
@@ -489,7 +490,11 @@ func (p *confirmPopup) view(m *Model) string {
 	if yes == "" {
 		yes = "Yes"
 	}
-	keys := th.OptionsText.Render("enter") + ": " + yes + "   " + th.OptionsText.Render("esc") + ": Cancel"
+	no := p.no
+	if no == "" {
+		no = "Cancel"
+	}
+	keys := th.OptionsText.Render("enter") + ": " + yes + "   " + th.OptionsText.Render("esc") + ": " + no
 	body := make([]string, 0, len(lines)+3)
 	body = append(body, "")
 	for _, l := range lines {

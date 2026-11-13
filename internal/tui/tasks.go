@@ -339,12 +339,25 @@ func (m *Model) pruneTasks() {
 	}
 }
 
-// cancelRunning stops the running task. The queued ones stay: the next starts
-// once the running one has ended.
-func (m *Model) cancelRunning() {
-	if t := m.running(); t != nil {
-		t.stop()
+// confirmCancelRunning asks before stopping the running task. The queued ones
+// stay: the next starts once the running one has ended. Only the task
+// asked about is stopped: if it ends while the question is open, the answer
+// does not reach the one that started after it.
+func (m *Model) confirmCancelRunning() {
+	t := m.running()
+	if t == nil {
+		return
 	}
+	m.push(&confirmPopup{
+		title: "Cancel task", yes: "Cancel task", no: "Keep running", danger: true,
+		message: fmt.Sprintf("Cancel %q?", t.title),
+		onYes: func(m *Model) tea.Cmd {
+			if m.running() == t {
+				t.stop()
+			}
+			return nil
+		},
+	})
 }
 
 // stop cancels a running task.
