@@ -463,6 +463,15 @@ type confirmPopup struct {
 	danger  bool
 	onYes   func(m *Model) tea.Cmd
 	onNo    func(m *Model) tea.Cmd
+	// extra are more answers, each on a key of its own, shown between yes
+	// and no.
+	extra []confirmKey
+}
+
+// confirmKey is an extra answer of a confirmPopup.
+type confirmKey struct {
+	key, label string
+	run        func(m *Model) tea.Cmd
 }
 
 func (p *confirmPopup) update(m *Model, msg tea.Msg) (func(*Model) tea.Cmd, bool) {
@@ -475,6 +484,11 @@ func (p *confirmPopup) update(m *Model, msg tea.Msg) (func(*Model) tea.Cmd, bool
 		return p.onYes, true
 	case "esc", "n", "q":
 		return p.onNo, true
+	}
+	for _, x := range p.extra {
+		if k.String() == x.key {
+			return x.run, true
+		}
 	}
 	return nil, false
 }
@@ -494,7 +508,11 @@ func (p *confirmPopup) view(m *Model) string {
 	if no == "" {
 		no = "Cancel"
 	}
-	keys := th.OptionsText.Render("enter") + ": " + yes + "   " + th.OptionsText.Render("esc") + ": " + no
+	keys := th.OptionsText.Render("enter") + ": " + yes + "   "
+	for _, x := range p.extra {
+		keys += th.OptionsText.Render(x.key) + ": " + x.label + "   "
+	}
+	keys += th.OptionsText.Render("esc") + ": " + no
 	body := make([]string, 0, len(lines)+3)
 	body = append(body, "")
 	for _, l := range lines {

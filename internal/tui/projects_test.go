@@ -810,3 +810,44 @@ func TestAddAPackage(t *testing.T) {
 		t.Errorf("screen:\n%s", screenText(m))
 	}
 }
+
+func TestMissingEditorCanOpenWithAnInstalledOne(t *testing.T) {
+	m := newTestModel(t)
+	m.missing = map[string]bool{}
+	m.refreshProjects()
+	old := selectProject(t, m, "Ancient Thing") // 2019.4.40f1 is not installed
+	os.MkdirAll(old.Path, 0o755)
+	f := useFakeCLI(t, m)
+	press(m, "enter")
+	if !strings.Contains(screenText(m), "v: Pick an installed version") {
+		t.Fatalf("the popup should offer the installed versions:\n%s", screenText(m))
+	}
+	press(m, "v")
+	out := screenText(m)
+	if len(m.popups) != 1 || !strings.Contains(out, "Unity version for Ancient Thing") {
+		t.Fatalf("v should open the version menu:\n%s", out)
+	}
+	for _, it := range m.popups[0].(*menuPopup).list.Items() {
+		if strings.Contains(it.label, "Install") {
+			t.Errorf("only installed versions are offered, not %q", it.label)
+		}
+	}
+	m.popups[0].(*menuPopup).list.SelectKey("2022.3.62f1")
+	press(m, "enter")
+	if got := m.st.PendingFor(old.Path).Version; got != "2022.3.62f1" {
+		t.Fatalf("pending version = %q", got)
+	}
+	if len(m.popups) != 1 || !strings.Contains(screenText(m), "Platform for Ancient Thing (Unity 2022.3.62f1)") {
+		t.Fatalf("the platform menu should follow:\n%s", screenText(m))
+	}
+	m.popups[0].(*menuPopup).list.SelectKey("Android") // it is on Linux now
+	press(m, "enter")
+	if len(m.popups) != 1 || !strings.Contains(screenText(m), "Open with another version") {
+		t.Fatalf("then the project opens, after the usual confirmation:\n%s", screenText(m))
+	}
+	_, cmd := m.Update(keyMsg("enter"))
+	drain(m, cmd)
+	if !f.called("Open", unitycli.OpenOptions{Project: old.Path, EditorVersion: "2022.3.62f1", BuildTarget: "android"}) {
+		t.Errorf("open: %v", f.Calls())
+	}
+}

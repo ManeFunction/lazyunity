@@ -24,9 +24,9 @@ func projectActions() []*action {
 		on(&action{id: "projects.open", ctx: ctxProjects, keys: []string{"enter", "space"}, desc: "Open in Unity, signed in", hint: "Open"},
 			func(m *Model, r projectRow) tea.Cmd { return m.openProject(r) }),
 		on(&action{id: "projects.version", ctx: ctxProjects, keys: []string{"v"}, desc: "Change the Unity version", hint: "Version"},
-			func(m *Model, r projectRow) tea.Cmd { m.versionMenu(r); return nil }),
+			func(m *Model, r projectRow) tea.Cmd { m.versionMenu(r, nil); return nil }),
 		on(&action{id: "projects.platform", ctx: ctxProjects, keys: []string{"p"}, desc: "Change the build platform", hint: "Platform"},
-			func(m *Model, r projectRow) tea.Cmd { m.platformMenu(r); return nil }),
+			func(m *Model, r projectRow) tea.Cmd { m.platformMenu(r, nil); return nil }),
 		on(&action{id: "projects.pin", ctx: ctxProjects, keys: []string{"f"}, desc: "Pin or unpin the project", hint: "Pin"},
 			func(m *Model, r projectRow) tea.Cmd { return m.togglePin(r) }),
 		{id: "projects.new", ctx: ctxProjects, keys: []string{"n"}, desc: "Create a new project", hint: "New",
@@ -108,6 +108,10 @@ func (m *Model) openProject(r projectRow) tea.Cmd {
 			title: "Editor not installed", yes: "Install",
 			message: fmt.Sprintf("%s needs Unity %s, which is not installed. Install it now?", r.name(), p.version),
 			onYes:   func(m *Model) tea.Cmd { return m.installEditorFlow(p.version, p.changeset) },
+			extra: []confirmKey{{key: "v", label: "Pick an installed version", run: func(m *Model) tea.Cmd {
+				m.openWithInstalled(r)
+				return nil
+			}}},
 		})
 	case openDirect:
 		m.push(&confirmPopup{
@@ -227,11 +231,48 @@ func (m *Model) upgradeMenu(r projectRow, p openPlan) {
 	m.push(menu)
 }
 
+// openWithInstalled opens a project whose Editor is not installed with one
+// that is: it asks for the version, then the platform, then opens it.
+func (m *Model) openWithInstalled(r projectRow) {
+	if len(m.inv.editors()) == 0 {
+		m.toastf(toastWarn, "No Unity Editor is installed")
+		return
+	}
+	m.versionMenu(r, func(m *Model, r projectRow) tea.Cmd {
+		m.platformMenu(r, func(m *Model, r projectRow) tea.Cmd { return m.openProject(r) })
+		return nil
+	})
+}
+
+// projectByPath is the project row of a path, as it is now.
+func (m *Model) projectByPath(path string) (projectRow, bool) {
+	for _, r := range m.projectsTab.list.Items() {
+		if r.Path == path {
+			return r, true
+		}
+	}
+	return projectRow{}, false
+}
+
+// thenWith runs then, when set, on the project's row as it is now.
+func (m *Model) thenWith(path string, then func(*Model, projectRow) tea.Cmd) tea.Cmd {
+	if then == nil {
+		return nil
+	}
+	if r, ok := m.projectByPath(path); ok {
+		return then(m, r)
+	}
+	return nil
+}
+
 // ---- version and platform -----------------------------------------------------------
 
-func (m *Model) versionMenu(r projectRow) {
+// versionMenu picks the Unity version a project opens with. With then set,
+// it offers only the installed versions and calls then with the project once
+// one is picked.
+func (m *Model) versionMenu(r projectRow, then func(*Model, projectRow) tea.Cmd) {
 	var items []menuItem
-	if !m.editorInstalled(r.Version) {
+	if then == nil && !m.editorInstalled(r.Version) {
 		v, cs := r.Version, r.Changeset
 		items = append(items, menuItem{
 			label: "Install " + v + "…", right: "the project's own version",
@@ -252,10 +293,12 @@ func (m *Model) versionMenu(r projectRow) {
 		v := e.Version
 		items = append(items, menuItem{
 			label: e.Version, right: strings.Join(tags, ", "),
-			run: func(m *Model) tea.Cmd { m.setPendingVersion(r, v); return nil },
+			run: func(m *Model) tea.Cmd { m.setPendingVersion(r, v); return m.thenWith(r.Path, then) },
 		})
 	}
-	items = append(items, menuItem{label: "Install another version…", run: (*Model).showReleases})
+	if then == nil {
+		items = append(items, menuItem{label: "Install another version…", run: (*Model).showReleases})
+	}
 	menu := newMenu("Unity version for "+r.name(), items)
 	menu.wanted = 48
 	// start on the version in use
@@ -285,7 +328,9 @@ func (m *Model) setPendingVersion(r projectRow, v string) {
 	m.projectsTab.SelectKey(r.Path)
 }
 
-func (m *Model) platformMenu(r projectRow) {
+// platformMenu picks the platform a project switches to when it opens. With
+// then set, it calls then with the project once one is picked.
+func (m *Model) platformMenu(r projectRow, then func(*Model, projectRow) tea.Cmd) {
 	ver := r.effVersion()
 	ed := m.editorFor(ver)
 	if ed == nil {
@@ -304,7 +349,7 @@ func (m *Model) platformMenu(r projectRow) {
 		target := p.BuildTarget
 		items = append(items, menuItem{
 			id: p.BuildTarget, label: p.Label, right: strings.Join(tags, ", "),
-			run: func(m *Model) tea.Cmd { m.setPendingTarget(r, target); return nil },
+			run: func(m *Model) tea.Cmd { m.setPendingTarget(r, target); return m.thenWith(r.Path, then) },
 		})
 	}
 	edCopy := *ed
