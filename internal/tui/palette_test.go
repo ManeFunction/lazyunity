@@ -2,6 +2,7 @@ package tui
 
 import (
 	"image/color"
+	"math"
 	"strconv"
 	"strings"
 	"testing"
@@ -57,35 +58,39 @@ func TestScannerTrailFollowsTheTerminalPalette(t *testing.T) {
 	}
 }
 
-// Warp reports its background but not its palette: the trail must not mix a
-// guessed RGB for the head's colour, only shade the terminal's own colour.
+// Warp reports its background but not its palette: the head and the trail are
+// both drawn from lazyunity's own RGB for the colour, so they share one hue and
+// fade into the background Warp did report.
 func TestScannerTrailWithoutThePalette(t *testing.T) {
 	m := newTestModel(t)
 	m.th.ActiveBorder = lipgloss.NewStyle().Foreground(lipgloss.Color("12")).Bold(true)
-	m.Update(tea.BackgroundColorMsg{Color: color.RGBA{0x19, 0x16, 0x22, 0xff}})
+	bg := color.RGBA{0x19, 0x16, 0x22, 0xff}
+	m.Update(tea.BackgroundColorMsg{Color: bg})
 	trail := m.barTrail()
-	if len(trail) != 3 {
-		t.Fatalf("trail has %d steps, want 3 (bold, plain, faint)", len(trail))
+	if len(trail) != barTrail {
+		t.Fatalf("trail has %d steps, want %d", len(trail), barTrail)
 	}
-	for i, st := range trail {
-		if st.GetForeground() != lipgloss.Color("12") {
-			t.Errorf("step %d is %v, want the terminal's own colour 12", i, st.GetForeground())
+	blue := fallbackPalette[12]
+	if got := trail[0].GetForeground(); !sameRGB(got, blue) || !trail[0].GetBold() {
+		t.Errorf("head is %v (bold %v), want bold %v", got, trail[0].GetBold(), blue)
+	}
+	for i := 1; i < barTrail; i++ {
+		want := fadeTo(blue, bg, math.Pow(0.65, float64(i)))
+		if got := trail[i].GetForeground(); !sameRGB(got, want) {
+			t.Errorf("step %d is %v, want %v", i, got, want)
 		}
 	}
-	if !trail[0].GetBold() || trail[1].GetBold() || trail[1].GetFaint() || !trail[2].GetFaint() {
-		t.Errorf("steps are not bold, plain, faint: %v %v %v", trail[0].GetBold(), trail[1].GetFaint(), trail[2].GetFaint())
-	}
-	// the scanner never goes dark, even holding at an end with so short a trail
+	// the scanner never goes dark, even holding at an end
 	for i := 0; i < 80; i++ {
 		m.spin = i
 		if b := stripANSI(m.bar(&task{pct: -1, status: taskRunning}, 20)); !strings.Contains(b, barDone) {
 			t.Errorf("frame %d has no lit cell: %q", i, b)
 		}
 	}
-	// once the terminal does report the colour, the full gradient comes back
-	m.th.setPaletteFromOSC("\x1b]4;12;rgb:5c/9d/ff\x07")
-	if got := len(m.barTrail()); got != barTrail {
-		t.Errorf("with the palette the trail has %d steps, want %d", got, barTrail)
+	// once the terminal does report the colour, the head is its own again
+	m.th.setPaletteFromOSC("\x1b]4;12;rgb:30/60/c0\x07")
+	if got := m.barTrail()[0].GetForeground(); got != lipgloss.Color("12") {
+		t.Errorf("with the palette the head is %v, want the terminal's colour 12", got)
 	}
 }
 

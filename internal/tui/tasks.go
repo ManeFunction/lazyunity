@@ -582,9 +582,10 @@ func (m *Model) scannerBar(w int, off lipgloss.Style) string {
 //
 // That takes the RGB the terminal really paints the head with. When the head
 // is an ANSI colour the terminal would not report (Warp does not answer the
-// palette query), any mix would start from a guessed RGB and show a different
-// hue behind the head, so the trail only uses the shades the terminal draws
-// itself: the head, the same colour without bold, then faint.
+// palette query), the trail would start from a guessed RGB and show a
+// different hue behind the head, so the head is drawn in that same RGB too:
+// the whole scanner is then one gradient, though its blue may differ a little
+// from the terminal's own.
 func (m *Model) barTrail() []lipgloss.Style {
 	head := m.th.ActiveBorder
 	c := head.GetForeground()
@@ -592,13 +593,9 @@ func (m *Model) barTrail() []lipgloss.Style {
 		c = m.th.BarEdge.GetForeground()
 		head = head.Foreground(c).Bold(true)
 	}
-	from, ok := m.th.shownRGB(c)
-	if !ok {
-		trail := []lipgloss.Style{head}
-		if head.GetBold() {
-			trail = append(trail, head.Bold(false))
-		}
-		return append(trail, head.Bold(false).Faint(true))
+	from, shown := m.th.paintRGB(c)
+	if !shown {
+		head = head.Foreground(from)
 	}
 	to := m.th.shownBackground()
 	trail := make([]lipgloss.Style, barTrail)
