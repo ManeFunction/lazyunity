@@ -101,10 +101,11 @@ func (m *Model) loadAuthCmd() tea.Cmd {
 
 // checkCLIUpdateCmd asks whether a newer Unity CLI is out.
 func (m *Model) checkCLIUpdateCmd() tea.Cmd {
+	channel := m.cliChannel()
 	return m.cliCmd(func(ctx context.Context, c unityCLI) tea.Msg {
 		ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
-		info, err := c.CheckUpdate(ctx)
+		info, err := c.CheckUpdate(ctx, channel)
 		return cliUpdateMsg{info: info, err: err}
 	})
 }

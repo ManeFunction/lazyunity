@@ -63,7 +63,7 @@ func TestVersionCompare(t *testing.T) {
 }
 
 func TestMinVersionString(t *testing.T) {
-	if got := MinVersion.String(); got != "1.0.0-beta.16" {
+	if got := MinVersion.String(); got != "1.0.0" {
 		t.Errorf("MinVersion = %s", got)
 	}
 }

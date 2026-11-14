@@ -123,6 +123,13 @@ func (m *Model) cliTool() tea.Cmd {
 	if m.cliUpdate.Available() {
 		updateDesc = "Updates the CLI to " + m.cliUpdate.Latest + "."
 	}
+	channel := m.cliChannel()
+	other, feed := unitycli.ChannelBeta, "beta"
+	switchDesc := "Follows the CLI's beta builds and installs the newest one, if it is newer."
+	if channel == unitycli.ChannelBeta {
+		other, feed = unitycli.ChannelStable, "release"
+		switchDesc = "Goes back to the CLI's releases and installs the newest one, which may be older than this beta."
+	}
 	menu := newMenu("Unity CLI "+m.cliStatus.Version.String(), []menuItem{
 		{label: "Update (self-update)", desc: updateDesc, run: func(m *Model) tea.Cmd {
 			return m.withCLI(func(c unityCLI) tea.Cmd {
@@ -130,8 +137,26 @@ func (m *Model) cliTool() tea.Cmd {
 					title: "Updating the Unity CLI",
 					label: "update the Unity CLI",
 					works: []string{"cli"},
-					do:    func(ctx context.Context) error { return c.SelfUpdate(ctx, "") },
+					do:    func(ctx context.Context) error { return c.SelfUpdate(ctx, channel) },
 					after: func(m *Model, err error) tea.Cmd { return m.reprobeCLI(err == nil) },
+				})
+			})
+		}},
+		{label: "Switch to the " + feed + " feed", desc: switchDesc, run: func(m *Model) tea.Cmd {
+			return m.withCLI(func(c unityCLI) tea.Cmd {
+				return m.enqueue(&task{
+					title: "Switching the Unity CLI to the " + feed + " feed",
+					label: "switch the Unity CLI to the " + feed + " feed",
+					works: []string{"cli"},
+					do:    func(ctx context.Context) error { return c.SelfUpdate(ctx, other) },
+					after: func(m *Model, err error) tea.Cmd {
+						if err != nil {
+							return nil
+						}
+						m.st.CLIChannel = other
+						m.saveState()
+						return m.reprobeCLI(true)
+					},
 				})
 			})
 		}},
@@ -140,6 +165,19 @@ func (m *Model) cliTool() tea.Cmd {
 	menu.wanted = 44
 	m.push(menu)
 	return nil
+}
+
+// cliChannel is the update channel the CLI follows: the one the user switched
+// to, else beta for a pre-release build and stable for a release.
+func (m *Model) cliChannel() string {
+	switch m.st.CLIChannel {
+	case unitycli.ChannelStable, unitycli.ChannelBeta:
+		return m.st.CLIChannel
+	}
+	if m.cliStatus.Version.Pre != "" {
+		return unitycli.ChannelBeta
+	}
+	return unitycli.ChannelStable
 }
 
 // reprobeCLI looks for the CLI again, after it was installed or updated.

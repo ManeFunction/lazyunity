@@ -73,7 +73,7 @@ func TestPaths(t *testing.T) {
 
 func TestCandidates(t *testing.T) {
 	files := map[string]string{
-		"/home/u/.config/unityhub/cli-install.json": `{"path":"/opt/custom/unity","version":"1.0.0-beta.16"}`,
+		"/home/u/.config/unityhub/cli-install.json": `{"path":"/opt/custom/unity","version":"1.0.0"}`,
 	}
 	env := testEnv("linux", "/home/u", nil, files, "/usr/bin/unity")
 	got := env.Candidates("/my/unity")
@@ -117,8 +117,8 @@ func TestProbe(t *testing.T) {
 
 	t.Run("ready", func(t *testing.T) {
 		env := testEnv("linux", "/home/u", nil, map[string]string{def: ""}, "")
-		got := Probe(ctx, env, "", versions(map[string]string{def: "1.0.0-beta.16\n"}))
-		if got.State != Ready || got.Path != def || got.Version.String() != "1.0.0-beta.16" {
+		got := Probe(ctx, env, "", versions(map[string]string{def: "1.0.0\n"}))
+		if got.State != Ready || got.Path != def || got.Version.String() != "1.0.0" {
 			t.Errorf("got %+v", got)
 		}
 	})
@@ -144,7 +144,7 @@ func TestProbe(t *testing.T) {
 		env := testEnv("linux", "/home/u", nil, files, "")
 		got := Probe(ctx, env, "/configured/unity", versions(map[string]string{
 			"/configured/unity": "1.0.0-beta.3", // old, but it is the one the user chose
-			def:                 "1.0.0-beta.16",
+			def:                 "1.0.0",
 		}))
 		if got.State != Outdated || got.Path != "/configured/unity" {
 			t.Errorf("got %+v", got)
@@ -170,7 +170,7 @@ func TestProbe(t *testing.T) {
 	t.Run("a good candidate beats an earlier broken one", func(t *testing.T) {
 		files := map[string]string{"/configured/unity": "", def: ""}
 		env := testEnv("linux", "/home/u", nil, files, "")
-		got := Probe(ctx, env, "/configured/unity", versions(map[string]string{def: "1.0.0-beta.16"}))
+		got := Probe(ctx, env, "/configured/unity", versions(map[string]string{def: "1.0.0"}))
 		if got.State != Ready || got.Path != def {
 			t.Errorf("got %+v", got)
 		}

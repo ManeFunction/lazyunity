@@ -14,7 +14,7 @@ lazyunity is a thin, fast front end for the official [Unity CLI](https://docs.un
 │                                             ││                                                       │
 │                                             │╰────────────────────────────────────────────────1 of 2─╯
 │                                             │╭─[3]─Tools─────────────────────────────────────────────╮
-│                                             ││Unity CLI                ready · 1.0.0-beta.16         │
+│                                             ││Unity CLI                ready · 1.0.0                 │
 │                                             ││Account                  signed in                     │
 │                                             ││License                  press enter to check          │
 │                                             ││ · · · · · · · · · · · · · · · · · · · · · · · · · · · │
@@ -27,7 +27,7 @@ Open: <enter> | Version: v | Platform: p | Pin: f | New: n | Add: a | Remove: d 
 
 ## Requirements
 
-- The Unity CLI, version 1.0.0-beta.16 or newer. If it is missing, lazyunity offers to install it with Unity's official installer (Tools tab, `3`).
+- The Unity CLI, version 1.0.0 or newer. If it is missing, lazyunity offers to install it with Unity's official installer (Tools tab, `3`).
 - Linux, macOS or Windows. A terminal with colours and, ideally, mouse support.
 
 ## Build
@@ -101,7 +101,7 @@ Everything follows lazygit where lazygit has an equivalent. `?` shows the keys t
 **Releases**: `enter` or `space` install · `/` filter by version, in the filter row at the bottom of the tab (every page of releases is searched, not only the ones loaded) · `ctrl+s` release stream: Supported (the default), LTS, Beta, Alpha or All · `o` release notes.
 **Anywhere in the Editors panel**: `C` cleans the download cache, where installers and the partial downloads of interrupted installs are kept (asks first, with its size; not while a task runs).
 
-**Tools**: `enter` runs the selected tool, and `e` edits `config.yml` from any row. The **Editors folder** row is where new Editors install and installed Editors are looked for; `enter` on it changes it through the CLI. When the editor quits with the config changed, lazyunity restarts to apply it; if a task is running, the Config file row says a restart is required instead, and `enter` on it restarts (asking first while a task would be cancelled). **OpenUPM CLI** installs [openupm-cli](https://github.com/openupm/openupm-cli) with npm (Node.js is needed): the official release from the npm registry, unless `openupm.repo` is set in `config.yml`: then that repository (the official one or a fork) is cloned and built, and git is needed too. **Donate** opens the GitHub Sponsors page. The bottom line ends with the lazyunity version.
+**Tools**: `enter` runs the selected tool, and `e` edits `config.yml` from any row. On the **Unity CLI** row, `enter` installs the CLI, or, once it is ready, opens a menu to update it, switch it between the release and beta feeds (the row says `beta feed` while you follow betas), or reinstall it with the official installer. The **Editors folder** row is where new Editors install and installed Editors are looked for; `enter` on it changes it through the CLI. When the editor quits with the config changed, lazyunity restarts to apply it; if a task is running, the Config file row says a restart is required instead, and `enter` on it restarts (asking first while a task would be cancelled). **OpenUPM CLI** installs [openupm-cli](https://github.com/openupm/openupm-cli) with npm (Node.js is needed): the official release from the npm registry, unless `openupm.repo` is set in `config.yml`: then that repository (the official one or a fork) is cloned and built, and git is needed too. **Donate** opens the GitHub Sponsors page. The bottom line ends with the lazyunity version.
 
 ## Configuration
 

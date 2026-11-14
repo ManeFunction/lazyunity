@@ -46,6 +46,9 @@ type State struct {
 	// ReleaseStream is the stream the Releases tab lists: all, lts, tech, beta
 	// or alpha. Empty means the default, tech (Unity's "Supported" releases).
 	ReleaseStream string `yaml:"releaseStream,omitempty"`
+	// CLIChannel is the update channel of the Unity CLI, stable or beta, once
+	// the user switched it. Empty: the channel of the installed build.
+	CLIChannel string `yaml:"cliChannel,omitempty"`
 
 	path string
 }

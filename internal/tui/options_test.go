@@ -95,7 +95,7 @@ func TestToolsTabRows(t *testing.T) {
 	m := newTestModel(t)
 	press(m, "3")
 	out := screenText(m)
-	for _, want := range []string{"Unity CLI", "ready · 1.0.0-beta.16", "Account", "checking…", "License", "Default project folder", "Config file", "OpenUPM CLI"} {
+	for _, want := range []string{"Unity CLI", "ready · 1.0.0", "Account", "checking…", "License", "Default project folder", "Config file", "OpenUPM CLI"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("the tools should contain %q:\n%s", want, out)
 		}
@@ -107,12 +107,12 @@ func TestToolsTabRows(t *testing.T) {
 	if !strings.Contains(screenText(m), "signed in as me@example.com") {
 		t.Error("the account is shown")
 	}
-	m.Update(cliUpdateMsg{info: unitycli.UpdateInfo{Current: "1.0.0-beta.16", Latest: "1.0.0-beta.17"}})
-	if !strings.Contains(screenText(m), "update available: 1.0.0-beta.17") {
+	m.Update(cliUpdateMsg{info: unitycli.UpdateInfo{Current: "1.0.0", Latest: "1.0.1"}})
+	if !strings.Contains(screenText(m), "update available: 1.0.1") {
 		t.Errorf("a newer CLI is announced:\n%s", screenText(m))
 	}
 	m.Update(cliUpdateMsg{err: errors.New("offline")})
-	if !strings.Contains(screenText(m), "update available: 1.0.0-beta.17") {
+	if !strings.Contains(screenText(m), "update available: 1.0.1") {
 		t.Error("a failed check keeps what was known")
 	}
 	m.cliStatus.State = unitycli.Missing
@@ -173,7 +173,7 @@ func TestCLIStatusMessage(t *testing.T) {
 	m := newTestModel(t)
 	m.cli = nil
 	cmd := m.onCLIStatus(cliStatusMsg{st: unitycli.Status{State: unitycli.Ready, Path: "/x/unity", Version: unitycli.MinVersion}})
-	if c, ok := m.cli.(*unitycli.Client); !ok || c.Path != "/x/unity" || cmd == nil || !strings.Contains(screenText(m), "Unity CLI 1.0.0-beta.16 is ready") {
+	if c, ok := m.cli.(*unitycli.Client); !ok || c.Path != "/x/unity" || cmd == nil || !strings.Contains(screenText(m), "Unity CLI 1.0.0 is ready") {
 		t.Errorf("a ready CLI is adopted and the data is loaded: cli=%v", m.cli)
 	}
 	m.onCLIStatus(cliStatusMsg{st: unitycli.Status{State: unitycli.Outdated}})
@@ -520,5 +520,67 @@ func TestEEditsTheConfigFromTheToolsTab(t *testing.T) {
 	m.keymap.lookup(ctxTools, "e").run(m)
 	if !strings.Contains(screenText(m), "Config file") {
 		t.Errorf("e should open the config from any row:\n%s", screenText(m))
+	}
+}
+
+func TestCLIFeedSwitch(t *testing.T) {
+	m := newTestModel(t)
+	f := useFakeCLI(t, m)
+	if m.cliChannel() != unitycli.ChannelStable {
+		t.Fatalf("a release build follows the release feed, got %q", m.cliChannel())
+	}
+	runToolRow(m, "cli")
+	if !strings.Contains(screenText(m), "Switch to the beta feed") {
+		t.Fatalf("screen:\n%s", screenText(m))
+	}
+	f.err["SelfUpdate"] = errors.New("offline")
+	press(m, "j")
+	_, cmd := m.Update(keyMsg("enter"))
+	drain(m, cmd)
+	if !f.called("SelfUpdate", "beta") || m.st.CLIChannel != "" {
+		t.Fatalf("a failed switch is not remembered: channel %q, calls %v", m.st.CLIChannel, f.Calls())
+	}
+
+	delete(f.err, "SelfUpdate")
+	m.popups = nil
+	runToolRow(m, "cli")
+	press(m, "j")
+	_, cmd = m.Update(keyMsg("enter"))
+	drain(m, cmd)
+	if m.st.CLIChannel != unitycli.ChannelBeta || m.cliChannel() != unitycli.ChannelBeta {
+		t.Fatalf("the beta feed is remembered: %q (calls %v)", m.st.CLIChannel, f.Calls())
+	}
+
+	// the CLI is still a release build, but the chosen feed wins
+	m.cli, m.popups = f, nil
+	m.cliStatus = unitycli.Status{State: unitycli.Ready, Version: unitycli.MinVersion}
+	m.refreshTools()
+	if !strings.Contains(screenText(m), "ready · 1.0.0 · beta feed") {
+		t.Errorf("the feed is on the Tools row:\n%s", screenText(m))
+	}
+	drain(m, m.checkCLIUpdateCmd())
+	if !f.called("CheckUpdate", "beta") {
+		t.Errorf("updates are checked on the chosen feed: %v", f.Calls())
+	}
+	runToolRow(m, "cli")
+	if !strings.Contains(screenText(m), "Switch to the release feed") {
+		t.Fatalf("screen:\n%s", screenText(m))
+	}
+	_, cmd = m.Update(keyMsg("enter")) // Update
+	drain(m, cmd)
+	if f.count("SelfUpdate", "beta") != 2 {
+		t.Errorf("Update stays on the beta feed: %v", f.Calls())
+	}
+}
+
+func TestCLIChannelFollowsABetaBuild(t *testing.T) {
+	m := newTestModel(t)
+	m.cliStatus.Version = unitycli.Version{Major: 1, Minor: 1, Pre: "beta", PreNum: 2}
+	if m.cliChannel() != unitycli.ChannelBeta {
+		t.Errorf("a beta build follows the beta feed, got %q", m.cliChannel())
+	}
+	m.st.CLIChannel = unitycli.ChannelStable
+	if m.cliChannel() != unitycli.ChannelStable {
+		t.Errorf("a chosen feed wins, got %q", m.cliChannel())
 	}
 }

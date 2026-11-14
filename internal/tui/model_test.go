@@ -53,6 +53,8 @@ func testOptions(t *testing.T) Options {
 		Env: unitycli.Env{GOOS: "linux", Home: dir,
 			Getenv:   func(string) string { return "" },
 			LookPath: func(string) (string, error) { return "", exec.ErrNotFound },
+			ReadFile: func(string) ([]byte, error) { return nil, os.ErrNotExist },
+			IsFile:   func(string) bool { return false },
 		},
 		host: &hostRecorder{},
 		GOOS: "linux",

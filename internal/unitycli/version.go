@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-// Version is a Unity CLI version such as 1.0.0-beta.16.
+// Version is a Unity CLI version such as 1.0.0 or 1.0.0-beta.16.
 type Version struct {
 	Major, Minor, Patch int
 	Pre                 string // "beta", "rc" ... empty for a release
@@ -16,7 +16,7 @@ type Version struct {
 
 // MinVersion is the oldest CLI lazyunity supports. Every command it uses was
 // tested against this release.
-var MinVersion = Version{Major: 1, Pre: "beta", PreNum: 16}
+var MinVersion = Version{Major: 1}
 
 var versionRe = regexp.MustCompile(`^(\d+)\.(\d+)\.(\d+)(?:-([A-Za-z]+)\.(\d+))?$`)
 

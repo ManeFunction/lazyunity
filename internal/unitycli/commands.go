@@ -466,7 +466,14 @@ func (c *Client) ReturnLicense(ctx context.Context) error {
 	return err
 }
 
-// SelfUpdate updates the CLI itself. channel may be empty.
+// The CLI's update channels, for SelfUpdate and CheckUpdate.
+const (
+	ChannelStable = "stable"
+	ChannelBeta   = "beta"
+)
+
+// SelfUpdate updates the CLI itself from channel, switching to it when the CLI
+// is on another one. channel may be empty: the CLI's own.
 func (c *Client) SelfUpdate(ctx context.Context, channel string) error {
 	args := []string{"self-update", "--yes"}
 	if channel != "" {
@@ -492,10 +499,15 @@ func (u UpdateInfo) Available() bool {
 	return u.Latest != "" && u.Latest != u.Current
 }
 
-// CheckUpdate asks whether a newer CLI is out, without installing it.
-func (c *Client) CheckUpdate(ctx context.Context) (UpdateInfo, error) {
+// CheckUpdate asks whether a newer CLI is out on channel, without installing
+// it. channel may be empty: the CLI's own.
+func (c *Client) CheckUpdate(ctx context.Context, channel string) (UpdateInfo, error) {
 	var u UpdateInfo
-	env, err := c.Run(ctx, "self-update", "--check")
+	args := []string{"self-update", "--check"}
+	if channel != "" {
+		args = append(args, "--channel", channel)
+	}
+	env, err := c.Run(ctx, args...)
 	if err != nil {
 		return u, err
 	}
