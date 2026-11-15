@@ -269,6 +269,41 @@ func TestInstallANewEditorEndToEnd(t *testing.T) {
 	}
 }
 
+// An install that was stopped left part of its download in the cache: the
+// confirmation says how much, since the CLI carries on from there.
+func TestInstallConfirmationShowsTheCachedDownload(t *testing.T) {
+	m := newTestModel(t)
+	f := useFakeCLI(t, m)
+	f.cache.Path = t.TempDir()
+	if err := os.WriteFile(filepath.Join(f.cache.Path, "Unity-6000.5.1f1.tar.xz"), make([]byte, 2300), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	f.plan.TotalDownloadSize = 4100
+	drain(m, m.planInstall(unitycli.InstallOptions{Version: "6000.5.1f1"}))
+	if out := screenText(m); !strings.Contains(out, "Downloaded: 2.3 of 4.1 kB (56%)") {
+		t.Errorf("the confirmation should show the cached part:\n%s", out)
+	}
+	if !f.called("DownloadCache") {
+		t.Errorf("the cache folder comes from the CLI: %v", f.Calls())
+	}
+}
+
+func TestDownloadLine(t *testing.T) {
+	for _, c := range []struct {
+		total, cached int64
+		want          string
+	}{
+		{4_100_000_000, 0, "Download: 4.1 GB."},
+		{4_132_655_564, 2_325_821_862, "Downloaded: 2.3 of 4.1 GB (56%), the rest resumes from there."},
+		{4_100_000_000, 512_000_000, "Downloaded: 512.0 MB of 4.1 GB (12%), the rest resumes from there."},
+		{4_100_000_000, 4_100_000_000, "Downloaded: 4.1 GB, all of it."},
+	} {
+		if got := downloadLine(c.total, c.cached); got != c.want {
+			t.Errorf("downloadLine(%d, %d) = %q, want %q", c.total, c.cached, got, c.want)
+		}
+	}
+}
+
 func TestInstallEditorAlreadyInstalled(t *testing.T) {
 	m := newTestModel(t)
 	useFakeCLI(t, m)
@@ -308,6 +343,9 @@ func TestUninstallListsTheProjectsThatUseIt(t *testing.T) {
 		t.Error("nothing runs before the user agrees")
 	}
 	_, cmd := m.Update(keyMsg("enter"))
+	if tk := m.running(); tk == nil || !tk.keep {
+		t.Error("an uninstall must not be cancellable: stopped halfway, it breaks the Editor")
+	}
 	drain(m, cmd)
 	if !f.called("Uninstall", "2022.3.62f1", "x86_64") || !f.called("Editors") {
 		t.Errorf("calls: %v", f.Calls())

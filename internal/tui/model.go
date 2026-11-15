@@ -387,6 +387,9 @@ func (m *Model) handlePaste(msg tea.PasteMsg) tea.Cmd {
 
 // requestQuit quits, after asking when something would be lost by it.
 func (m *Model) requestQuit() tea.Cmd {
+	if m.refuseWhileKept("quitting") {
+		return nil
+	}
 	if m.busy() && !m.quitConfirmed {
 		m.push(&confirmPopup{
 			title: "Quit", yes: "Quit", danger: true,

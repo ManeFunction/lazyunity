@@ -88,6 +88,7 @@ func (m *Model) uninstallConfirm(e editorRow) {
 					title: "Uninstalling Unity " + e.Version,
 					label: "uninstall " + e.Version,
 					works: []string{workEditor(e.Version)},
+					keep:  true,
 					do:    func(ctx context.Context) error { return c.Uninstall(ctx, e.Version, e.Arch) },
 					after: func(m *Model, err error) tea.Cmd { return m.refreshEditorsCmd() },
 				})
@@ -238,6 +239,7 @@ func (m *Model) removeModuleConfirm(e editorRow, mod unitycli.Module) {
 					label:    e.Version + ": remove " + mod.Name,
 					works:    []string{workModule(e.Version, mod.ID)},
 					removing: true,
+					keep:     true,
 					do:       func(ctx context.Context) error { return c.RemoveModules(ctx, e.Version, e.Arch, []string{mod.ID}) },
 					after:    func(m *Model, err error) tea.Cmd { return tea.Batch(m.scanEditorsCmd(), m.reloadModulesCmd()) },
 				})
@@ -379,9 +381,10 @@ type releaseModulesMsg struct {
 }
 
 type planMsg struct {
-	opts unitycli.InstallOptions
-	plan unitycli.InstallPlan
-	err  error
+	opts   unitycli.InstallOptions
+	plan   unitycli.InstallPlan
+	cached int64 // bytes an interrupted install left in the download cache
+	err    error
 }
 
 // installEditorFlow installs an Editor: pick modules, see the size, confirm.
@@ -428,14 +431,41 @@ func (m *Model) onReleaseModules(msg releaseModulesMsg) tea.Cmd {
 	return nil
 }
 
-// planInstall asks the CLI what the install would download.
+// planInstall asks the CLI what the install would download, and how much of
+// it an interrupted install already left in the download cache. The two are
+// asked at once; the cache is only a nicety, so failing to read it is not an
+// error.
 func (m *Model) planInstall(o unitycli.InstallOptions) tea.Cmd {
 	return m.withCLI(func(c unityCLI) tea.Cmd {
 		return func() tea.Msg {
-			plan, err := c.PlanInstall(context.Background(), o)
-			return planMsg{opts: o, plan: plan, err: err}
+			ctx := context.Background()
+			cache := make(chan unitycli.CacheInfo, 1)
+			go func() {
+				info, _ := c.DownloadCache(ctx)
+				cache <- info
+			}()
+			plan, err := c.PlanInstall(ctx, o)
+			info := <-cache
+			return planMsg{opts: o, plan: plan, cached: unitycli.CachedBytes(info.Path, o.Version), err: err}
 		}
 	})
+}
+
+// downloadLine is the size of a download, with how much of it an interrupted
+// install already left in the cache: "Download: 4.1 GB.", or
+// "Downloaded: 2.3 of 4.1 GB (56%), the rest resumes from there."
+func downloadLine(total, cached int64) string {
+	switch {
+	case cached <= 0 || total <= 0:
+		return "Download: " + humanBytes(total) + "."
+	case cached >= total:
+		return "Downloaded: " + humanBytes(total) + ", all of it."
+	}
+	done, all := humanBytes(cached), humanBytes(total)
+	if num, unit, ok := strings.Cut(done, " "); ok && strings.HasSuffix(all, " "+unit) {
+		done = num // one unit for both: "2.3 of 4.1 GB"
+	}
+	return fmt.Sprintf("Downloaded: %s of %s (%d%%), the rest resumes from there.", done, all, cached*100/total)
 }
 
 func (m *Model) onPlan(msg planMsg) {
@@ -455,8 +485,8 @@ func (m *Model) onPlan(msg planMsg) {
 	if len(names) > 0 {
 		text += " with " + strings.Join(names, ", ")
 	}
-	text += fmt.Sprintf(".\n\nDownload: %s.\n\nInstalling accepts Unity's license terms for the Editor and each selected component.",
-		humanBytes(msg.plan.TotalDownloadSize))
+	text += ".\n\n" + downloadLine(msg.plan.TotalDownloadSize, msg.cached) +
+		"\n\nInstalling accepts Unity's license terms for the Editor and each selected component."
 	opts := msg.opts
 	m.push(&confirmPopup{
 		title: "Install Unity " + opts.Version, yes: "Install", message: text,

@@ -60,7 +60,7 @@ func globalActions() []*action {
 		{id: "universal.copyPath", ctx: ctxGlobal, keys: []string{"ctrl+o"}, desc: "Copy the path of the selected item",
 			run: func(m *Model) tea.Cmd { return m.copySelectedPath() }},
 		{id: "universal.cancelTask", ctx: ctxGlobal, keys: []string{"X"}, desc: "Cancel the running task", hint: "Cancel task",
-			enabled: func(m *Model) bool { return m.busy() },
+			enabled: func(m *Model) bool { return m.cancellable() },
 			run:     func(m *Model) tea.Cmd { m.confirmCancelRunning(); return nil }},
 		{id: "universal.suspend", ctx: ctxGlobal, keys: []string{"ctrl+z"}, desc: "Suspend to the shell",
 			run: func(m *Model) tea.Cmd { return tea.Suspend }},

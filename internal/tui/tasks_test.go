@@ -212,13 +212,17 @@ func TestProgressFramesShow(t *testing.T) {
 
 	m.Update(taskFrameMsg{id: tk.id, frame: unitycli.Frame{Type: "progress", Pct: pct(42), Phase: "download", Message: "Downloading Web Build Support..."}})
 	out := screenText(m)
-	for _, want := range []string{"─Tasks─", "Installing 6000.7.0b8", " 42%", "download · Downloading Web Build Support...", "[■■■■"} {
+	for _, want := range []string{"─Tasks─", "Installing 6000.7.0b8", " 42%", "download · Downloading Web Build Support", "[■■■■"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("the task frame should contain %q:\n%s", want, out)
 		}
 	}
+	// the CLI's trailing "..." reads like a cut line, so it is dropped
+	if strings.Contains(out, "Support...") || strings.Contains(out, "Support…") {
+		t.Errorf("the trailing dots should be dropped:\n%s", out)
+	}
 	m.Update(taskFrameMsg{id: tk.id, frame: unitycli.Frame{Type: "progress", Pct: pct(50), Phase: "install", Message: "Installing..."}})
-	if !strings.Contains(screenText(m), "install · Installing...") {
+	if !strings.Contains(screenText(m), "install · Installing") || strings.Contains(screenText(m), "Installing...") {
 		t.Error("the next phase replaces the first")
 	}
 	// the CLI holds the install phase at 50%: that is not progress worth a number
@@ -564,4 +568,38 @@ func TestCancelConfirmSparesTheNextTask(t *testing.T) {
 		t.Error("the confirmation reached a task it was not asked about")
 	}
 	m.cancelTasks()
+}
+
+// An uninstall deletes files as it goes, so stopping it halfway leaves a
+// broken Editor: X, quitting and restarting all leave it running.
+func TestKeptTaskCannotBeStopped(t *testing.T) {
+	m := newTestModel(t)
+	m.enqueue(&task{title: "Uninstalling Unity 6000.3.28f1", keep: true, do: func(context.Context) error { return nil }})
+	tk := m.running()
+	if tk == nil || tk.cancel != nil {
+		t.Fatal("a kept task runs without a way to cancel it")
+	}
+	if m.cancellable() {
+		t.Error("the cancel action is offered for a kept task")
+	}
+	press(m, "X")
+	if len(m.popups) != 0 || tk.cancelled {
+		t.Errorf("X must not offer to cancel a kept task:\n%s", screenText(m))
+	}
+	press(m, "q")
+	if m.quit || len(m.popups) != 0 {
+		t.Errorf("quitting waits for a kept task: quit=%v popups=%d", m.quit, len(m.popups))
+	}
+	if !strings.Contains(screenText(m), "Wait for") {
+		t.Errorf("the user is told to wait:\n%s", screenText(m))
+	}
+	m.cancelTasks()
+	if tk.cancelled || m.running() != tk {
+		t.Error("cancelTasks must not stop a kept task")
+	}
+	m.Update(taskEndMsg{id: tk.id})
+	press(m, "q")
+	if !m.quit {
+		t.Error("once the kept task is done, quitting works again")
+	}
 }

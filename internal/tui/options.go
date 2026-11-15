@@ -342,6 +342,9 @@ func (m *Model) onConfigEdited(msg configEditedMsg) tea.Cmd {
 	if !m.configLoads() {
 		return nil
 	}
+	if m.refuseWhileKept("restarting") {
+		return nil
+	}
 	if m.busy() {
 		m.configPending = true
 		m.refreshTools()
@@ -366,6 +369,9 @@ func (m *Model) configLoads() bool {
 // when a task would still be cancelled by it.
 func (m *Model) restartForConfig() tea.Cmd {
 	if !m.configLoads() {
+		return nil
+	}
+	if m.refuseWhileKept("restarting") {
 		return nil
 	}
 	if m.busy() {

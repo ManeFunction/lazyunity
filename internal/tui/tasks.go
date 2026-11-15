@@ -37,7 +37,12 @@ type task struct {
 	// removing marks a task that removes what it works on, such as a module,
 	// so its rows show a cross instead of a download arrow.
 	removing bool
-	status   taskStatus
+	// keep marks a task that must not be stopped halfway, such as an
+	// uninstall: the CLI deletes files as it goes, so a stopped one leaves a
+	// broken Editor behind. It cannot be cancelled, and lazyunity will not
+	// quit or restart while it runs.
+	keep   bool
+	status taskStatus
 	// pct is the progress of the current phase, 0 to 100; negative when unknown.
 	pct   float64
 	phase string
@@ -215,8 +220,12 @@ func (m *Model) startNext() tea.Cmd {
 			continue
 		}
 		t.status = taskRunning
-		ctx, cancel := context.WithCancel(context.Background())
-		t.cancel = cancel
+		ctx := context.Background()
+		if !t.keep {
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithCancel(ctx)
+			t.cancel = cancel
+		}
 		id := t.id
 		switch {
 		case t.open != nil:
@@ -356,6 +365,10 @@ func (m *Model) confirmCancelRunning() {
 	if t == nil {
 		return
 	}
+	if t.keep {
+		m.toastf(toastWarn, "%s cannot be cancelled: stopping it halfway breaks what it works on", t.title)
+		return
+	}
 	m.push(&confirmPopup{
 		title: "Cancel task", yes: "Cancel task", no: "Keep running", danger: true,
 		message: fmt.Sprintf("Cancel %q?", t.title),
@@ -368,12 +381,29 @@ func (m *Model) confirmCancelRunning() {
 	})
 }
 
-// stop cancels a running task.
+// stop cancels a running task, unless it must not be stopped.
 func (t *task) stop() {
-	if t.cancel != nil {
+	if t.cancel != nil && !t.keep {
 		t.cancelled = true
 		t.cancel()
 	}
+}
+
+// cancellable reports whether a task is running that the user may stop.
+func (m *Model) cancellable() bool {
+	t := m.running()
+	return t != nil && !t.keep
+}
+
+// refuseWhileKept tells the user to wait, and reports true, while a task that
+// cannot be stopped is running, so quitting or restarting does not kill it.
+func (m *Model) refuseWhileKept(what string) bool {
+	t := m.running()
+	if t == nil || !t.keep {
+		return false
+	}
+	m.toastf(toastWarn, "Wait for %q to finish before %s: stopping it halfway breaks what it works on", t.title, what)
+	return true
 }
 
 // cancelTasks stops the running task and drops the queued ones, for quitting.
@@ -466,9 +496,10 @@ func (m *Model) taskLine(t *task, w int, labelW int) string {
 		parts = append(parts, pct)
 		used += width(pct) + 1
 	}
-	detail := t.msg
-	if t.phase != "" && t.msg != "" {
-		detail = t.phase + " · " + t.msg
+	msg := trimEllipsis(t.msg)
+	detail := msg
+	if t.phase != "" && msg != "" {
+		detail = t.phase + " · " + msg
 	} else if t.phase != "" {
 		detail = t.phase
 	}
@@ -477,6 +508,21 @@ func (m *Model) taskLine(t *task, w int, labelW int) string {
 	}
 	parts = append(parts, th.Dim.Render(truncate(detail, max(w-used, 0))))
 	return icon + " " + strings.Join(parts, " ")
+}
+
+// trimEllipsis drops the trailing "..." the CLI puts on its progress messages
+// ("Downloading 6000.6.9f1-x86_64..."): the spinner already says the task is
+// going, and many fonts draw "..." as one glyph that reads like the … a cut
+// line ends in, so a whole message looked truncated.
+func trimEllipsis(s string) string {
+	s = strings.TrimSpace(s)
+	for {
+		t := strings.TrimSuffix(strings.TrimSuffix(s, "..."), "…")
+		if t == s {
+			return strings.TrimSpace(s)
+		}
+		s = t
+	}
 }
 
 // Progress bars are black squares (U+25A0) for what is done and middle dots
