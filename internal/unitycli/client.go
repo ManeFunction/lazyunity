@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"os/exec"
 	"strings"
 	"sync"
@@ -75,24 +74,32 @@ type runOpts struct {
 	// interactive lets the CLI ask questions and open a browser; the sign-in
 	// needs it.
 	interactive bool
+
+	// format is the output format; empty means json.
+	format string
 }
 
-// command builds the process for args. Output format and prompts are set
-// through the CLI's documented environment variables rather than flags, so they
-// cannot swallow positional arguments or end up inside variadic options.
-func (c *Client) command(ctx context.Context, o runOpts, args []string) *exec.Cmd {
-	cmd := c.newCmd(ctx, c.Path, args...)
-	env := append(os.Environ(),
-		"UNITY_FORMAT=json",
-		"UNITY_NO_BANNER=1",
-		"UNITY_NO_PAGER=1",
-		"NO_COLOR=1",
-	)
-	if !o.interactive {
-		env = append(env, "UNITY_NON_INTERACTIVE=1")
+// globalFlags are the CLI's global options for o. They go before the command,
+// where they cannot swallow positional arguments or end up inside variadic
+// options. They are flags rather than the equivalent UNITY_* and NO_COLOR
+// environment variables because the CLI's children inherit its environment:
+// an Editor started by `unity open` would pass them on to every terminal, IDE
+// and `unity` command started from it.
+func globalFlags(o runOpts) []string {
+	format := o.format
+	if format == "" {
+		format = "json"
 	}
-	cmd.Env = append(env, cmd.Env...) // keep anything a test added
-	return cmd
+	flags := []string{"--format", format, "--no-banner", "--no-pager", "--no-color"}
+	if !o.interactive {
+		flags = append(flags, "--non-interactive")
+	}
+	return flags
+}
+
+// command builds the process for args.
+func (c *Client) command(ctx context.Context, o runOpts, args []string) *exec.Cmd {
+	return c.newCmd(ctx, c.Path, append(globalFlags(o), args...)...)
 }
 
 // Run runs the CLI and decodes its JSON envelope. A non-nil envelope may be

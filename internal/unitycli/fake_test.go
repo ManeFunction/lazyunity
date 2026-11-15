@@ -54,12 +54,29 @@ func TestHelperProcess(t *testing.T) {
 			break
 		}
 	}
+	// The global options come first; the table is keyed by what follows them.
+	var globals []string
+	for len(args) > 0 && strings.HasPrefix(args[0], "--") {
+		n := 1
+		if args[0] == "--format" && len(args) > 1 {
+			n = 2
+		}
+		globals = append(globals, args[:n]...)
+		args = args[n:]
+	}
 	key := strings.Join(args, " ")
 
-	// "env-probe" reports how the CLI was configured.
+	// "env-probe" reports how the CLI was configured: the global options it
+	// got and the configuration variables in its environment.
 	if key == "env-probe" {
-		fmt.Printf(`{"success":true,"command":"env-probe","data":{"format":%q,"nonInteractive":%q,"banner":%q}}`,
-			os.Getenv("UNITY_FORMAT"), os.Getenv("UNITY_NON_INTERACTIVE"), os.Getenv("UNITY_NO_BANNER"))
+		var env []string
+		for _, kv := range os.Environ() {
+			if strings.HasPrefix(kv, "UNITY_") || strings.HasPrefix(kv, "NO_COLOR=") {
+				env = append(env, kv)
+			}
+		}
+		data, _ := json.Marshal(map[string][]string{"globals": globals, "env": env})
+		fmt.Printf(`{"type":"result","success":true,"command":"env-probe","data":%s}`+"\n", data)
 		os.Exit(0)
 	}
 

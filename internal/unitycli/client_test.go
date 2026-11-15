@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -206,28 +207,64 @@ func TestCannotStart(t *testing.T) {
 	}
 }
 
+// TestEnvironment checks that the CLI is configured through global options
+// before the command, and not through environment variables, which the Editor
+// started by `unity open` would inherit and pass on.
 func TestEnvironment(t *testing.T) {
+	// Keep the probe independent of the shell the tests run in.
+	for _, k := range []string{"UNITY_FORMAT", "UNITY_NO_BANNER", "UNITY_NO_PAGER", "UNITY_NON_INTERACTIVE", "NO_COLOR"} {
+		t.Setenv(k, "") // restores the variable afterwards
+		os.Unsetenv(k)
+	}
 	c := fakeClient(t, nil)
 	ctx := ctx5(t)
+
+	probe := func(env *Envelope) (globals, vars []string) {
+		var d struct{ Globals, Env []string }
+		if err := json.Unmarshal(env.Data, &d); err != nil {
+			t.Fatal(err)
+		}
+		return d.Globals, d.Env
+	}
+	check := func(name string, got []string, want string) {
+		t.Helper()
+		if g := strings.Join(got, " "); g != want {
+			t.Errorf("%s: global options = %q, want %q", name, g, want)
+		}
+	}
 
 	env, err := c.Run(ctx, "env-probe")
 	if err != nil {
 		t.Fatal(err)
 	}
-	var d map[string]string
-	json.Unmarshal(env.Data, &d)
-	if d["format"] != "json" || d["nonInteractive"] != "1" || d["banner"] != "1" {
-		t.Errorf("normal run environment: %v", d)
+	globals, vars := probe(env)
+	check("normal run", globals, "--format json --no-banner --no-pager --no-color --non-interactive")
+	if len(vars) > 0 {
+		t.Errorf("the CLI must not be configured through its environment, got %v", vars)
 	}
 
 	env, err = c.run(ctx, runOpts{interactive: true}, []string{"env-probe"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	json.Unmarshal(env.Data, &d)
-	if d["nonInteractive"] != "" {
-		t.Errorf("an interactive run must not set UNITY_NON_INTERACTIVE, got %q", d["nonInteractive"])
+	globals, _ = probe(env)
+	check("interactive run", globals, "--format json --no-banner --no-pager --no-color")
+
+	s, err := c.Stream(ctx, "env-probe")
+	if err != nil {
+		t.Fatal(err)
 	}
+	var result Frame
+	for f := range s.Frames {
+		if f.IsResult() {
+			result = f
+		}
+	}
+	if err := s.Wait(); err != nil {
+		t.Fatal(err)
+	}
+	globals, _ = probe(&Envelope{Data: result.Data})
+	check("stream", globals, "--format ndjson --no-banner --no-pager --no-color --non-interactive")
 }
 
 // TestArguments pins the exact command lines, which is what keeps lazyunity in

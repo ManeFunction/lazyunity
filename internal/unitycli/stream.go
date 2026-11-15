@@ -76,8 +76,8 @@ const pipeGrace = 500 * time.Millisecond
 // Stream runs a command with --format ndjson and returns its frames as they
 // arrive. Cancelling ctx interrupts the command.
 func (c *Client) Stream(ctx context.Context, args ...string) (*Stream, error) {
-	full := append(append([]string(nil), args...), "--format", "ndjson")
-	cmd := c.command(ctx, runOpts{}, full)
+	full := append([]string(nil), args...)
+	cmd := c.command(ctx, runOpts{format: "ndjson"}, full)
 	prepare(cmd)
 
 	r, w, err := os.Pipe()

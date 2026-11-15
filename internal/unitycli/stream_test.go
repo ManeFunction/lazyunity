@@ -8,8 +8,8 @@ import (
 )
 
 // installKey is the argument list Install(...) produces for the options used
-// below, including the --format that Stream adds.
-const installKey = "install 6000.5.1f1 --module webgl --child-modules --accept-eula --yes --format ndjson"
+// below.
+const installKey = "install 6000.5.1f1 --module webgl --child-modules --accept-eula --yes"
 
 var installOpts = InstallOptions{Version: "6000.5.1f1", Modules: []string{"webgl"}}
 
@@ -59,7 +59,7 @@ func TestStreamFrames(t *testing.T) {
 // TestStreamRealOutput replays what `unity install-modules` really printed.
 func TestStreamRealOutput(t *testing.T) {
 	c := fakeClient(t, map[string]fakeResp{
-		"install-modules --editor-version 6000.6.8f1 --module language-ja --child-modules --accept-eula --yes --format ndjson": {File: "install-modules.ndjson"},
+		"install-modules --editor-version 6000.6.8f1 --module language-ja --child-modules --accept-eula --yes": {File: "install-modules.ndjson"},
 	})
 	s, err := c.InstallModules(ctx5(t), "6000.6.8f1", "", []string{"language-ja"})
 	if err != nil {
@@ -185,9 +185,9 @@ func TestStreamCannotStart(t *testing.T) {
 func TestInstallModulesAndUpgradeArguments(t *testing.T) {
 	ok := []string{`{"type":"result","success":true}`}
 	c := fakeClient(t, map[string]fakeResp{
-		"install-modules --editor-version 6000.6.8f1 --module webgl --module ios --architecture arm64 --child-modules --accept-eula --yes --format ndjson": {Lines: ok},
-		"editors upgrade 2022.3.10f1 --yes --accept-eula --format ndjson":                                                                                  {Lines: ok},
-		"install 6000.5.1f1 --changeset abc --architecture arm64 --child-modules --accept-eula --yes --set-default --format ndjson":                        {Lines: ok},
+		"install-modules --editor-version 6000.6.8f1 --module webgl --module ios --architecture arm64 --child-modules --accept-eula --yes": {Lines: ok},
+		"editors upgrade 2022.3.10f1 --yes --accept-eula":                                                           {Lines: ok},
+		"install 6000.5.1f1 --changeset abc --architecture arm64 --child-modules --accept-eula --yes --set-default": {Lines: ok},
 	})
 	ctx := ctx5(t)
 
