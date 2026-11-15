@@ -108,6 +108,7 @@ func (c *Client) Stream(ctx context.Context, args ...string) (*Stream, error) {
 
 	readDone := make(chan struct{})
 	var result *Frame
+	var sawResult bool
 	var raw strings.Builder
 	go func() {
 		defer close(readDone)
@@ -127,14 +128,15 @@ func (c *Client) Stream(ctx context.Context, args ...string) (*Stream, error) {
 				raw.WriteString(line)
 				raw.WriteByte('\n')
 			}
+			if sawResult {
+				continue // the result is the last frame the reader needs
+			}
 			if f.IsResult() {
 				fc := f
 				result = &fc
+				sawResult = true
 			}
-			select {
-			case frames <- f:
-			case <-ctx.Done():
-			}
+			queueFrame(frames, f)
 		}
 	}()
 
@@ -164,6 +166,56 @@ func (c *Client) Stream(ctx context.Context, args ...string) (*Stream, error) {
 		close(s.done)
 	}()
 	return s, nil
+}
+
+// queueFrame queues a frame without ever waiting. The frames are read by
+// lazyunity's event loop, which stops while the terminal is handed over (a
+// shell command, $EDITOR, ctrl+z). Waiting for it then would stop reading the
+// pipe, and once the pipe is full the CLI blocks and the install pauses. So
+// when the queue is full, the progress waiting in it is folded, in order, into
+// one frame that says where things stand now: only the newest progress is
+// shown anyway. Nothing is queued after the result, so it is never folded.
+// frames has a single sender, this one, so once drained there is room.
+func queueFrame(frames chan Frame, f Frame) {
+	select {
+	case frames <- f:
+		return
+	default:
+	}
+	var acc *Frame
+	for drained := false; !drained; {
+		select {
+		case old := <-frames:
+			if acc != nil {
+				old = carryOver(*acc, old)
+			}
+			acc = &old
+		default:
+			drained = true
+		}
+	}
+	if acc != nil {
+		if f.IsResult() {
+			frames <- *acc
+		} else {
+			f = carryOver(*acc, f)
+		}
+	}
+	frames <- f
+}
+
+// carryOver fills what newer leaves empty from older, the frame it replaces.
+func carryOver(older, newer Frame) Frame {
+	if newer.Phase == "" {
+		newer.Phase = older.Phase
+	}
+	if newer.Message == "" {
+		newer.Message = older.Message
+	}
+	if newer.Pct == nil {
+		newer.Pct = older.Pct
+	}
+	return newer
 }
 
 // streamError turns the end of a stream into an error, or nil on success.

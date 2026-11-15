@@ -3,6 +3,7 @@ package unitycli
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 )
@@ -149,6 +150,63 @@ func TestStreamManyFramesDoNotBlock(t *testing.T) {
 		}
 	case <-time.After(15 * time.Second):
 		t.Fatal("Wait deadlocked with unread frames")
+	}
+}
+
+// TestStreamUnreadFramesDoNotStallTheCLI stands for lazyunity handing the
+// terminal over: nobody reads Frames, yet the CLI prints far more than the pipe
+// and the queue hold. It must still finish, and the frames left still end where
+// the CLI did, with the result last.
+func TestStreamUnreadFramesDoNotStallTheCLI(t *testing.T) {
+	pad := strings.Repeat("x", 200)
+	c := fakeClient(t, map[string]fakeResp{installKey: {Repeat: 2000, Lines: []string{
+		`{"type":"progress","pct":1,"msg":"` + pad + `"}`,
+		`{"type":"progress","phase":"install","msg":"Installing..."}`,
+		`{"type":"progress","pct":99}`,
+		`{"type":"result","success":true}`,
+	}}})
+
+	s, err := c.Install(ctx5(t), installOpts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-s.done: // the command ended with every frame unread
+	case <-time.After(15 * time.Second):
+		t.Fatal("the CLI stalled while nobody read its frames")
+	}
+	var frames []Frame
+	for f := range s.Frames {
+		frames = append(frames, f)
+	}
+	if err := s.Wait(); err != nil {
+		t.Fatal(err)
+	}
+	if n := len(frames); n > 64 || n < 2 {
+		t.Fatalf("got %d frames, want the queue's worth at most", n)
+	}
+	// Replay the frames the way the task line does.
+	var pct float64
+	var phase, msg string
+	for _, f := range frames[:len(frames)-1] {
+		if f.IsResult() {
+			t.Fatalf("the result must be the last frame: %+v", frames)
+		}
+		if f.Pct != nil {
+			pct = *f.Pct
+		}
+		if f.Phase != "" {
+			phase = f.Phase
+		}
+		if f.Message != "" {
+			msg = f.Message
+		}
+	}
+	if !frames[len(frames)-1].IsResult() {
+		t.Errorf("the result frame must not be dropped, last frame: %+v", frames[len(frames)-1])
+	}
+	if pct != 99 || phase != "install" || msg != "Installing..." {
+		t.Errorf("the frames left should end where the CLI did: pct %v, phase %q, msg %q", pct, phase, msg)
 	}
 }
 

@@ -1,6 +1,7 @@
 package unitycli
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -17,6 +18,7 @@ type fakeResp struct {
 	File   string   `json:"file,omitempty"`   // print this fixture from testdata/cli
 	Stdout string   `json:"stdout,omitempty"` // or this text
 	Lines  []string `json:"lines,omitempty"`  // or these lines (ndjson)
+	Repeat int      `json:"repeat,omitempty"` // print the first of Lines this many times
 	Stderr string   `json:"stderr,omitempty"`
 	Exit   int      `json:"exit,omitempty"`
 	Sleep  string   `json:"sleep,omitempty"` // wait this long first, e.g. "30s"
@@ -103,6 +105,11 @@ func TestHelperProcess(t *testing.T) {
 		}
 		os.Stdout.Write(b)
 	case len(resp.Lines) > 0:
+		w := bufio.NewWriter(os.Stdout)
+		for i := 1; i < resp.Repeat; i++ {
+			fmt.Fprintln(w, resp.Lines[0])
+		}
+		w.Flush()
 		for _, l := range resp.Lines {
 			fmt.Println(l)
 		}
