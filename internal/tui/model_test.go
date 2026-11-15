@@ -76,6 +76,7 @@ type hostRecorder struct {
 	editors       []string // exe, then the project, then the target, joined by spaces
 	added         [][]string
 	openupm       string // the OpenUPM CLI found, if any
+	openupmLatest string // what LatestOpenUPM answers
 	err           error  // what every start answers
 }
 
@@ -109,6 +110,10 @@ func (h *hostRecorder) FindOpenUPM(context.Context) (string, string) {
 		return "", ""
 	}
 	return h.openupm, "4.5.3"
+}
+
+func (h *hostRecorder) LatestOpenUPM(context.Context, config.OpenUPM) (string, error) {
+	return h.openupmLatest, nil
 }
 
 func (h *hostRecorder) AddPackages(_ context.Context, exe, dir string, packages []string) error {

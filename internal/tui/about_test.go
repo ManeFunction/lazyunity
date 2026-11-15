@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/ManeFunction/lazyunity/internal/config"
+	"github.com/ManeFunction/lazyunity/internal/state"
 	"github.com/ManeFunction/lazyunity/internal/unitycli"
 )
 
@@ -74,20 +75,88 @@ func TestAboutNamesTheAuthorAndTheRepository(t *testing.T) {
 
 func TestOpenUPMToolRow(t *testing.T) {
 	m := newTestModel(t)
-	if r := m.openupmRow(); r.status != "checking…" {
-		t.Errorf("before the probe: %q", r.status)
+	status := func() string { return m.openupmRow().status }
+	if r := status(); r != "checking…" {
+		t.Errorf("before the probe: %q", r)
 	}
 	m.Update(openupmMsg{checked: true})
-	if r := m.openupmRow(); !strings.Contains(r.status, "not installed") {
-		t.Errorf("not installed: %q", r.status)
+	if r := status(); r != "not installed · press enter to install" {
+		t.Errorf("not installed: %q", r)
 	}
-	m.Update(openupmMsg{checked: true, path: "/usr/bin/openupm", version: "4.5.3"})
-	if r := m.openupmRow(); !strings.HasPrefix(r.status, "4.5.3") || strings.Contains(r.status, "from") {
-		t.Errorf("installed: %q", r.status)
+
+	// the npm release reads like the Unity CLI's row
+	official := m.cfg.OpenUPM
+	if cmd := m.onOpenUPM(openupmMsg{checked: true, path: "/usr/bin/openupm", version: "4.5.3"}); cmd == nil {
+		t.Error("once installed, updates are looked for")
 	}
-	m.cfg.OpenUPM = config.OpenUPM{Repo: "https://github.com/ManeFunction/openupm-cli.git", Ref: "fixes"}
-	if r := m.openupmRow(); !strings.Contains(r.status, "from ManeFunction/openupm-cli@fixes") {
-		t.Errorf("a fork is named: %q", r.status)
+	if r := status(); r != "ready · 4.5.3" {
+		t.Errorf("installed: %q", r)
+	}
+	m.Update(openupmLatestMsg{openupmLatest: openupmLatest{src: official, latest: "4.5.3"}})
+	if r := status(); r != "ready · 4.5.3" {
+		t.Errorf("up to date: %q", r)
+	}
+	m.Update(openupmLatestMsg{openupmLatest: openupmLatest{src: official, latest: "4.6.0"}})
+	if r := m.openupmRow(); r.status != "update available: 4.6.0 · enter to update" || r.tone != toneWarn {
+		t.Errorf("an update: %q", r.status)
+	}
+
+	// a build from a repository names its branch and commit
+	fork := config.OpenUPM{Repo: "https://github.com/ManeFunction/openupm-cli.git", Ref: "fixes"}
+	m.cfg.OpenUPM = fork
+	if r := status(); r != "4.5.3 · not built from ManeFunction/openupm-cli@fixes · enter to install it" {
+		t.Errorf("a fork that lazyunity did not build: %q", r)
+	}
+	m.st.OpenUPMBuild = &state.OpenUPMBuild{Repo: "https://github.com/ManeFunction/openupm-cli", Ref: "fixes", Commit: "0123456789abcdef", Version: "4.5.3"}
+	if r := m.openupmRow(); r.status != "4.5.3 · from ManeFunction/openupm-cli@fixes #0123456" || r.tone != toneGood {
+		t.Errorf("a fork: %q", r.status)
+	}
+	m.Update(openupmLatestMsg{openupmLatest: openupmLatest{src: fork, latest: "0123456789abcdef"}})
+	if r := status(); r != "4.5.3 · from ManeFunction/openupm-cli@fixes #0123456" {
+		t.Errorf("the branch has no new commits: %q", r)
+	}
+	m.Update(openupmLatestMsg{openupmLatest: openupmLatest{src: fork, latest: "fedcba9876543210"}})
+	if r := m.openupmRow(); r.status != "update available: #fedcba9 · from ManeFunction/openupm-cli@fixes #0123456" || r.tone != toneWarn {
+		t.Errorf("a new commit on the branch, of the same version: %q", r.status)
+	}
+
+	m.cfg.OpenUPM = config.OpenUPM{Repo: fork.Repo, Ref: "main"}
+	if r := status(); r != "4.5.3 · from ManeFunction/openupm-cli@fixes #0123456 · enter to install ManeFunction/openupm-cli@main" {
+		t.Errorf("another branch is configured: %q", r)
+	}
+	m.cfg.OpenUPM = official
+	if r := status(); r != "4.5.3 · from ManeFunction/openupm-cli@fixes #0123456 · enter to install the npm release" {
+		t.Errorf("the npm release is configured: %q", r)
+	}
+	m.onOpenUPM(openupmMsg{checked: true, path: "/usr/bin/openupm", version: "4.6.0"})
+	if r := status(); r != "ready · 4.6.0" {
+		t.Errorf("another version replaced the build: %q", r)
+	}
+	m.onOpenUPM(openupmMsg{checked: true})
+	if m.st.OpenUPMBuild != nil {
+		t.Error("once the CLI is gone, so is the build")
+	}
+}
+
+func TestOpenUPMInstallRecordsTheCommit(t *testing.T) {
+	m := newTestModel(t)
+	fork := config.OpenUPM{Repo: " https://github.com/me/openupm-cli ", Ref: "fixes"}
+	stamp := filepath.Join(t.TempDir(), "stamp")
+	os.WriteFile(stamp, []byte("0123456789abcdef\n"), 0o644)
+	m.onOpenUPMInstalled(openupmInstalledMsg{src: fork, stamp: stamp})
+	if b := m.st.OpenUPMBuild; b == nil || *b != (state.OpenUPMBuild{Repo: "https://github.com/me/openupm-cli", Ref: "fixes", Commit: "0123456789abcdef"}) {
+		t.Errorf("the build: %+v", b)
+	}
+	if _, err := os.Stat(stamp); err == nil {
+		t.Error("the stamp is removed")
+	}
+	m.onOpenUPM(openupmMsg{checked: true, path: "/usr/bin/openupm", version: "4.5.3"})
+	if b := state.Load(filepath.Dir(m.st.Path())).OpenUPMBuild; b == nil || b.Version != "4.5.3" {
+		t.Errorf("the probe fills in the version, and it is saved: %+v", b)
+	}
+	m.onOpenUPMInstalled(openupmInstalledMsg{src: config.OpenUPM{}})
+	if m.st.OpenUPMBuild != nil {
+		t.Error("the npm release is not a build")
 	}
 }
 

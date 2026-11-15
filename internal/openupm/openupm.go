@@ -51,10 +51,60 @@ func Add(ctx context.Context, exe, dir string, packages []string) error {
 	return nil
 }
 
+// LatestRelease asks npm for the newest openupm-cli in the registry.
+func LatestRelease(ctx context.Context, npm string) (string, error) {
+	out, err := exec.CommandContext(ctx, npm, "view", "openupm-cli", "version").Output()
+	if err != nil {
+		return "", fmt.Errorf("npm view openupm-cli: %w", err)
+	}
+	v := strings.TrimSpace(string(out))
+	if v == "" {
+		return "", fmt.Errorf("npm view openupm-cli: no version")
+	}
+	return v, nil
+}
+
+// LatestCommit asks repo for the commit that ref, a branch or a tag, points to
+// now; with no ref, the commit of its default branch. git never asks for a
+// password: lazyunity owns the terminal.
+func LatestCommit(ctx context.Context, git, repo, ref string) (string, error) {
+	repo, ref = strings.TrimSpace(repo), strings.TrimSpace(ref)
+	want := []string{"HEAD"}
+	if ref != "" {
+		// a branch first, as git clone --branch does, then the commit a tag points to
+		want = []string{"refs/heads/" + ref, "refs/tags/" + ref + "^{}", "refs/tags/" + ref}
+	}
+	cmd := exec.CommandContext(ctx, git, append([]string{"ls-remote", "--", repo}, want...)...)
+	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
+	if os.Getenv("GIT_SSH_COMMAND") == "" && os.Getenv("GIT_SSH") == "" {
+		cmd.Env = append(cmd.Env, "GIT_SSH_COMMAND=ssh -o BatchMode=yes")
+	}
+	out, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("git ls-remote %s: %w", repo, err)
+	}
+	refs := map[string]string{}
+	for _, l := range strings.Split(string(out), "\n") {
+		if f := strings.Fields(l); len(f) == 2 {
+			refs[f[1]] = f[0]
+		}
+	}
+	for _, w := range want {
+		if c := refs[w]; c != "" {
+			return c, nil
+		}
+	}
+	if ref == "" {
+		return "", fmt.Errorf("%s has no default branch", repo)
+	}
+	return "", fmt.Errorf("%s has no branch or tag %s", repo, ref)
+}
+
 // InstallCommand is the process that installs the OpenUPM CLI from src, to be
 // run with the terminal handed over: it says how the install went and waits
-// for Enter.
-func InstallCommand(goos string, src config.OpenUPM) *exec.Cmd {
+// for Enter. When it builds from a repository and stamp is not empty, it
+// writes the commit it installed to the file stamp.
+func InstallCommand(goos string, src config.OpenUPM, stamp string) *exec.Cmd {
 	var cmd *exec.Cmd
 	if goos == "windows" {
 		cmd = exec.Command("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", psScript)
@@ -65,7 +115,7 @@ func InstallCommand(goos string, src config.OpenUPM) *exec.Cmd {
 	if !src.FromRegistry() {
 		repo, ref = strings.TrimSpace(src.Repo), strings.TrimSpace(src.Ref)
 	}
-	cmd.Env = append(os.Environ(), "LAZYUNITY_OPENUPM_REPO="+repo, "LAZYUNITY_OPENUPM_REF="+ref)
+	cmd.Env = append(os.Environ(), "LAZYUNITY_OPENUPM_REPO="+repo, "LAZYUNITY_OPENUPM_REF="+ref, "LAZYUNITY_OPENUPM_STAMP="+stamp)
 	return cmd
 }
 
@@ -101,7 +151,10 @@ install() {
     git clone --depth 1 -- "$LAZYUNITY_OPENUPM_REPO" "$tmp/src" || return
   fi
   (cd "$tmp/src" && npm ci && npm run build && npm pack --pack-destination "$tmp") || return
-  npm_global "$tmp"/*.tgz
+  npm_global "$tmp"/*.tgz || return
+  if [ -n "$LAZYUNITY_OPENUPM_STAMP" ]; then
+    git -C "$tmp/src" rev-parse HEAD > "$LAZYUNITY_OPENUPM_STAMP"
+  fi
 }
 install
 status=$?
@@ -134,6 +187,10 @@ try {
       } finally { Pop-Location }
       $tgz = Get-ChildItem $tmp -Filter *.tgz | Select-Object -First 1
       Run 'npm' @('install', '-g', $tgz.FullName)
+      if ($env:LAZYUNITY_OPENUPM_STAMP) {
+        $commit = & git -C $src rev-parse HEAD
+        Set-Content -LiteralPath $env:LAZYUNITY_OPENUPM_STAMP -Value $commit -Encoding ascii
+      }
     } finally { Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue }
   }
   Write-Host ''

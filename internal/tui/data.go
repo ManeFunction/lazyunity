@@ -201,8 +201,13 @@ func (m *Model) handleData(msg tea.Msg) tea.Cmd {
 	case cliStatusMsg:
 		return m.onCLIStatus(msg)
 	case openupmMsg:
-		m.openupm = openupmState(msg)
-		m.refreshTools()
+		return m.onOpenUPM(msg)
+	case openupmLatestMsg:
+		// like the CLI's, a failed check is not worth a word
+		if msg.err == nil {
+			m.openupmNew = msg.openupmLatest
+			m.refreshTools()
+		}
 	case openupmInstalledMsg:
 		return m.onOpenUPMInstalled(msg)
 	case toastMsg:

@@ -2,12 +2,16 @@ package tui
 
 import (
 	"context"
+	"os"
 	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/ManeFunction/lazyunity/internal/config"
 	"github.com/ManeFunction/lazyunity/internal/openupm"
+	"github.com/ManeFunction/lazyunity/internal/state"
+	"github.com/ManeFunction/lazyunity/internal/unitycli"
 )
 
 // The OpenUPM CLI's row of the Tools tab and its install. The OpenUPM package
@@ -22,7 +26,23 @@ type openupmState struct {
 
 type openupmMsg openupmState
 
-type openupmInstalledMsg struct{ err error }
+// openupmLatest is where the source of the OpenUPM CLI is now: the newest
+// version in the npm registry, or the commit the repository's branch points to.
+type openupmLatest struct {
+	src    config.OpenUPM
+	latest string
+}
+
+type openupmLatestMsg struct {
+	openupmLatest
+	err error
+}
+
+type openupmInstalledMsg struct {
+	err   error
+	src   config.OpenUPM
+	stamp string // the file the install wrote the commit it built to
+}
 
 // probeOpenUPMCmd looks for the OpenUPM CLI and asks it for its version.
 func (m *Model) probeOpenUPMCmd() tea.Cmd {
@@ -35,24 +55,124 @@ func (m *Model) probeOpenUPMCmd() tea.Cmd {
 	}
 }
 
-// openupmStatus is the OpenUPM row of the Tools tab.
+// checkOpenUPMUpdateCmd asks whether a newer OpenUPM CLI is out where it comes from.
+func (m *Model) checkOpenUPMUpdateCmd() tea.Cmd {
+	h, src := m.host, m.cfg.OpenUPM
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		latest, err := h.LatestOpenUPM(ctx, src)
+		return openupmLatestMsg{openupmLatest: openupmLatest{src: src, latest: latest}, err: err}
+	}
+}
+
+func (m *Model) onOpenUPM(msg openupmMsg) tea.Cmd {
+	m.openupm = openupmState(msg)
+	b := m.st.OpenUPMBuild
+	switch {
+	case b != nil && msg.path == "":
+		// gone: whatever is installed next is not that build
+		m.st.OpenUPMBuild = nil
+		m.saveState()
+	case b != nil && b.Version == "" && msg.version != "":
+		b.Version = msg.version
+		m.saveState()
+	}
+	m.refreshTools()
+	if msg.path == "" {
+		return nil
+	}
+	return m.checkOpenUPMUpdateCmd()
+}
+
+// openupmBuild is the build from a repository that is installed, if it is.
+func (m *Model) openupmBuild() *state.OpenUPMBuild {
+	b := m.st.OpenUPMBuild
+	if b == nil || (b.Version != "" && m.openupm.version != "" && b.Version != m.openupm.version) {
+		return nil
+	}
+	return b
+}
+
+// buildIs reports whether b was built from src.
+func buildIs(b *state.OpenUPMBuild, src config.OpenUPM) bool {
+	return !src.FromRegistry() && repoName(b.Repo, "") == repoName(src.Repo, "") &&
+		strings.TrimSpace(b.Ref) == strings.TrimSpace(src.Ref)
+}
+
+// buildName is the repository, branch and commit of a build.
+func buildName(b *state.OpenUPMBuild) string {
+	return repoName(b.Repo, b.Ref) + " #" + shortCommit(b.Commit)
+}
+
+func shortCommit(c string) string {
+	if len(c) > 7 {
+		return c[:7]
+	}
+	return c
+}
+
+// openupmUpdate is the newer OpenUPM CLI that is out, as the row names it: a
+// version from the npm registry, or a #commit of the repository. It is ""
+// when there is none, or when the installed CLI is not from the configured
+// source, so that there is nothing to compare it with.
+func (m *Model) openupmUpdate() string {
+	src, n := m.cfg.OpenUPM, m.openupmNew
+	if m.openupm.path == "" || n.latest == "" || n.src != src {
+		return ""
+	}
+	b := m.openupmBuild()
+	if src.FromRegistry() {
+		if b != nil {
+			return ""
+		}
+		if (unitycli.UpdateInfo{Current: m.openupm.version, Latest: n.latest}).Available() {
+			return n.latest
+		}
+		return ""
+	}
+	if b == nil || !buildIs(b, src) || b.Commit == n.latest {
+		return ""
+	}
+	return "#" + shortCommit(n.latest)
+}
+
+// openupmRow is the OpenUPM row of the Tools tab. The npm release reads like
+// the Unity CLI's row; a build from a repository names its branch and commit.
 func (m *Model) openupmRow() toolRow {
 	r := toolRow{id: "openupm", label: "OpenUPM CLI", run: (*Model).openupmTool}
-	o := m.openupm
-	switch {
-	case !o.checked:
+	o, src := m.openupm, m.cfg.OpenUPM
+	if !o.checked {
 		r.status = "checking…"
-	case o.path == "":
-		r.status, r.tone = "not installed · enter to install", toneWarn
-	default:
-		v := o.version
-		if v == "" {
-			v = "installed"
-		}
-		r.status, r.tone = v+" · enter to reinstall", toneGood
+		return r
 	}
-	if src := m.cfg.OpenUPM; !src.FromRegistry() {
-		r.status += " · from " + repoName(src.Repo, src.Ref)
+	if o.path == "" {
+		r.status, r.tone = "not installed · press enter to install", toneWarn
+		if !src.FromRegistry() {
+			r.status += " from " + repoName(src.Repo, src.Ref)
+		}
+		return r
+	}
+	v := o.version
+	if v == "" {
+		v = "installed"
+	}
+	b, update := m.openupmBuild(), m.openupmUpdate()
+	switch {
+	case src.FromRegistry() && b != nil:
+		r.status, r.tone = v+" · from "+buildName(b)+" · enter to install the npm release", toneWarn
+	case src.FromRegistry() && update != "":
+		r.status, r.tone = "update available: "+update+" · enter to update", toneWarn
+	case src.FromRegistry():
+		r.status, r.tone = "ready · "+v, toneGood
+	case b == nil:
+		r.status, r.tone = v+" · not built from "+repoName(src.Repo, src.Ref)+" · enter to install it", toneWarn
+	case !buildIs(b, src):
+		r.status, r.tone = v+" · from "+buildName(b)+" · enter to install "+repoName(src.Repo, src.Ref), toneWarn
+	case update != "":
+		r.status, r.tone = "update available: "+update+" · from "+buildName(b), toneWarn
+	default:
+		r.status, r.tone = v+" · from "+buildName(b), toneGood
 	}
 	return r
 }
@@ -92,19 +212,23 @@ func (m *Model) openupmTool() tea.Cmd {
 				map[bool]string{true: ", and git,", false: ""}[len(needs) > 1]+" then try again.", 70)})
 		return nil
 	}
-	verb := "Install"
-	if m.openupm.path != "" {
+	verb, to := "Install", ""
+	update := m.openupmUpdate()
+	switch {
+	case update != "":
+		verb, to = "Update", " to "+update
+	case m.openupm.path != "":
 		verb = "Reinstall"
 	}
 	var msg string
 	if src.FromRegistry() {
-		msg = verb + " openupm-cli, the official release from the npm registry (npm install -g openupm-cli)?"
+		msg = verb + " openupm-cli" + to + ", the official release from the npm registry (npm install -g openupm-cli)?"
 	} else {
 		msg = verb + " openupm-cli from " + src.Repo
 		if src.Ref != "" {
 			msg += " (" + src.Ref + ")"
 		}
-		msg += "? It is cloned with git, built with npm, and installed with npm install -g."
+		msg += to + "? It is cloned with git, built with npm, and installed with npm install -g."
 	}
 	msg += "\n\n"
 	if src.FromRegistry() {
@@ -115,17 +239,38 @@ func (m *Model) openupmTool() tea.Cmd {
 	m.push(&confirmPopup{
 		title: verb + " the OpenUPM CLI", yes: verb, message: msg,
 		onYes: func(m *Model) tea.Cmd {
-			return tea.ExecProcess(openupm.InstallCommand(m.goos, src), func(err error) tea.Msg { return openupmInstalledMsg{err: err} })
+			stamp := ""
+			if !src.FromRegistry() {
+				if f, err := os.CreateTemp("", "lazyunity-openupm-*.txt"); err == nil {
+					stamp = f.Name()
+					f.Close()
+				}
+			}
+			return tea.ExecProcess(openupm.InstallCommand(m.goos, src, stamp), func(err error) tea.Msg {
+				return openupmInstalledMsg{err: err, src: src, stamp: stamp}
+			})
 		},
 	})
 	return nil
 }
 
 func (m *Model) onOpenUPMInstalled(msg openupmInstalledMsg) tea.Cmd {
+	var commit string
+	if msg.stamp != "" {
+		b, _ := os.ReadFile(msg.stamp)
+		commit = strings.TrimSpace(string(b))
+		os.Remove(msg.stamp)
+	}
 	if msg.err != nil {
 		m.toastf(toastError, "The OpenUPM CLI was not installed: %v", msg.err)
 	} else {
 		m.toastf(toastOK, "Installed the OpenUPM CLI")
+		// the version is filled in by the probe that follows
+		m.st.OpenUPMBuild = nil
+		if !msg.src.FromRegistry() && commit != "" {
+			m.st.OpenUPMBuild = &state.OpenUPMBuild{Repo: strings.TrimSpace(msg.src.Repo), Ref: strings.TrimSpace(msg.src.Ref), Commit: commit}
+		}
+		m.saveState()
 	}
 	m.openupm.checked = false
 	m.refreshTools()

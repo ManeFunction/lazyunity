@@ -4,6 +4,7 @@ import (
 	"context"
 	"os/exec"
 
+	"github.com/ManeFunction/lazyunity/internal/config"
 	"github.com/ManeFunction/lazyunity/internal/launch"
 	"github.com/ManeFunction/lazyunity/internal/openupm"
 	"github.com/ManeFunction/lazyunity/internal/unitycli"
@@ -23,6 +24,9 @@ type host interface {
 	// FindOpenUPM looks for the OpenUPM CLI and asks for its version. path is
 	// "" when it is not installed.
 	FindOpenUPM(ctx context.Context) (path, version string)
+	// LatestOpenUPM asks where src is now: the newest version in the npm
+	// registry, or the commit the repository's branch points to.
+	LatestOpenUPM(ctx context.Context, src config.OpenUPM) (string, error)
 	// AddPackages adds packages to the project in dir with the OpenUPM CLI.
 	AddPackages(ctx context.Context, exe, dir string, packages []string) error
 }
@@ -48,6 +52,21 @@ func (h machine) FindOpenUPM(ctx context.Context) (string, string) {
 		return "", ""
 	}
 	return path, openupm.Version(ctx, path)
+}
+
+func (h machine) LatestOpenUPM(ctx context.Context, src config.OpenUPM) (string, error) {
+	tool := "npm"
+	if !src.FromRegistry() {
+		tool = "git"
+	}
+	exe, err := h.env.LookPath(tool)
+	if err != nil {
+		return "", err
+	}
+	if src.FromRegistry() {
+		return openupm.LatestRelease(ctx, exe)
+	}
+	return openupm.LatestCommit(ctx, exe, src.Repo, src.Ref)
 }
 
 func (h machine) AddPackages(ctx context.Context, exe, dir string, packages []string) error {

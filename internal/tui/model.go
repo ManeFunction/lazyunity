@@ -99,6 +99,7 @@ type Model struct {
 	authKnown   bool
 	cliUpdate   unitycli.UpdateInfo // what the launch check found; empty until it answers
 	openupm     openupmState
+	openupmNew  openupmLatest // what the OpenUPM update check found
 
 	popups []popup
 	toast  toast

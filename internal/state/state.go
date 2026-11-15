@@ -49,8 +49,22 @@ type State struct {
 	// CLIChannel is the update channel of the Unity CLI, stable or beta, once
 	// the user switched it. Empty: the channel of the installed build.
 	CLIChannel string `yaml:"cliChannel,omitempty"`
+	// OpenUPMBuild is the OpenUPM CLI that lazyunity last built from a git
+	// repository, so that the Tools tab can name the commit and look for newer
+	// ones. Empty when it was installed from the npm registry.
+	OpenUPMBuild *OpenUPMBuild `yaml:"openupmBuild,omitempty"`
 
 	path string
+}
+
+// OpenUPMBuild is an OpenUPM CLI built from a git repository.
+type OpenUPMBuild struct {
+	Repo   string `yaml:"repo"`
+	Ref    string `yaml:"ref,omitempty"`
+	Commit string `yaml:"commit"`
+	// Version is what the built CLI says it is, once it was asked; another
+	// version installed later means the build was replaced.
+	Version string `yaml:"version,omitempty"`
 }
 
 // Load reads state.yml from dir. A missing or unreadable file gives an empty

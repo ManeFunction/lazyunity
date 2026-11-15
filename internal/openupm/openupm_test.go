@@ -22,20 +22,21 @@ func TestInstallCommand(t *testing.T) {
 		}
 		return v
 	}
-	official := InstallCommand("linux", config.Default().OpenUPM)
+	official := InstallCommand("linux", config.Default().OpenUPM, "")
 	if official.Args[0] != "/bin/sh" || env(official, "LAZYUNITY_OPENUPM_REPO") != "" {
 		t.Errorf("the official repository installs from the registry: %v", official.Args)
 	}
-	fork := InstallCommand("linux", config.OpenUPM{Repo: " https://github.com/me/openupm-cli ", Ref: "fixes"})
-	if env(fork, "LAZYUNITY_OPENUPM_REPO") != "https://github.com/me/openupm-cli" || env(fork, "LAZYUNITY_OPENUPM_REF") != "fixes" {
-		t.Errorf("a fork is passed in the environment: %v", fork.Env[len(fork.Env)-2:])
+	fork := InstallCommand("linux", config.OpenUPM{Repo: " https://github.com/me/openupm-cli ", Ref: "fixes"}, "/tmp/stamp")
+	if env(fork, "LAZYUNITY_OPENUPM_REPO") != "https://github.com/me/openupm-cli" || env(fork, "LAZYUNITY_OPENUPM_REF") != "fixes" ||
+		env(fork, "LAZYUNITY_OPENUPM_STAMP") != "/tmp/stamp" {
+		t.Errorf("a fork is passed in the environment: %v", fork.Env[len(fork.Env)-3:])
 	}
 	for _, a := range fork.Args {
 		if strings.Contains(a, "me/openupm-cli") {
 			t.Errorf("the repository never reaches the shell's command line: %q", a)
 		}
 	}
-	if win := InstallCommand("windows", config.Default().OpenUPM); win.Args[0] != "powershell" {
+	if win := InstallCommand("windows", config.Default().OpenUPM, ""); win.Args[0] != "powershell" {
 		t.Errorf("windows: %v", win.Args)
 	}
 	if runtime.GOOS != "windows" {
@@ -93,5 +94,56 @@ func TestAddAndVersion(t *testing.T) {
 	}
 	if v := Version(context.Background(), filepath.Join(dir, "nope")); v != "" {
 		t.Errorf("a missing CLI has no version: %q", v)
+	}
+}
+
+func TestLatestCommit(t *testing.T) {
+	git, err := exec.LookPath("git")
+	if err != nil {
+		t.Skip("needs git")
+	}
+	repo := t.TempDir()
+	run := func(args ...string) string {
+		t.Helper()
+		cmd := exec.Command(git, args...)
+		cmd.Dir = repo
+		cmd.Env = append(os.Environ(), "GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t", "GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@t")
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+		return strings.TrimSpace(string(out))
+	}
+	run("init", "-q", "-b", "main")
+	run("commit", "-q", "--allow-empty", "-m", "one")
+	first := run("rev-parse", "HEAD")
+	run("tag", "-a", "v1", "-m", "v1") // an annotated tag: the commit, not the tag object
+	run("branch", "fixes")
+	run("commit", "-q", "--allow-empty", "-m", "two")
+	second := run("rev-parse", "HEAD")
+
+	ctx := context.Background()
+	for ref, want := range map[string]string{"": second, "main": second, "fixes": first, "v1": first} {
+		if got, err := LatestCommit(ctx, git, repo, ref); err != nil || got != want {
+			t.Errorf("LatestCommit(%q) = %q, %v; want %q", ref, got, err, want)
+		}
+	}
+	if _, err := LatestCommit(ctx, git, repo, "nope"); err == nil || !strings.Contains(err.Error(), "no branch or tag nope") {
+		t.Errorf("a missing ref: %v", err)
+	}
+}
+
+func TestLatestRelease(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("uses a shell script")
+	}
+	npm := filepath.Join(t.TempDir(), "npm")
+	os.WriteFile(npm, []byte("#!/bin/sh\n[ \"$*\" = 'view openupm-cli version' ] && echo 4.6.0\n"), 0o755)
+	if v, err := LatestRelease(context.Background(), npm); err != nil || v != "4.6.0" {
+		t.Errorf("LatestRelease = %q, %v", v, err)
+	}
+	os.WriteFile(npm, []byte("#!/bin/sh\nexit 1\n"), 0o755)
+	if _, err := LatestRelease(context.Background(), npm); err == nil {
+		t.Error("a failed npm is an error")
 	}
 }
