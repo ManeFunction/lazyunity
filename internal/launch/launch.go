@@ -117,8 +117,13 @@ func Edit(tmpl, path, dir string, getenv func(string) string) (*exec.Cmd, error)
 }
 
 // returnPrompt is the blue line that waits for the user before lazyunity takes
-// the terminal back.
+// the terminal back. A Unix shell gets it in returnPromptVar, so it is never
+// part of the shell's code. cmd.exe expands even %VAR% before it parses the
+// line, so there it is written into the line and must stay free of the
+// characters cmd.exe reads (see TestReturnPromptIsSafeForCmd).
 const returnPrompt = "\x1b[34mPress enter to return to lazyunity...\x1b[0m "
+
+const returnPromptVar = "LAZYUNITY_RETURN_PROMPT"
 
 // ShellCommand runs a line of shell in dir, then waits for Enter, so that
 // its output can be read before lazyunity takes the terminal back. shell is the
@@ -140,7 +145,8 @@ func ShellCommand(goos, shell, text, dir string, getenv func(string) string) *ex
 		if shell == "" {
 			shell = "/bin/sh"
 		}
-		cmd = exec.Command(shell, "-c", text+`; printf '\n%s' '`+returnPrompt+`'; read _`)
+		cmd = exec.Command(shell, "-c", text+`; printf '\n%s' "$`+returnPromptVar+`"; read _`)
+		cmd.Env = append(os.Environ(), returnPromptVar+"="+returnPrompt)
 	}
 	cmd.Dir = dir
 	return cmd

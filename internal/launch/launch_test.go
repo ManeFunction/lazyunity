@@ -202,7 +202,7 @@ func TestEdit(t *testing.T) {
 func TestShellCommand(t *testing.T) {
 	noEnv := func(string) string { return "" }
 	unix := ShellCommand("linux", "/bin/zsh", "ls -la", "/p", noEnv)
-	if unix.Path != "/bin/zsh" || unix.Args[1] != "-c" || !strings.HasPrefix(unix.Args[2], "ls -la;") || !strings.Contains(unix.Args[2], "Press enter") || unix.Dir != "/p" {
+	if unix.Path != "/bin/zsh" || unix.Args[1] != "-c" || !strings.HasPrefix(unix.Args[2], "ls -la;") || !strings.Contains(unix.Args[2], "$"+returnPromptVar) || !slices.Contains(unix.Env, returnPromptVar+"="+returnPrompt) || unix.Dir != "/p" {
 		t.Errorf("unix: %v (dir %q)", unix.Args, unix.Dir)
 	}
 	if c := ShellCommand("linux", "", "x", "/p", func(string) string { return "/usr/bin/fish" }); c.Args[0] != "/usr/bin/fish" {
@@ -214,5 +214,29 @@ func TestShellCommand(t *testing.T) {
 	win := ShellCommand("windows", "", `dir "C:\Program Files"`, `C:\p`, noEnv)
 	if win.Args[0] != "cmd" || !slices.Contains(win.Args, "/C") || !strings.HasPrefix(win.Args[len(win.Args)-1], `dir "C:\Program Files" &`) {
 		t.Errorf("windows: %v", win.Args)
+	}
+}
+
+// The prompt reaches the terminal through the environment, whatever it holds.
+func TestShellCommandPrintsThePrompt(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("runs a Unix shell")
+	}
+	cmd := ShellCommand("linux", "/bin/sh", "echo hi", t.TempDir(), func(string) string { return "" })
+	cmd.Stdin = strings.NewReader("\n")
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "hi\n\n" + returnPrompt; string(out) != want {
+		t.Errorf("output = %q, want %q", out, want)
+	}
+}
+
+// cmd.exe gets the prompt in the line it parses: none of its special
+// characters may be in it.
+func TestReturnPromptIsSafeForCmd(t *testing.T) {
+	if strings.ContainsAny(returnPrompt, `"&|<>^%!()`) {
+		t.Errorf("returnPrompt %q has a character cmd.exe would read", returnPrompt)
 	}
 }
