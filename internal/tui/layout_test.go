@@ -144,3 +144,11 @@ func TestParseScreenMode(t *testing.T) {
 		t.Error("String")
 	}
 }
+
+func TestFirstPanelIsOnScreen(t *testing.T) {
+	for _, mode := range []screenMode{modeFull, modeProjects, modeEditors} {
+		if p := mode.firstPanel(); !mode.shows(p) {
+			t.Errorf("%s: first panel %d is not on screen", mode, p)
+		}
+	}
+}

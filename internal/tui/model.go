@@ -162,7 +162,7 @@ func New(o Options) (*Model, error) {
 	m.buildTabs()
 	m.focus = panelProjects // always the first panel at launch: focus is not saved
 	if !m.mode.shows(m.focus) {
-		m.focus = map[bool]int{true: panelProjects, false: panelEditors}[m.mode == modeProjects]
+		m.focus = m.mode.firstPanel()
 	}
 
 	if o.Local != nil {

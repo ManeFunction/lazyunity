@@ -141,7 +141,7 @@ func (m *Model) cycleMode(delta int) {
 	m.mode = (m.mode + screenMode(delta) + numModes) % numModes
 	if !m.mode.shows(m.focus) {
 		m.filter.active = false
-		m.focus = map[bool]int{true: panelProjects, false: panelEditors}[m.mode == modeProjects]
+		m.focus = m.mode.firstPanel()
 	}
 	m.relayout()
 }

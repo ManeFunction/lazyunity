@@ -44,6 +44,14 @@ func (s screenMode) shows(panel int) bool {
 	return true
 }
 
+// firstPanel is where focus goes when the focused panel leaves the screen.
+func (s screenMode) firstPanel() int {
+	if s == modeProjects {
+		return panelProjects
+	}
+	return panelEditors
+}
+
 // modeShowing is the smaller mode that has the panel on screen.
 func modeShowing(panel int) screenMode {
 	if panel == panelProjects {
