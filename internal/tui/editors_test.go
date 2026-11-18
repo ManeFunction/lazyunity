@@ -636,7 +636,7 @@ func TestRefreshReloadsTheReleases(t *testing.T) {
 	}
 	press(m, "2")
 	drain(m, m.switchTab(1))
-	drain(m, m.refreshAllCmd())
+	drain(m, m.reload(srcAll))
 	if n := f.count("Releases", "tech", 0, 25); n != 2 {
 		t.Errorf("R loads the first page again: %d loads (%v)", n, f.Calls())
 	}

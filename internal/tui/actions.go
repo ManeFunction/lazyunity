@@ -48,7 +48,7 @@ func globalActions() []*action {
 		{id: "universal.filter", ctx: ctxGlobal, keys: []string{"/"}, desc: "Filter the list",
 			run: func(m *Model) tea.Cmd { m.startFilter(); return nil }},
 		{id: "universal.refresh", ctx: ctxGlobal, keys: []string{"R"}, desc: "Refresh",
-			run: func(m *Model) tea.Cmd { return m.refreshAllCmd() }},
+			run: func(m *Model) tea.Cmd { return m.reload(srcAll) }},
 		{id: "universal.nextScreenMode", ctx: ctxGlobal, keys: []string{"+"}, desc: "Next screen mode (full, projects, editors)",
 			run: func(m *Model) tea.Cmd { m.cycleMode(1); return nil }},
 		{id: "universal.prevScreenMode", ctx: ctxGlobal, keys: []string{"_"}, desc: "Previous screen mode",

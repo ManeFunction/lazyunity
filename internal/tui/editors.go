@@ -125,7 +125,7 @@ func unityLine(version string) string {
 
 // refreshEditorsCmd rescans the disk and asks the CLI again.
 func (m *Model) refreshEditorsCmd() tea.Cmd {
-	return tea.Batch(m.scanEditorsCmd(), m.loadEditorsCmd(), m.loadProjectsCmd())
+	return m.reload(srcDisk | srcEditors | srcProjects)
 }
 
 // ---- modules of one Editor ----------------------------------------------------------

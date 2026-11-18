@@ -291,9 +291,10 @@ func tick() tea.Cmd {
 // Restart reports whether lazyunity quit to be started again, with the config reloaded.
 func (m *Model) Restart() bool { return m.restart }
 
-// Init starts the slow loads; what was cheap to load is already in place.
+// Init starts the slow loads; what was cheap to load (the projects and the
+// scan of the disk) is already in place.
 func (m *Model) Init() tea.Cmd {
-	return tea.Batch(tick(), m.probeOpenUPMCmd(), m.loadEditorsCmd(), m.loadAuthCmd(), m.loadInstallPathCmd(), m.checkCLIUpdateCmd(), queryPaletteCmd(), tea.RequestBackgroundColor)
+	return tea.Batch(tick(), m.reload(srcAll&^(srcProjects|srcDisk)), queryPaletteCmd(), tea.RequestBackgroundColor)
 }
 
 // Update handles every message.

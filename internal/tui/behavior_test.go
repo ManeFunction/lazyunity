@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -454,5 +455,45 @@ func TestToastsShowThenExpire(t *testing.T) {
 	m.now = func() time.Time { return later }
 	if strings.Contains(screenText(m), "Done it") {
 		t.Error("toast should expire")
+	}
+}
+
+// What each reload asks the Unity CLI for, in one table: the refresh key
+// reloads everything, including the update check, and the CLI becoming usable
+// reloads all that comes from it. The disk scan, OpenUPM probe and Releases
+// tab are not CLI calls, so they are not listed.
+func TestReloadPolicy(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		src  source
+		want []string
+	}{
+		{"everything", srcAll, []string{"Projects", "Editors", "AuthStatus", "InstallPath", "CheckUpdate"}},
+		{"the CLI", srcCLI, []string{"Projects", "Editors", "AuthStatus", "InstallPath", "CheckUpdate"}},
+		{"Editors", srcDisk | srcEditors | srcProjects, []string{"Projects", "Editors"}},
+		{"at launch", srcAll &^ (srcProjects | srcDisk), []string{"Editors", "AuthStatus", "InstallPath", "CheckUpdate"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			m := newTestModel(t)
+			f := useFakeCLI(t, m)
+			// run the loads, without feeding their answers back: what those lead
+			// to is each answer's own business
+			if msg, ok := m.reload(tc.src)().(tea.BatchMsg); ok {
+				for _, c := range msg {
+					if c != nil {
+						c()
+					}
+				}
+			}
+			var got []string
+			for _, c := range f.Calls() {
+				got = append(got, strings.Fields(c)[0])
+			}
+			slices.Sort(got)
+			want := slices.Sorted(slices.Values(tc.want))
+			if !slices.Equal(got, want) {
+				t.Errorf("calls = %v, want %v", got, want)
+			}
+		})
 	}
 }

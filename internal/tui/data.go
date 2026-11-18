@@ -117,13 +117,48 @@ func (m *Model) loadInstallPathCmd() tea.Cmd {
 	})
 }
 
-// refreshAllCmd reloads everything.
-func (m *Model) refreshAllCmd() tea.Cmd {
-	cmds := []tea.Cmd{
-		m.scanEditorsCmd(), m.probeOpenUPMCmd(),
-		m.loadProjectsCmd(), m.loadEditorsCmd(), m.loadAuthCmd(), m.loadInstallPathCmd(),
+// source is something lazyunity shows that can be loaded again. reload maps
+// each one to its load, so what "reload everything" means is written once.
+type source uint
+
+const (
+	srcProjects    source = 1 << iota // the CLI's project list
+	srcEditors                        // the CLI's Editor list
+	srcDisk                           // the scan of the Editors folder
+	srcAuth                           // who is signed in
+	srcInstallPath                    // where new Editors go
+	srcCLIUpdate                      // whether a newer Unity CLI is out
+	srcOpenUPM                        // the OpenUPM CLI
+	srcReleases                       // the Releases tab, once it was opened
+
+	// srcCLI is what comes from the Unity CLI; it is all loaded again once the
+	// CLI becomes usable.
+	srcCLI = srcProjects | srcEditors | srcAuth | srcInstallPath | srcCLIUpdate
+	// srcAll is everything.
+	srcAll = srcCLI | srcDisk | srcOpenUPM | srcReleases
+)
+
+// reload loads the sources in s again.
+func (m *Model) reload(s source) tea.Cmd {
+	loads := []struct {
+		src  source
+		load func() tea.Cmd
+	}{
+		{srcProjects, m.loadProjectsCmd},
+		{srcEditors, m.loadEditorsCmd},
+		{srcDisk, m.scanEditorsCmd},
+		{srcAuth, m.loadAuthCmd},
+		{srcInstallPath, m.loadInstallPathCmd},
+		{srcCLIUpdate, m.checkCLIUpdateCmd},
+		{srcOpenUPM, m.probeOpenUPMCmd},
+		{srcReleases, func() tea.Cmd { return m.releasesTab.refresh(m) }},
 	}
-	cmds = append(cmds, m.releasesTab.refresh(m))
+	var cmds []tea.Cmd
+	for _, l := range loads {
+		if s&l.src != 0 {
+			cmds = append(cmds, l.load())
+		}
+	}
 	return tea.Batch(cmds...)
 }
 

@@ -202,7 +202,7 @@ func (m *Model) onCLIStatus(msg cliStatusMsg) tea.Cmd {
 	m.cliUpdate = unitycli.UpdateInfo{}
 	m.refreshTools()
 	m.toastf(toastOK, "Unity CLI %s is ready", msg.st.Version)
-	return tea.Batch(m.loadProjectsCmd(), m.loadEditorsCmd(), m.loadAuthCmd(), m.loadInstallPathCmd(), m.checkCLIUpdateCmd())
+	return m.reload(srcCLI)
 }
 
 func (m *Model) accountTool() tea.Cmd {
