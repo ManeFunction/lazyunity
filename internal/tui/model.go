@@ -175,7 +175,7 @@ func New(o Options) (*Model, error) {
 	} else {
 		m.inv.setFound(scanEditors(m.goos, m.inv.installRoot()))
 	}
-	m.rawProjects = o.Projects
+	m.rawProjects, m.missing = o.Projects, missingPaths(o.Projects)
 	m.refreshEditors()
 	m.refreshProjects()
 	m.refreshTools()

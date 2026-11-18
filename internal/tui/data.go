@@ -67,14 +67,19 @@ type toastMsg struct {
 func (m *Model) loadProjectsCmd() tea.Cmd {
 	return m.cliCmd(func(ctx context.Context, c unityCLI) tea.Msg {
 		ps, err := c.Projects(ctx)
-		missing := map[string]bool{}
-		for _, p := range ps {
-			if _, serr := os.Stat(p.Path); serr != nil {
-				missing[p.Path] = true
-			}
-		}
-		return projectsMsg{projects: ps, missing: missing, err: err}
+		return projectsMsg{projects: ps, missing: missingPaths(ps), err: err}
 	})
+}
+
+// missingPaths are the projects whose folder is not there.
+func missingPaths(ps []unitycli.Project) map[string]bool {
+	missing := map[string]bool{}
+	for _, p := range ps {
+		if _, err := os.Stat(p.Path); err != nil {
+			missing[p.Path] = true
+		}
+	}
+	return missing
 }
 
 func (m *Model) loadEditorsCmd() tea.Cmd {

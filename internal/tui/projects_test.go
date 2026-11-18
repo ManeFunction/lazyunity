@@ -851,3 +851,24 @@ func TestMissingEditorCanOpenWithAnInstalledOne(t *testing.T) {
 		t.Errorf("open: %v", f.Calls())
 	}
 }
+
+// A project whose folder is gone is marked from the first frame, not only
+// once the list is loaded again.
+func TestPreloadedProjectsAreMarkedMissing(t *testing.T) {
+	o := testOptions(t)
+	for _, p := range o.Projects[:2] {
+		os.MkdirAll(p.Path, 0o755)
+	}
+	m, err := New(o) // not newTestModel, which marks the missing folder itself
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(m.projectsTab.Items()) != 3 {
+		t.Fatalf("projects: %d", len(m.projectsTab.Items()))
+	}
+	for _, r := range m.projectsTab.Items() {
+		if want := r.name() == "Ancient Thing"; r.Missing != want {
+			t.Errorf("%s: missing = %v, want %v", r.name(), r.Missing, want)
+		}
+	}
+}
