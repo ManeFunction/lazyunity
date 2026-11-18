@@ -321,10 +321,7 @@ func (m *Model) setPendingVersion(r projectRow, v string) {
 		p.BuildTarget = ""
 		m.toastf(toastWarn, "Unity %s does not have that platform: platform choice cleared", eff)
 	}
-	m.st.SetPending(r.Path, p)
-	m.saveState()
-	m.refreshProjects()
-	m.projectsTab.SelectKey(r.Path)
+	m.commitPending(r.Path, p)
 }
 
 // platformMenu picks the platform a project switches to when it opens. With
@@ -366,10 +363,16 @@ func (m *Model) setPendingTarget(r projectRow, target string) {
 	} else {
 		p.BuildTarget = target
 	}
-	m.st.SetPending(r.Path, p)
+	m.commitPending(r.Path, p)
+}
+
+// commitPending saves what a project will change to when it next opens, and
+// redraws the list with the project still selected.
+func (m *Model) commitPending(path string, p state.Pending) {
+	m.st.SetPending(path, p)
 	m.saveState()
 	m.refreshProjects()
-	m.projectsTab.SelectKey(r.Path)
+	m.projectsTab.SelectKey(path)
 }
 
 // ---- pin, sort, remove --------------------------------------------------------------
