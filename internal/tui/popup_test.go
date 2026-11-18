@@ -552,6 +552,18 @@ func TestInputEditing(t *testing.T) {
 	}
 }
 
+// With the text longer than the field, every cursor position draws without a
+// panic and fills the field exactly, including one step left of the end.
+func TestInputViewWithCursorScrolled(t *testing.T) {
+	in := newInput(strings.Repeat("x", 80))
+	for _, cur := range []int{0, 1, 40, 64, 65, 66, 78, 79, 80} {
+		in.cur = cur
+		if got := in.View(66); width(got) != 66 {
+			t.Errorf("cursor %d: view width = %d", cur, width(got))
+		}
+	}
+}
+
 func TestInfoPopupWrapsLongLinesInsteadOfCuttingThem(t *testing.T) {
 	m := newTestModel(t)
 	long := "/home/someone/Projects/with/a/very/long/path/that/goes/on/and/on/for/more/than/the/popup/is/wide/ProjectName"

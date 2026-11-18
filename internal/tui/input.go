@@ -112,7 +112,7 @@ func (in *input) ViewGhost(w int, ghost string, ghostStyle lipgloss.Style) strin
 	if in.cur > w-1 {
 		start = in.cur - (w - 1)
 	}
-	end := min(start+w-1, len(in.value))
+	end := min(start+w, len(in.value)) // the cursor's own cell counts too
 	before := string(in.value[start:min(in.cur, end)])
 	after := ""
 	cursor := " "
