@@ -136,7 +136,7 @@ func (m *Model) cliTool() tea.Cmd {
 				return m.enqueue(&task{
 					title: "Updating the Unity CLI",
 					label: "update the Unity CLI",
-					works: []string{"cli"},
+					works: []string{workCLI},
 					do:    func(ctx context.Context) error { return c.SelfUpdate(ctx, channel) },
 					after: func(m *Model, err error) tea.Cmd { return m.reprobeCLI(err == nil) },
 				})
@@ -147,7 +147,7 @@ func (m *Model) cliTool() tea.Cmd {
 				return m.enqueue(&task{
 					title: "Switching the Unity CLI to the " + feed + " feed",
 					label: "switch the Unity CLI to the " + feed + " feed",
-					works: []string{"cli"},
+					works: []string{workCLI},
 					do:    func(ctx context.Context) error { return c.SelfUpdate(ctx, other) },
 					after: func(m *Model, err error) tea.Cmd {
 						if err != nil {

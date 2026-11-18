@@ -161,6 +161,9 @@ func workModule(version, id string) string    { return "module:" + version + ":"
 func workProject(path string) string          { return "project:" + path }
 func workUpgradeEditor(version string) string { return "upgrade:" + version }
 
+// workCLI is the Unity CLI itself, while it updates or changes feed.
+const workCLI = "cli"
+
 // enqueue adds a task and starts it if nothing else is running. A task that
 // would work on something another task is already busy with is refused.
 func (m *Model) enqueue(t *task) tea.Cmd {
