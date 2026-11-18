@@ -3,6 +3,7 @@ package launch
 import (
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"runtime"
@@ -222,14 +223,22 @@ func TestShellCommandPrintsThePrompt(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("runs a Unix shell")
 	}
-	cmd := ShellCommand("linux", "/bin/sh", "echo hi", t.TempDir(), func(string) string { return "" })
-	cmd.Stdin = strings.NewReader("\n")
-	out, err := cmd.Output()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if want := "hi\n\n" + returnPrompt; string(out) != want {
-		t.Errorf("output = %q, want %q", out, want)
+	for _, sh := range []string{"sh", "bash", "zsh", "fish"} {
+		path, err := exec.LookPath(sh)
+		if err != nil {
+			continue
+		}
+		cmd := ShellCommand("linux", path, "echo hi", t.TempDir(), func(string) string { return "" })
+		cmd.Stdin = strings.NewReader("\n")
+		var stderr strings.Builder
+		cmd.Stderr = &stderr
+		out, err := cmd.Output()
+		if err != nil || stderr.Len() > 0 {
+			t.Errorf("%s: %v %s", sh, err, stderr.String())
+		}
+		if want := "hi\n\n" + returnPrompt; string(out) != want {
+			t.Errorf("%s: output = %q, want %q", sh, out, want)
+		}
 	}
 }
 

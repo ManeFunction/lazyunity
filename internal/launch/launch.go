@@ -145,7 +145,7 @@ func ShellCommand(goos, shell, text, dir string, getenv func(string) string) *ex
 		if shell == "" {
 			shell = "/bin/sh"
 		}
-		cmd = exec.Command(shell, "-c", text+`; printf '\n%s' "$`+returnPromptVar+`"; read _`)
+		cmd = exec.Command(shell, "-c", text+`; printf '\n%s' "$`+returnPromptVar+`"; read lazyunity_return`) // not read _: _ is read-only in fish
 		cmd.Env = append(os.Environ(), returnPromptVar+"="+returnPrompt)
 	}
 	cmd.Dir = dir
