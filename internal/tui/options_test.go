@@ -584,3 +584,26 @@ func TestCLIChannelFollowsABetaBuild(t *testing.T) {
 		t.Errorf("a chosen feed wins, got %q", m.cliChannel())
 	}
 }
+
+// With os.edit set the editor runs on its own and cannot be waited for: the
+// edit is looked at once the user is back in lazyunity's terminal.
+func TestConfigEditedInADetachedEditorAppliesOnFocus(t *testing.T) {
+	m := newTestModel(t)
+	m.cfg.OS.Edit = "code {{path}}"
+	path := filepath.Join(m.configDir, "config.yml")
+	os.MkdirAll(m.configDir, 0o755)
+	os.WriteFile(path, []byte("quitAfterOpen: false\n"), 0o644)
+
+	if cmd := m.editConfig(); cmd != nil {
+		t.Fatal("a detached editor hands nothing to run")
+	}
+	if len(recorder(m).editors) != 1 {
+		t.Fatalf("os.edit should start the editor: %v", recorder(m).editors)
+	}
+	os.WriteFile(path, []byte("quitAfterOpen: true\n"), 0o644)
+	_, cmd := m.Update(tea.FocusMsg{})
+	drain(m, cmd)
+	if !m.Restart() || !m.quit {
+		t.Error("the changed config should relaunch once the terminal is focused again")
+	}
+}

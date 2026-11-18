@@ -109,6 +109,9 @@ type Model struct {
 	restart bool
 	// configPending is a config edited while a task ran, applied by a restart from the Tools tab.
 	configPending bool
+	// onFocus is the message to handle once the terminal is focused again,
+	// such as the end of an edit in an editor that runs on its own.
+	onFocus tea.Msg
 
 	// selectAfterLoad is a project path to put the cursor on once the list reloads.
 	selectAfterLoad string
@@ -316,6 +319,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmd = m.handleWheel(msg)
 	case tea.FocusMsg:
 		cmd = m.loadProjectsCmd()
+		if msg := m.onFocus; msg != nil {
+			m.onFocus = nil
+			cmd = tea.Batch(cmd, func() tea.Msg { return msg })
+		}
 	case tea.BackgroundColorMsg:
 		if msg.Color != nil {
 			m.th.background = msg.Color

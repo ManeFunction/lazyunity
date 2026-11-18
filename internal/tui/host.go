@@ -79,7 +79,9 @@ func (h machine) AddPackages(ctx context.Context, exe, dir string, packages []st
 // edit opens path in the code editor: os.edit from config.yml, started on its
 // own, or else $VISUAL or $EDITOR, run in dir with the terminal handed over.
 // noEditor runs when none is set; done, if not nil, is the message once a
-// terminal editor has quit.
+// terminal editor has quit. An editor started on its own cannot be waited
+// for, so done then comes when lazyunity's terminal is focused again: the
+// user is back from the editor.
 func (m *Model) edit(path, dir string, noEditor func(m *Model), done tea.Msg) tea.Cmd {
 	cmd, err := m.host.Edit(m.cfg.OS.Edit, path, dir, m.getenv)
 	switch {
@@ -90,6 +92,7 @@ func (m *Model) edit(path, dir string, noEditor func(m *Model), done tea.Msg) te
 		m.toastf(toastError, "Could not start the editor: %v", err)
 		return nil
 	case cmd == nil: // started on its own
+		m.onFocus = done
 		return nil
 	}
 	return tea.ExecProcess(cmd, func(err error) tea.Msg {
