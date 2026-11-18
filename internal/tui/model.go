@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -19,7 +20,8 @@ import (
 // Options is what the interface starts from. Data loaded before the first frame
 // is passed in, so the first thing drawn already has projects on it.
 type Options struct {
-	Config    config.Config
+	Config config.Config
+	// State is state.yml; when nil, it is loaded from ConfigDir.
 	State     *state.State
 	ConfigDir string
 	Version   string // lazyunity's own version
@@ -159,7 +161,12 @@ func New(o Options) (*Model, error) {
 		m.host = machine{env: m.env}
 	}
 	if m.st == nil {
-		m.st = state.Load("")
+		// state.yml lives next to config.yml; without a folder for them it
+		// would be read from and written to wherever lazyunity was started
+		if o.ConfigDir == "" {
+			return nil, errors.New("tui.New: Options.State or Options.ConfigDir is needed")
+		}
+		m.st = state.Load(o.ConfigDir)
 	}
 	m.inv = newInventory(m.goos, homeDir(), o.InstallRoot)
 	km, warnings := newKeymap(buildActions(), o.Config.Keybinding)

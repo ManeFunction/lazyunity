@@ -250,3 +250,22 @@ func TestNewScansTheEditorsFolderItself(t *testing.T) {
 		t.Errorf("both Editors of the Editors folder are found: %+v", eds)
 	}
 }
+
+// Without a state, New loads it from the config folder, and never from
+// wherever lazyunity happens to run.
+func TestNewLoadsStateFromTheConfigFolder(t *testing.T) {
+	o := testOptions(t)
+	o.State = nil
+	m, err := New(o)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.saveState()
+	if _, err := os.Stat(filepath.Join(o.ConfigDir, "state.yml")); err != nil {
+		t.Errorf("state.yml should be in the config folder: %v", err)
+	}
+	o.ConfigDir = ""
+	if _, err := New(o); err == nil {
+		t.Error("with neither a state nor a config folder, New must refuse")
+	}
+}
