@@ -275,3 +275,33 @@ func TestConfigTemplateListsEverySettingAtItsDefault(t *testing.T) {
 		t.Errorf("the template's values are not the defaults:\n%+v\n%+v", cfg, config.Default())
 	}
 }
+
+// The install asks with the verb that matches the row: install, update to the
+// newer one, or reinstall.
+func TestOpenUPMInstallVerb(t *testing.T) {
+	m := newTestModel(t)
+	m.env.LookPath = func(name string) (string, error) { return "/usr/bin/" + name, nil }
+	title := func() string {
+		m.popups = nil
+		m.openupmTool()
+		if len(m.popups) != 1 {
+			t.Fatalf("no confirmation:\n%s", screenText(m))
+		}
+		return m.popups[0].(*confirmPopup).title
+	}
+	m.Update(openupmMsg{checked: true})
+	if got := title(); got != "Install the OpenUPM CLI" {
+		t.Errorf("not installed: %q", got)
+	}
+	m.onOpenUPM(openupmMsg{checked: true, path: "/usr/bin/openupm", version: "4.5.3"})
+	if got := title(); got != "Reinstall the OpenUPM CLI" {
+		t.Errorf("installed: %q", got)
+	}
+	m.Update(openupmLatestMsg{openupmLatest: openupmLatest{src: m.cfg.OpenUPM, latest: "4.6.0"}})
+	if got := title(); got != "Update the OpenUPM CLI" {
+		t.Errorf("an update: %q", got)
+	}
+	if msg := m.popups[0].(*confirmPopup).message; !strings.Contains(msg, "openupm-cli to 4.6.0,") {
+		t.Errorf("the update names the version: %q", msg)
+	}
+}

@@ -112,65 +112,84 @@ func shortCommit(c string) string {
 	return c
 }
 
-// openupmUpdate is the newer OpenUPM CLI that is out, as the row names it: a
-// version from the npm registry, or a #commit of the repository. It is ""
-// when there is none, or when the installed CLI is not from the configured
-// source, so that there is nothing to compare it with.
-func (m *Model) openupmUpdate() string {
-	src, n := m.cfg.OpenUPM, m.openupmNew
-	if m.openupm.path == "" || n.latest == "" || n.src != src {
-		return ""
+// openupmKind is where the installed OpenUPM CLI stands against the
+// configured source (openupm.repo in config.yml, or the npm registry).
+type openupmKind int
+
+const (
+	openupmChecking openupmKind = iota // the probe has not answered yet
+	openupmMissing                     // not installed
+	openupmOther                       // installed, but not from the configured source
+	openupmUpdate                      // from the configured source, and a newer one is out
+	openupmReady                       // from the configured source, and current
+)
+
+// openupmStatus is all the row and the install say about the OpenUPM CLI, made
+// once from the probe, the update check, the remembered build and the
+// configured source.
+type openupmStatus struct {
+	kind    openupmKind
+	version string              // as the CLI reports it, or "installed"
+	build   *state.OpenUPMBuild // the build from a repository that is installed, if it is
+	// update is the newer CLI that is out, as the row names it: a version from
+	// the npm registry, or a #commit of the repository.
+	update string
+}
+
+func (m *Model) openupmStatus() openupmStatus {
+	o, src := m.openupm, m.cfg.OpenUPM
+	switch {
+	case !o.checked:
+		return openupmStatus{kind: openupmChecking}
+	case o.path == "":
+		return openupmStatus{kind: openupmMissing}
 	}
-	b := m.openupmBuild()
-	if src.FromRegistry() {
-		if b != nil {
-			return ""
+	st := openupmStatus{kind: openupmReady, version: o.version, build: m.openupmBuild()}
+	if st.version == "" {
+		st.version = "installed"
+	}
+	b, n := st.build, m.openupmNew
+	known := n.latest != "" && n.src == src // the update check answered for this source
+	switch {
+	case src.FromRegistry() && b != nil, !src.FromRegistry() && (b == nil || !buildIs(b, src)):
+		st.kind = openupmOther
+	case !known:
+	case src.FromRegistry():
+		if (unitycli.UpdateInfo{Current: o.version, Latest: n.latest}).Available() {
+			st.kind, st.update = openupmUpdate, n.latest
 		}
-		if (unitycli.UpdateInfo{Current: m.openupm.version, Latest: n.latest}).Available() {
-			return n.latest
-		}
-		return ""
+	case b.Commit != n.latest:
+		st.kind, st.update = openupmUpdate, "#"+shortCommit(n.latest)
 	}
-	if b == nil || !buildIs(b, src) || b.Commit == n.latest {
-		return ""
-	}
-	return "#" + shortCommit(n.latest)
+	return st
 }
 
 // openupmRow is the OpenUPM row of the Tools tab. The npm release reads like
 // the Unity CLI's row; a build from a repository names its branch and commit.
 func (m *Model) openupmRow() toolRow {
 	r := toolRow{id: "openupm", label: "OpenUPM CLI", run: (*Model).openupmTool}
-	o, src := m.openupm, m.cfg.OpenUPM
-	if !o.checked {
+	src, st := m.cfg.OpenUPM, m.openupmStatus()
+	v, b, repo := st.version, st.build, repoName(src.Repo, src.Ref)
+	switch {
+	case st.kind == openupmChecking:
 		r.status = "checking…"
-		return r
-	}
-	if o.path == "" {
+	case st.kind == openupmMissing:
 		r.status, r.tone = "not installed · press enter to install", toneWarn
 		if !src.FromRegistry() {
-			r.status += " from " + repoName(src.Repo, src.Ref)
+			r.status += " from " + repo
 		}
-		return r
-	}
-	v := o.version
-	if v == "" {
-		v = "installed"
-	}
-	b, update := m.openupmBuild(), m.openupmUpdate()
-	switch {
-	case src.FromRegistry() && b != nil:
+	case st.kind == openupmOther && src.FromRegistry():
 		r.status, r.tone = v+" · from "+buildName(b)+" · enter to install the npm release", toneWarn
-	case src.FromRegistry() && update != "":
-		r.status, r.tone = "update available: "+update+" · enter to update", toneWarn
+	case st.kind == openupmOther && b == nil:
+		r.status, r.tone = v+" · not built from "+repo+" · enter to install it", toneWarn
+	case st.kind == openupmOther:
+		r.status, r.tone = v+" · from "+buildName(b)+" · enter to install "+repo, toneWarn
+	case st.kind == openupmUpdate && src.FromRegistry():
+		r.status, r.tone = "update available: "+st.update+" · enter to update", toneWarn
+	case st.kind == openupmUpdate:
+		r.status, r.tone = "update available: "+st.update+" · from "+buildName(b), toneWarn
 	case src.FromRegistry():
 		r.status, r.tone = "ready · "+v, toneGood
-	case b == nil:
-		r.status, r.tone = v+" · not built from "+repoName(src.Repo, src.Ref)+" · enter to install it", toneWarn
-	case !buildIs(b, src):
-		r.status, r.tone = v+" · from "+buildName(b)+" · enter to install "+repoName(src.Repo, src.Ref), toneWarn
-	case update != "":
-		r.status, r.tone = "update available: "+update+" · from "+buildName(b), toneWarn
 	default:
 		r.status, r.tone = v+" · from "+buildName(b), toneGood
 	}
@@ -212,13 +231,12 @@ func (m *Model) openupmTool() tea.Cmd {
 				map[bool]string{true: ", and git,", false: ""}[len(needs) > 1]+" then try again.", 70)})
 		return nil
 	}
-	verb, to := "Install", ""
-	update := m.openupmUpdate()
-	switch {
-	case update != "":
-		verb, to = "Update", " to "+update
-	case m.openupm.path != "":
-		verb = "Reinstall"
+	verb, to := "Reinstall", ""
+	switch st := m.openupmStatus(); st.kind {
+	case openupmChecking, openupmMissing:
+		verb = "Install"
+	case openupmUpdate:
+		verb, to = "Update", " to "+st.update
 	}
 	var msg string
 	if src.FromRegistry() {
