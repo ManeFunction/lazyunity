@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"unicode/utf8"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -118,10 +119,22 @@ func newKeymap(actions []*action, overrides map[string]config.KeyGroup) (*keymap
 				continue
 			}
 			var keys []string
+			given := false
 			for _, k := range overrides[g][n] {
-				if nk := config.NormalizeKey(k); nk != "" {
-					keys = append(keys, nk)
+				nk := config.NormalizeKey(k)
+				if nk == "" {
+					continue // <disabled>
 				}
+				given = true
+				if !pressable(nk) {
+					warnings = append(warnings, fmt.Sprintf("keybinding.%s.%s: %q is not a key that can be pressed; ignored", g, n, k))
+					continue
+				}
+				keys = append(keys, nk)
+			}
+			if given && len(keys) == 0 {
+				warnings = append(warnings, fmt.Sprintf("keybinding.%s.%s: no usable key; the default is kept", g, n))
+				continue
 			}
 			override[a] = keys // an empty list disables the action's keys
 		}
@@ -239,4 +252,30 @@ func renderHints(th *Theme, items []hintItem, w int) string {
 	}
 	s := strings.Join(parts, " | ")
 	return th.OptionsText.Render(truncate(s, w))
+}
+
+// keyMods are the modifiers as Bubble Tea writes them, in the order it writes
+// them: a key spelled with them in another order is never pressed.
+var keyMods = []string{"ctrl+", "alt+", "shift+", "meta+", "hyper+", "super+"}
+
+// keyNames are the keys Bubble Tea names rather than writes as a character.
+var keyNames = func() map[string]bool {
+	names := map[string]bool{}
+	for _, n := range strings.Fields("enter tab backspace esc space up down left right begin find insert delete " +
+		"select pgup pgdown home end capslock scrolllock numlock printscreen pause menu") {
+		names[n] = true
+	}
+	for i := 1; i <= 63; i++ {
+		names[fmt.Sprintf("f%d", i)] = true
+	}
+	return names
+}()
+
+// pressable reports whether k is spelled as Bubble Tea spells a key press, so
+// that a binding to it can ever match.
+func pressable(k string) bool {
+	for _, mod := range keyMods {
+		k = strings.TrimPrefix(k, mod) // in order: each at most once
+	}
+	return keyNames[k] || (utf8.RuneCountInString(k) == 1 && k != " ")
 }

@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -261,7 +262,7 @@ func (c *Config) validate() error {
 }
 
 // NormalizeKey turns a key written in lazygit's notation (<c-s>, <a-x>,
-// <space>, <backtab>) into Bubble Tea's (ctrl+s, alt+x, space, shift+tab).
+// <space>, <backtab>, <f2>) into Bubble Tea's (ctrl+s, alt+x, space, shift+tab).
 // Anything else is returned as it is.
 func NormalizeKey(k string) string {
 	if !strings.HasPrefix(k, "<") || !strings.HasSuffix(k, ">") || len(k) < 3 {
@@ -287,6 +288,9 @@ func NormalizeKey(k string) string {
 		return "pgdown"
 	case "disabled":
 		return ""
+	}
+	if n, err := strconv.Atoi(strings.TrimPrefix(lower, "f")); err == nil && lower[0] == 'f' && n >= 1 && n <= 63 {
+		return lower // <f2>
 	}
 	return k
 }

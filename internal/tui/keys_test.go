@@ -33,6 +33,13 @@ func TestDefaultKeymapIsSound(t *testing.T) {
 	if len(warnings) != 0 {
 		t.Errorf("the defaults conflict with themselves: %v", warnings)
 	}
+	for _, a := range actions {
+		for _, k := range a.keys {
+			if !pressable(k) {
+				t.Errorf("%s: default key %q can never be pressed", a.id, k)
+			}
+		}
+	}
 	// every default key reaches its action
 	for _, a := range actions {
 		for _, k := range a.keys {
@@ -67,10 +74,12 @@ func TestLazygitKeysAreThere(t *testing.T) {
 func TestKeymapOverrides(t *testing.T) {
 	cfg := map[string]config.KeyGroup{
 		"universal": {
-			"quit":    {"x", "<c-q>"}, // replaces q and ctrl+c
-			"refresh": {"<disabled>"}, // switches R off
-			"bogus":   {"z"},          // no such action
-			"filter":  {"<f2>"},       // a key this program cannot name still binds
+			"quit":     {"x", "<c-q>"},          // replaces q and ctrl+c
+			"refresh":  {"<disabled>"},          // switches R off
+			"bogus":    {"z"},                   // no such action
+			"filter":   {"<f2>"},                // a function key
+			"suspend":  {"Ctrl+Z"},              // never pressed: Bubble Tea writes ctrl+z
+			"openMenu": {"alt+ctrl+m", "<c-o>"}, // the first is never pressed, the second is kept
 		},
 		"nonsense": {"quit": {"y"}},
 	}
@@ -87,8 +96,17 @@ func TestKeymapOverrides(t *testing.T) {
 	if km.lookup(ctxGlobal, "R") != nil {
 		t.Error("<disabled> must switch the action off")
 	}
+	if a := km.lookup(ctxGlobal, "f2"); a == nil || a.id != "universal.filter" {
+		t.Errorf("<f2> should become f2: %v", a)
+	}
+	if a := km.lookup(ctxGlobal, "ctrl+z"); a == nil || a.id != "universal.suspend" {
+		t.Errorf("with no key that can be pressed, the default stays: %v", a)
+	}
+	if a := km.lookup(ctxGlobal, "ctrl+o"); a == nil || a.id != "universal.openMenu" {
+		t.Errorf("the usable key of a list binds: %v", a)
+	}
 	joined := strings.Join(warnings, "\n")
-	for _, want := range []string{"universal.bogus", "nonsense.quit"} {
+	for _, want := range []string{"universal.bogus", "nonsense.quit", `"Ctrl+Z" is not a key`, "suspend: no usable key", `"alt+ctrl+m" is not a key`} {
 		if !strings.Contains(joined, want) {
 			t.Errorf("expected a warning about %s, got %q", want, joined)
 		}

@@ -160,7 +160,9 @@ func TestNormalizeKey(t *testing.T) {
 		"<":          "<",
 		">":          ">",
 		"<>":         "<>",
-		"<f1>":       "<f1>",
+		"<f1>":       "f1",
+		"<F12>":      "f12",
+		"<f64>":      "<f64>", // no such key
 	}
 	for in, want := range cases {
 		if got := NormalizeKey(in); got != want {
