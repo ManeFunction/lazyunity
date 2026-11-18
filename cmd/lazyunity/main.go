@@ -78,9 +78,9 @@ func session(dir string) (restart bool, err error) {
 
 	// What is cheap to load goes in before the first frame is drawn.
 	env := unitycli.DefaultEnv()
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	status := unitycli.Probe(ctx, env, config.ExpandHome(cfg.Unity.CLIPath), nil)
+	probeCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	status := unitycli.Probe(probeCtx, env, config.ExpandHome(cfg.Unity.CLIPath), nil)
+	cancel()
 
 	opts := tui.Options{
 		Config: cfg, State: st, ConfigDir: dir, Version: version,
@@ -89,11 +89,13 @@ func session(dir string) (restart bool, err error) {
 	}
 	if status.State == unitycli.Ready {
 		opts.Client = unitycli.New(status.Path)
+		// a budget of its own: a slow probe must not starve it. When it does
+		// not make it, the interface loads the projects after the first frame.
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		if ps, err := opts.Client.Projects(ctx); err == nil {
 			opts.Projects = ps
-		} else {
-			opts.Warnings = append(opts.Warnings, "could not list projects: "+err.Error())
 		}
+		cancel()
 	}
 	home, _ := os.UserHomeDir()
 	opts.InstallRoot = unity.DefaultInstallRoot(env.GOOS, home)

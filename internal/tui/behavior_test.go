@@ -497,3 +497,16 @@ func TestReloadPolicy(t *testing.T) {
 		})
 	}
 }
+
+// The projects loaded before the first frame are not loaded again at launch;
+// when that load failed, they are loaded after the first frame.
+func TestLaunchLoadsProjectsOnlyWhenNotPreloaded(t *testing.T) {
+	m := newTestModel(t)
+	if m.launchLoads()&srcProjects != 0 {
+		t.Error("preloaded projects are loaded again")
+	}
+	m.rawProjects = nil
+	if m.launchLoads()&srcProjects == 0 {
+		t.Error("projects that did not preload are never loaded")
+	}
+}
