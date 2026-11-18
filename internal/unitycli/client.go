@@ -3,6 +3,7 @@ package unitycli
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os/exec"
 	"strings"
@@ -44,14 +45,23 @@ type Client struct {
 	// newCmd builds the process to run; tests replace it.
 	newCmd func(ctx context.Context, name string, args ...string) *exec.Cmd
 
+	// queryTimeout bounds a query: a call that only reads, such as a listing.
+	queryTimeout time.Duration
+
 	mu  sync.Mutex
 	log []LogEntry
 }
 
 // New returns a Client for the CLI at path.
 func New(path string) *Client {
-	return &Client{Path: path, newCmd: exec.CommandContext}
+	return &Client{Path: path, newCmd: exec.CommandContext, queryTimeout: QueryTimeout}
 }
+
+// QueryTimeout is how long a query may take before it is given up on. It is
+// generous: some queries go over the network. Calls that change things, or
+// that the user waits on by choice (an install, unity open, the sign-in), have
+// no deadline of their own.
+const QueryTimeout = time.Minute
 
 // Log returns a copy of the command log, oldest first.
 func (c *Client) Log() []LogEntry {
@@ -106,6 +116,19 @@ func (c *Client) command(ctx context.Context, o runOpts, args []string) *exec.Cm
 // returned together with an error, for commands whose failure carries data.
 func (c *Client) Run(ctx context.Context, args ...string) (*Envelope, error) {
 	return c.run(ctx, runOpts{}, args)
+}
+
+// query is Run for a call that only reads, bounded by the query timeout so a
+// CLI that never answers cannot leave its caller waiting forever.
+func (c *Client) query(ctx context.Context, args ...string) (*Envelope, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.queryTimeout)
+	defer cancel()
+	env, err := c.run(ctx, runOpts{}, args)
+	if err != nil && errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return env, &Error{Args: args, ExitCode: ExitTerminated,
+			Message: fmt.Sprintf("unity %s did not answer within %s", strings.Join(args, " "), c.queryTimeout)}
+	}
+	return env, err
 }
 
 func (c *Client) run(ctx context.Context, o runOpts, args []string) (*Envelope, error) {

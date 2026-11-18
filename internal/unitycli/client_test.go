@@ -207,6 +207,22 @@ func TestCannotStart(t *testing.T) {
 	}
 }
 
+// A query that gets no answer is given up on with an error that says so,
+// instead of leaving the caller waiting.
+func TestQueryTimeout(t *testing.T) {
+	c := fakeClient(t, map[string]fakeResp{"projects --all": {Sleep: "30s", Stdout: "{}"}})
+	c.queryTimeout = 200 * time.Millisecond
+	start := time.Now()
+	_, err := c.Projects(ctx5(t))
+	var e *Error
+	if !errors.As(err, &e) || !strings.Contains(e.Message, "did not answer within 200ms") {
+		t.Errorf("err = %v", err)
+	}
+	if d := time.Since(start); d > 4*time.Second {
+		t.Errorf("gave up after %s", d)
+	}
+}
+
 // TestEnvironment checks that the CLI is configured through global options
 // before the command, and not through environment variables, which the Editor
 // started by `unity open` would inherit and pass on.

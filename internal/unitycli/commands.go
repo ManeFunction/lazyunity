@@ -13,7 +13,7 @@ import (
 
 // Projects lists every project in the Hub's database.
 func (c *Client) Projects(ctx context.Context) ([]Project, error) {
-	env, err := c.Run(ctx, "projects", "--all")
+	env, err := c.query(ctx, "projects", "--all")
 	if err != nil {
 		return nil, err
 	}
@@ -23,7 +23,7 @@ func (c *Client) Projects(ctx context.Context) ([]Project, error) {
 // ProjectInfo returns the details of one project.
 func (c *Client) ProjectInfo(ctx context.Context, path string) (ProjectInfo, error) {
 	var info ProjectInfo
-	env, err := c.Run(ctx, "projects", "info", path)
+	env, err := c.query(ctx, "projects", "info", path)
 	if err != nil {
 		return info, err
 	}
@@ -86,7 +86,7 @@ type CacheInfo struct {
 // DownloadCache reports where the download cache is and how big it is.
 func (c *Client) DownloadCache(ctx context.Context) (CacheInfo, error) {
 	var info CacheInfo
-	env, err := c.Run(ctx, "cache", "info")
+	env, err := c.query(ctx, "cache", "info")
 	if err != nil {
 		return info, err
 	}
@@ -187,7 +187,7 @@ func (c *Client) CreateProject(ctx context.Context, o CreateOptions) error {
 
 // Templates lists the project templates available offline for an Editor.
 func (c *Client) Templates(ctx context.Context, editorVersion string) ([]Template, error) {
-	env, err := c.Run(ctx, "templates", "--installed", "--brief", "--editor-version", editorVersion)
+	env, err := c.query(ctx, "templates", "--installed", "--brief", "--editor-version", editorVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -198,7 +198,7 @@ func (c *Client) Templates(ctx context.Context, editorVersion string) ([]Templat
 
 // Editors lists the Editors the CLI knows about.
 func (c *Client) Editors(ctx context.Context) ([]Editor, error) {
-	env, err := c.Run(ctx, "editors", "--installed")
+	env, err := c.query(ctx, "editors", "--installed")
 	if err != nil {
 		return nil, err
 	}
@@ -226,7 +226,7 @@ func (c *Client) Releases(ctx context.Context, stream string, offset, limit int)
 		args = append(args, "--stream", stream)
 	}
 	var out ReleasePage
-	env, err := c.Run(ctx, args...)
+	env, err := c.query(ctx, args...)
 	if err != nil {
 		return out, err
 	}
@@ -246,7 +246,7 @@ func (c *Client) Releases(ctx context.Context, stream string, offset, limit int)
 
 // InstallPath returns the folder new Editors are installed into.
 func (c *Client) InstallPath(ctx context.Context) (string, error) {
-	env, err := c.Run(ctx, "install-path", "--get")
+	env, err := c.query(ctx, "install-path", "--get")
 	if err != nil {
 		return "", err
 	}
@@ -270,7 +270,7 @@ func (c *Client) Modules(ctx context.Context, version, arch string) ([]Module, e
 	if arch != "" {
 		args = append(args, "--architecture", arch)
 	}
-	env, err := c.Run(ctx, args...)
+	env, err := c.query(ctx, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -282,7 +282,7 @@ func (c *Client) Modules(ctx context.Context, version, arch string) ([]Module, e
 // It reads `editors info`: `install --list-modules` (despite its help text) and
 // `modules` only answer for an Editor that is already installed.
 func (c *Client) ReleaseModules(ctx context.Context, version string) ([]Module, error) {
-	env, err := c.Run(ctx, "editors", "info", version)
+	env, err := c.query(ctx, "editors", "info", version)
 	if err != nil {
 		return nil, err
 	}
@@ -349,7 +349,7 @@ func repeated(flag string, values []string) []string {
 func (c *Client) PlanInstall(ctx context.Context, o InstallOptions) (InstallPlan, error) {
 	var plan InstallPlan
 	args := append(installArgs(o), "--dry-run")
-	env, err := c.Run(ctx, args...)
+	env, err := c.query(ctx, args...)
 	if err != nil {
 		return plan, err
 	}
@@ -419,7 +419,7 @@ func (c *Client) UpgradeEditor(ctx context.Context, version string) (*Stream, er
 // error.
 func (c *Client) AuthStatus(ctx context.Context) (AuthInfo, error) {
 	var info AuthInfo
-	env, err := c.Run(ctx, "auth", "status")
+	env, err := c.query(ctx, "auth", "status")
 	if err != nil {
 		var e *Error
 		if errors.As(err, &e) && e.NotSignedIn() {
@@ -507,7 +507,7 @@ func (c *Client) CheckUpdate(ctx context.Context, channel string) (UpdateInfo, e
 	if channel != "" {
 		args = append(args, "--channel", channel)
 	}
-	env, err := c.Run(ctx, args...)
+	env, err := c.query(ctx, args...)
 	if err != nil {
 		return u, err
 	}
