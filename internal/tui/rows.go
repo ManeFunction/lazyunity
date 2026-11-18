@@ -286,13 +286,6 @@ func measureModules(mods []unitycli.Module) moduleCols {
 	return moduleCols{category: maxWidth(c, 16), size: maxWidth(s, 9)}
 }
 
-func padLeft(s string, w int) string {
-	if n := w - width(s); n > 0 {
-		return strings.Repeat(" ", n) + s
-	}
-	return s
-}
-
 // sortModules puts platforms first, then the rest by name.
 func sortModules(mods []unitycli.Module) {
 	rank := func(m unitycli.Module) int {

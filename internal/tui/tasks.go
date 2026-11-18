@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"strings"
 	"time"
 
@@ -514,5 +513,3 @@ func trimEllipsis(s string) string {
 		s = t
 	}
 }
-
-func clampF(v, lo, hi float64) float64 { return math.Min(math.Max(v, lo), hi) }

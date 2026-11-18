@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -87,3 +88,25 @@ func clamp(v, lo, hi int) int {
 	}
 	return min(max(v, lo), hi)
 }
+
+// wrapText wraps s to w cells, keeping its own line breaks.
+func wrapText(s string, w int) []string {
+	var out []string
+	for _, para := range strings.Split(s, "\n") {
+		if strings.TrimSpace(para) == "" {
+			out = append(out, "")
+			continue
+		}
+		out = append(out, strings.Split(ansi.Wrap(para, w, " "), "\n")...)
+	}
+	return out
+}
+
+func padLeft(s string, w int) string {
+	if n := w - width(s); n > 0 {
+		return strings.Repeat(" ", n) + s
+	}
+	return s
+}
+
+func clampF(v, lo, hi float64) float64 { return math.Min(math.Max(v, lo), hi) }

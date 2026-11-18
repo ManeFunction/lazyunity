@@ -12,7 +12,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/ManeFunction/lazyunity/internal/config"
-	"github.com/ManeFunction/lazyunity/internal/launch"
 	"github.com/ManeFunction/lazyunity/internal/state"
 	"github.com/ManeFunction/lazyunity/internal/unity"
 	"github.com/ManeFunction/lazyunity/internal/unitycli"
@@ -481,75 +480,6 @@ func (m *Model) deleteProjectFlow(r projectRow) {
 
 // ---- adding -----------------------------------------------------------------------------
 
-// completeDir completes a folder path as far as it is unambiguous.
-func completeDir(text string) []string {
-	out := completeExpanded(config.ExpandHome(text))
-	if strings.HasPrefix(text, "~") {
-		for i, o := range out {
-			out[i] = displayPath(o) // keep the ~ the user typed
-		}
-	}
-	return out
-}
-
-// dirMatches lists the folders (full text expanded) whose names continue text,
-// and the folder they are in. Hidden folders show only once a dot is typed.
-func dirMatches(text string) (dir string, names []string) {
-	dir, base := filepath.Split(text)
-	if dir == "" {
-		dir = "."
-	}
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return dir, nil
-	}
-	for _, e := range entries {
-		if !strings.HasPrefix(e.Name(), base) || (base == "" && strings.HasPrefix(e.Name(), ".")) {
-			continue
-		}
-		if st, err := os.Stat(filepath.Join(dir, e.Name())); err != nil || !st.IsDir() {
-			continue
-		}
-		names = append(names, e.Name())
-	}
-	sort.Strings(names)
-	return dir, names
-}
-
-func completeExpanded(text string) []string {
-	dir, names := dirMatches(text)
-	base := filepath.Base(text)
-	if strings.HasSuffix(text, string(filepath.Separator)) || text == "" {
-		base = ""
-	}
-	switch len(names) {
-	case 0:
-		return nil
-	case 1:
-		return []string{filepath.Join(dir, names[0]) + string(filepath.Separator)}
-	}
-	common := commonPrefix(names)
-	if len(common) > len(base) {
-		return []string{filepath.Join(dir, common)}
-	}
-	return nil
-}
-
-// commonPrefix is the longest prefix every name starts with, cut between
-// characters, never inside one.
-func commonPrefix(names []string) string {
-	common := []rune(names[0])
-	for _, n := range names[1:] {
-		r := []rune(n)
-		i := 0
-		for i < len(common) && i < len(r) && common[i] == r[i] {
-			i++
-		}
-		common = common[:i]
-	}
-	return string(common)
-}
-
 func (m *Model) addProjectPrompt() {
 	m.push(&promptPopup{
 		title: "Add an existing project", label: "Folder of the Unity project:",
@@ -630,33 +560,6 @@ func (m *Model) editProject(r projectRow) tea.Cmd {
 		m.toastf(toastWarn, "Set os.edit in config.yml, or $EDITOR, to edit projects")
 	}, nil)
 }
-
-// edit opens path in the code editor: os.edit from config.yml, started on its
-// own, or else $VISUAL or $EDITOR, run in dir with the terminal handed over.
-// noEditor runs when none is set; done, if not nil, is the message once a
-// terminal editor has quit.
-func (m *Model) edit(path, dir string, noEditor func(m *Model), done tea.Msg) tea.Cmd {
-	cmd, err := m.host.Edit(m.cfg.OS.Edit, path, dir, m.getenv)
-	switch {
-	case errors.Is(err, launch.ErrNoEditor):
-		noEditor(m)
-		return nil
-	case err != nil:
-		m.toastf(toastError, "Could not start the editor: %v", err)
-		return nil
-	case cmd == nil: // started on its own
-		return nil
-	}
-	return tea.ExecProcess(cmd, func(err error) tea.Msg {
-		if err != nil {
-			return errorMsg{what: "Editor", err: err}
-		}
-		return done
-	})
-}
-
-// getenv reads an environment variable of the machine lazyunity runs on.
-func (m *Model) getenv(key string) string { return m.env.Getenv(key) }
 
 type projectInfoMsg struct {
 	row  projectRow
@@ -753,22 +656,6 @@ func (m *Model) copyMenu(r projectRow) {
 	m.copyChoices(56, [][2]string{
 		{"Path", r.Path}, {"Name", r.name()}, {"Unity version", r.effVersion()}, {"Folder name", filepath.Base(r.Path)},
 	})
-}
-
-// copyChoices opens a Copy menu of label and value pairs; picking one puts its
-// value on the clipboard.
-func (m *Model) copyChoices(wanted int, choices [][2]string) {
-	var items []menuItem
-	for _, c := range choices {
-		label, value := c[0], c[1]
-		items = append(items, menuItem{label: label, right: truncate(value, wanted-16), run: func(m *Model) tea.Cmd {
-			m.toastf(toastOK, "Copied the %s", strings.ToLower(label))
-			return tea.SetClipboard(value)
-		}})
-	}
-	menu := newMenu("Copy", items)
-	menu.wanted = wanted
-	m.push(menu)
 }
 
 func (m *Model) cleanConfirm(r projectRow) {

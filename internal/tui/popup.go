@@ -25,19 +25,6 @@ type popup interface {
 	click(m *Model, row int) (next func(*Model) tea.Cmd, done bool)
 }
 
-// wrapText wraps s to w cells, keeping its own line breaks.
-func wrapText(s string, w int) []string {
-	var out []string
-	for _, para := range strings.Split(s, "\n") {
-		if strings.TrimSpace(para) == "" {
-			out = append(out, "")
-			continue
-		}
-		out = append(out, strings.Split(ansi.Wrap(para, w, " "), "\n")...)
-	}
-	return out
-}
-
 // boxWidth picks a popup width: wanted, but within the screen and at least min.
 func (m *Model) boxWidth(wanted, minW int) int {
 	return clamp(wanted, minW, max(m.w-4, minW))
@@ -712,4 +699,20 @@ func (p *infoPopup) view(m *Model) string {
 		w: w, h: p.height + 2, tabs: []string{p.title}, focused: true, lines: shown, footer: footer,
 		scroll: scrollbar{offset: p.offset, visible: p.height, total: len(rows)},
 	})
+}
+
+// copyChoices opens a Copy menu of label and value pairs; picking one puts its
+// value on the clipboard.
+func (m *Model) copyChoices(wanted int, choices [][2]string) {
+	var items []menuItem
+	for _, c := range choices {
+		label, value := c[0], c[1]
+		items = append(items, menuItem{label: label, right: truncate(value, wanted-16), run: func(m *Model) tea.Cmd {
+			m.toastf(toastOK, "Copied the %s", strings.ToLower(label))
+			return tea.SetClipboard(value)
+		}})
+	}
+	menu := newMenu("Copy", items)
+	menu.wanted = wanted
+	m.push(menu)
 }

@@ -2,7 +2,10 @@ package tui
 
 import (
 	"context"
+	"errors"
 	"os/exec"
+
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/ManeFunction/lazyunity/internal/config"
 	"github.com/ManeFunction/lazyunity/internal/launch"
@@ -72,3 +75,30 @@ func (h machine) LatestOpenUPM(ctx context.Context, src config.OpenUPM) (string,
 func (h machine) AddPackages(ctx context.Context, exe, dir string, packages []string) error {
 	return openupm.Add(ctx, exe, dir, packages)
 }
+
+// edit opens path in the code editor: os.edit from config.yml, started on its
+// own, or else $VISUAL or $EDITOR, run in dir with the terminal handed over.
+// noEditor runs when none is set; done, if not nil, is the message once a
+// terminal editor has quit.
+func (m *Model) edit(path, dir string, noEditor func(m *Model), done tea.Msg) tea.Cmd {
+	cmd, err := m.host.Edit(m.cfg.OS.Edit, path, dir, m.getenv)
+	switch {
+	case errors.Is(err, launch.ErrNoEditor):
+		noEditor(m)
+		return nil
+	case err != nil:
+		m.toastf(toastError, "Could not start the editor: %v", err)
+		return nil
+	case cmd == nil: // started on its own
+		return nil
+	}
+	return tea.ExecProcess(cmd, func(err error) tea.Msg {
+		if err != nil {
+			return errorMsg{what: "Editor", err: err}
+		}
+		return done
+	})
+}
+
+// getenv reads an environment variable of the machine lazyunity runs on.
+func (m *Model) getenv(key string) string { return m.env.Getenv(key) }
