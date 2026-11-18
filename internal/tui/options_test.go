@@ -607,3 +607,15 @@ func TestConfigEditedInADetachedEditorAppliesOnFocus(t *testing.T) {
 		t.Error("the changed config should relaunch once the terminal is focused again")
 	}
 }
+
+func TestConfigThatCannotBeCreatedSaysSo(t *testing.T) {
+	m := newTestModel(t)
+	blocker := filepath.Join(t.TempDir(), "file")
+	os.WriteFile(blocker, nil, 0o644)
+	m.configDir = filepath.Join(blocker, "lazyunity") // a folder under a file cannot be made
+	m.cfg.OS.Edit = "code {{path}}"
+	m.editConfig()
+	if !strings.Contains(screenText(m), "Could not create the config file") || len(recorder(m).editors) != 0 {
+		t.Errorf("the failure is shown and no editor is started:\n%s", screenText(m))
+	}
+}

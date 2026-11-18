@@ -315,9 +315,14 @@ func (m *Model) projectDirPrompt() {
 func (m *Model) editConfig() tea.Cmd {
 	path := filepath.Join(m.configDir, "config.yml")
 	if _, err := os.Stat(path); err != nil {
-		// give the editor something to open; a failure here only means it opens empty
-		if os.MkdirAll(m.configDir, 0o755) == nil {
-			os.WriteFile(path, []byte(configTemplate()), 0o644)
+		// give the editor something to open
+		err := os.MkdirAll(m.configDir, 0o755)
+		if err == nil {
+			err = os.WriteFile(path, []byte(configTemplate()), 0o644)
+		}
+		if err != nil {
+			m.toastf(toastError, "Could not create the config file: %v", err)
+			return nil
 		}
 	}
 	before, _ := os.ReadFile(path)
