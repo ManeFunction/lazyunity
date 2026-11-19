@@ -130,6 +130,7 @@ keybinding:                  # lazygit's notation works: <c-s>, <space>, <enter>
 os:
   edit: code {{dir}}         # for `e`; default is $VISUAL / $EDITOR
   openFolder: ''             # default is xdg-open, open or explorer
+  shell: ''                  # for `:`; default is $SHELL, or cmd on Windows (pwsh works too)
 unity:
   cliPath: ''                # default: found automatically
 projects:

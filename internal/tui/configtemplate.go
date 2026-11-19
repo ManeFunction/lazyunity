@@ -88,7 +88,7 @@ func configTemplate() string {
 	set(0, "os", "", "")
 	set(1, "edit", "''", "for e, {{dir}} is the folder; default: $VISUAL / $EDITOR")
 	set(1, "openFolder", "''", "{{dir}} is the folder; default: xdg-open, open, explorer")
-	set(1, "shell", "''", "runs : commands; default: $SHELL, or cmd on Windows")
+	set(1, "shell", "''", "runs : commands; default: $SHELL, or cmd on Windows (pwsh works too)")
 	line("")
 	set(0, "unity", "", "")
 	set(1, "cliPath", "''", "the Unity CLI; default: found automatically")

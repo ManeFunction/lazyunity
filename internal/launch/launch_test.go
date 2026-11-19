@@ -1,6 +1,8 @@
 package launch
 
 import (
+	"encoding/base64"
+	"encoding/binary"
 	"errors"
 	"os"
 	"os/exec"
@@ -12,6 +14,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf16"
 )
 
 func TestSplit(t *testing.T) {
@@ -247,6 +250,51 @@ func TestShellCommand(t *testing.T) {
 	if win.Args[0] != "cmd" || !slices.Contains(win.Args, "/C") || !strings.HasPrefix(win.Args[len(win.Args)-1], `dir "C:\Program Files" &`) {
 		t.Errorf("windows: %v", win.Args)
 	}
+}
+
+// os.shell picks the shell on Windows too; $SHELL does not.
+func TestShellCommandOnWindows(t *testing.T) {
+	gitBash := func(string) string { return "/usr/bin/bash" } // what Git Bash sets
+	for _, sh := range []string{"", "cmd", `C:\Windows\System32\CMD.EXE`} {
+		if c := ShellCommand("windows", sh, "dir", `C:\p`, gitBash); c.Args[0] != "cmd" {
+			t.Errorf("shell %q: %v", sh, c.Args)
+		}
+	}
+	for _, sh := range []string{"pwsh", "powershell.exe", `C:\Program Files\PowerShell\7\pwsh.exe`} {
+		c := ShellCommand("windows", sh, "Get-ChildItem", `C:\p`, gitBash)
+		if c.Args[0] != sh || !slices.Contains(c.Args, "-EncodedCommand") || !slices.Contains(c.Env, returnPromptVar+"="+returnPrompt) || c.Dir != `C:\p` {
+			t.Errorf("shell %q: %v", sh, c.Args)
+		}
+		script := decodePowerShell(t, c.Args[len(c.Args)-1])
+		if !strings.HasPrefix(script, "Get-ChildItem\n") || !strings.Contains(script, "$env:"+returnPromptVar) {
+			t.Errorf("shell %q runs %q", sh, script)
+		}
+	}
+	bash := `C:\Program Files\Git\bin\bash.exe`
+	if c := ShellCommand("windows", bash, "ls", `C:\p`, gitBash); c.Args[0] != bash || c.Args[1] != "-c" || !strings.HasPrefix(c.Args[2], "ls;") {
+		t.Errorf("another shell is a Unix one: %v", c.Args)
+	}
+}
+
+// The script survives the encoding whole, quotes and all non-ASCII text.
+func TestEncodePowerShell(t *testing.T) {
+	in := `Write-Host "it's" 'ok' & | % $x; ✓ 𝄞`
+	if got := decodePowerShell(t, encodePowerShell(in)); got != in {
+		t.Errorf("round trip = %q, want %q", got, in)
+	}
+}
+
+func decodePowerShell(t *testing.T, s string) string {
+	t.Helper()
+	b, err := base64.StdEncoding.DecodeString(s)
+	if err != nil || len(b)%2 != 0 {
+		t.Fatalf("not base64 of UTF-16: %q %v", s, err)
+	}
+	u := make([]uint16, len(b)/2)
+	for i := range u {
+		u[i] = binary.LittleEndian.Uint16(b[2*i:])
+	}
+	return string(utf16.Decode(u))
 }
 
 // The prompt reaches the terminal through the environment, whatever it holds.

@@ -4,6 +4,8 @@ package launch
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"net/url"
@@ -11,6 +13,7 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+	"unicode/utf16"
 )
 
 // Editor starts a Unity Editor directly, without the Unity CLI. The Editor then
@@ -128,30 +131,81 @@ const returnPrompt = "\x1b[34mPress enter to return to lazyunity...\x1b[0m "
 const returnPromptVar = "LAZYUNITY_RETURN_PROMPT"
 
 // ShellCommand runs a line of shell in dir, then waits for Enter, so that
-// its output can be read before lazyunity takes the terminal back. shell is the
-// shell to use on Unix; empty means $SHELL, as read by getenv, then /bin/sh.
-// Windows uses cmd.
+// its output can be read before lazyunity takes the terminal back. shell is
+// os.shell from config.yml. On Unix, empty means $SHELL, as read by getenv,
+// then /bin/sh. On Windows, empty means cmd; pwsh and powershell run the line
+// as PowerShell, and any other shell (Git Bash, say) is taken for a Unix one.
+// $SHELL is not read on Windows, where Git Bash sets it to a path that only
+// its own programs understand.
 func ShellCommand(goos, shell, text, dir string, getenv func(string) string) *exec.Cmd {
 	var cmd *exec.Cmd
-	if goos == "windows" {
-		// set /p prints the prompt without a newline; pause waits silently.
-		line := text + ` & echo. & <nul set /p "=` + returnPrompt + `" & pause >nul`
-		cmd = exec.Command("cmd", "/S", "/C", line)
-		// cmd.exe does not read the \" that Go would quote the line with. With
-		// /S it takes off the outer quotes and runs the rest as it is.
-		setCmdLine(cmd, `cmd /S /C "`+line+`"`)
-	} else {
+	switch {
+	case goos != "windows":
 		if shell == "" {
 			shell = getenv("SHELL")
 		}
 		if shell == "" {
 			shell = "/bin/sh"
 		}
-		cmd = exec.Command(shell, "-c", text+`; printf '\n%s' "$`+returnPromptVar+`"; read lazyunity_return`) // not read _: _ is read-only in fish
-		cmd.Env = append(os.Environ(), returnPromptVar+"="+returnPrompt)
+		cmd = unixShell(shell, text)
+	case shell == "" || isShell(shell, "cmd"):
+		cmd = cmdShell(text)
+	case isShell(shell, "pwsh", "powershell"):
+		cmd = powerShell(shell, text)
+	default:
+		cmd = unixShell(shell, text)
 	}
 	cmd.Dir = dir
 	return cmd
+}
+
+// isShell reports whether the program shell, a name or a path with either
+// separator, is one of names, with or without .exe, in any case.
+func isShell(shell string, names ...string) bool {
+	base := strings.ToLower(shell[strings.LastIndexAny(shell, `/\`)+1:])
+	base = strings.TrimSuffix(base, ".exe")
+	for _, n := range names {
+		if base == n {
+			return true
+		}
+	}
+	return false
+}
+
+func unixShell(shell, text string) *exec.Cmd {
+	cmd := exec.Command(shell, "-c", text+`; printf '\n%s' "$`+returnPromptVar+`"; read lazyunity_return`) // not read _: _ is read-only in fish
+	cmd.Env = append(os.Environ(), returnPromptVar+"="+returnPrompt)
+	return cmd
+}
+
+func cmdShell(text string) *exec.Cmd {
+	// set /p prints the prompt without a newline; pause waits silently.
+	line := text + ` & echo. & <nul set /p "=` + returnPrompt + `" & pause >nul`
+	cmd := exec.Command("cmd", "/S", "/C", line)
+	// cmd.exe does not read the \" that Go would quote the line with. With
+	// /S it takes off the outer quotes and runs the rest as it is.
+	setCmdLine(cmd, `cmd /S /C "`+line+`"`)
+	return cmd
+}
+
+// powerShell runs text as PowerShell. The script goes in -EncodedCommand
+// (base64 of UTF-16LE), so no quoting rule of Windows or of PowerShell ever
+// touches it, and the prompt comes from the environment, as on Unix.
+func powerShell(shell, text string) *exec.Cmd {
+	script := text + "\n" + `Write-Host ''; [Console]::Write($env:` + returnPromptVar + `); [void][Console]::ReadLine()`
+	cmd := exec.Command(shell, "-NoLogo", "-NoProfile", "-EncodedCommand", encodePowerShell(script))
+	cmd.Env = append(os.Environ(), returnPromptVar+"="+returnPrompt)
+	return cmd
+}
+
+// encodePowerShell encodes a script for PowerShell's -EncodedCommand.
+func encodePowerShell(script string) string {
+	u := utf16.Encode([]rune(script))
+	b := make([]byte, 2*len(u))
+	for i, c := range u {
+		binary.LittleEndian.PutUint16(b[2*i:], c)
+	}
+	return base64.StdEncoding.EncodeToString(b)
 }
 
 // Expand splits a command line into words and puts dir where {{dir}} is. The

@@ -139,7 +139,8 @@ type OS struct {
 	// OpenFolder opens a folder in the file manager. {{dir}} is the folder.
 	// Empty: the system's default (xdg-open, open, explorer).
 	OpenFolder string `yaml:"openFolder"`
-	// Shell is the program that runs ':' commands. Empty: $SHELL, or cmd on Windows.
+	// Shell is the program that runs ':' commands. Empty: $SHELL, or cmd on Windows,
+	// where pwsh and powershell run PowerShell and any other shell is a Unix one.
 	Shell string `yaml:"shell"`
 }
 
