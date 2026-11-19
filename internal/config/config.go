@@ -214,13 +214,18 @@ func Default() Config {
 }
 
 // Dir is the folder holding config.yml and state.yml. override, if not empty,
-// wins; then $LAZYUNITY_CONFIG_DIR; then the user's config folder.
+// wins; then $LAZYUNITY_CONFIG_DIR; then lazyunity in $XDG_CONFIG_HOME, when
+// that is an absolute path, on every system, as lazygit does; then the user's
+// config folder (~/.config, ~/Library/Application Support, %AppData%).
 func Dir(override string) (string, error) {
 	if override != "" {
 		return override, nil
 	}
 	if d := os.Getenv("LAZYUNITY_CONFIG_DIR"); d != "" {
 		return d, nil
+	}
+	if x := os.Getenv("XDG_CONFIG_HOME"); filepath.IsAbs(x) {
+		return filepath.Join(x, "lazyunity"), nil
 	}
 	base, err := os.UserConfigDir()
 	if err != nil {

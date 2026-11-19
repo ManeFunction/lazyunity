@@ -134,7 +134,12 @@ func TestDir(t *testing.T) {
 		t.Errorf("the flag beats the environment: %q", got)
 	}
 	t.Setenv("LAZYUNITY_CONFIG_DIR", "")
-	t.Setenv("XDG_CONFIG_HOME", "/xdg")
+	xdg := t.TempDir() // absolute on every system
+	t.Setenv("XDG_CONFIG_HOME", xdg)
+	if got, err := Dir(""); err != nil || got != filepath.Join(xdg, "lazyunity") {
+		t.Errorf("$XDG_CONFIG_HOME, on macOS and Windows too: %q, %v", got, err)
+	}
+	t.Setenv("XDG_CONFIG_HOME", "")
 	t.Setenv("HOME", "/home/x")
 	if got, err := Dir(""); err != nil || filepath.Base(got) != "lazyunity" {
 		t.Errorf("default: %q, %v", got, err)
