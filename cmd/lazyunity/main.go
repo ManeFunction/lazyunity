@@ -98,7 +98,7 @@ func session(dir string) (restart bool, err error) {
 		cancel()
 	}
 	home, _ := os.UserHomeDir()
-	opts.InstallRoot = unity.DefaultInstallRoot(env.GOOS, home)
+	opts.InstallRoot = unity.DefaultInstallRoot(env.GOOS, home, env.Getenv)
 
 	model, err := tui.New(opts) // scans the Editor folders, too
 	if err != nil {

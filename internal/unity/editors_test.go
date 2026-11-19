@@ -36,14 +36,21 @@ func TestExecutableRel(t *testing.T) {
 }
 
 func TestDefaultInstallRoot(t *testing.T) {
-	if got := DefaultInstallRoot("linux", "/home/u"); got != "/home/u/Unity/Hub/Editor" {
+	env := func(vars map[string]string) func(string) string {
+		return func(k string) string { return vars[k] }
+	}
+	pf := env(map[string]string{"ProgramFiles": `D:\Apps\`})
+	if got := DefaultInstallRoot("linux", "/home/u", pf); got != filepath.Join("/home/u", "Unity", "Hub", "Editor") {
 		t.Errorf("linux: %q", got)
 	}
-	if got := DefaultInstallRoot("darwin", "/Users/u"); got != "/Applications/Unity/Hub/Editor" {
+	if got := DefaultInstallRoot("darwin", "/Users/u", pf); got != "/Applications/Unity/Hub/Editor" {
 		t.Errorf("darwin: %q", got)
 	}
-	if got := DefaultInstallRoot("windows", `C:\Users\u`); got != `C:\Program Files\Unity\Hub\Editor` {
-		t.Errorf("windows: %q", got)
+	if got := DefaultInstallRoot("windows", `C:\Users\u`, pf); got != `D:\Apps\Unity\Hub\Editor` {
+		t.Errorf("windows reads %%ProgramFiles%%: %q", got)
+	}
+	if got := DefaultInstallRoot("windows", `C:\Users\u`, env(nil)); got != `C:\Program Files\Unity\Hub\Editor` {
+		t.Errorf("windows without %%ProgramFiles%%: %q", got)
 	}
 }
 

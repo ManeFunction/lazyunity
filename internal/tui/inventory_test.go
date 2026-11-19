@@ -10,8 +10,11 @@ import (
 	"github.com/ManeFunction/lazyunity/internal/unitycli"
 )
 
+// noEnv is a machine with no environment variables set.
+func noEnv(string) string { return "" }
+
 func TestInventoryRoot(t *testing.T) {
-	inv := newInventory("linux", "/home/u", "")
+	inv := newInventory("linux", "/home/u", "", noEnv)
 	want := filepath.Clean("/home/u/Unity/Hub/Editor")
 	if got := inv.installRoot(); got != want {
 		t.Errorf("the default install folder: %q", got)
@@ -27,7 +30,7 @@ func TestInventoryScanAndMerge(t *testing.T) {
 	exe := filepath.Join(root, "6000.6.8f1", unity.ExecutableRel("linux"))
 	os.MkdirAll(filepath.Dir(exe), 0o755)
 	os.WriteFile(exe, nil, 0o755)
-	inv := newInventory("linux", "", root)
+	inv := newInventory("linux", "", root, noEnv)
 
 	inv.setFound(scanEditors("linux", inv.installRoot()))
 	if !inv.has("6000.6.8f1") || inv.find("6000.6.8f1").Location != exe {
@@ -50,7 +53,7 @@ func TestInventoryMergeDarwinAppLocations(t *testing.T) {
 	exe := filepath.Join(root, "6000.6.8f1", unity.ExecutableRel("darwin"))
 	os.MkdirAll(filepath.Dir(exe), 0o755)
 	os.WriteFile(exe, nil, 0o755)
-	inv := newInventory("darwin", "", root)
+	inv := newInventory("darwin", "", root, noEnv)
 
 	inv.setFound(scanEditors("darwin", inv.installRoot()))
 	inv.setListed(listEditors("darwin", []unitycli.Editor{
@@ -66,7 +69,7 @@ func TestInventoryMergeDarwinAppLocations(t *testing.T) {
 }
 
 func TestInventoryStraysAreToldOnce(t *testing.T) {
-	inv := newInventory("linux", "", "/r")
+	inv := newInventory("linux", "", "/r", noEnv)
 	inv.setFound([]foundEditor{
 		{Installed: unity.Installed{Version: "a", Location: "/r/a/Editor/Unity"}},
 		{Installed: unity.Installed{Version: "b", Location: "/r/b/Editor/Unity"}},

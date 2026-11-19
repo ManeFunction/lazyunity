@@ -46,11 +46,16 @@ func NormalizeLocation(location, goos string) string {
 }
 
 // DefaultInstallRoot is where Unity's tools install Editors unless told
-// otherwise.
-func DefaultInstallRoot(goos, home string) string {
+// otherwise. On Windows that is under %ProgramFiles%, as read by getenv, which
+// is not always on C:.
+func DefaultInstallRoot(goos, home string, getenv func(string) string) string {
 	switch goos {
 	case "windows":
-		return `C:\Program Files\Unity\Hub\Editor`
+		base := strings.TrimRight(getenv("ProgramFiles"), `\/`)
+		if base == "" {
+			base = `C:\Program Files`
+		}
+		return base + `\Unity\Hub\Editor` // not filepath.Join: goos need not be the host's
 	case "darwin":
 		return "/Applications/Unity/Hub/Editor"
 	default:

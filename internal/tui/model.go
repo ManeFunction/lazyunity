@@ -168,7 +168,7 @@ func New(o Options) (*Model, error) {
 		}
 		m.st = state.Load(o.ConfigDir)
 	}
-	m.inv = newInventory(m.goos, homeDir(), o.InstallRoot)
+	m.inv = newInventory(m.goos, homeDir(), o.InstallRoot, m.getenv)
 	km, warnings := newKeymap(buildActions(), o.Config.Keybinding)
 	m.keymap = km
 	m.buildTabs()

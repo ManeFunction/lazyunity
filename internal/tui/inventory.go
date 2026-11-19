@@ -17,6 +17,7 @@ import (
 // commands that bring their results, so that the Update loop does not.
 type inventory struct {
 	goos, home string
+	getenv     func(string) string
 	// install is the folder the CLI installs new Editors into, once it said
 	// so; until then, the default for the platform.
 	install string
@@ -44,8 +45,8 @@ type listedEditor struct {
 	platforms []unity.Platform
 }
 
-func newInventory(goos, home, install string) *inventory {
-	return &inventory{goos: goos, home: home, install: install,
+func newInventory(goos, home, install string, getenv func(string) string) *inventory {
+	return &inventory{goos: goos, home: home, install: install, getenv: getenv,
 		registered: map[string]bool{}, versions: map[string]bool{}}
 }
 
@@ -86,7 +87,7 @@ func (inv *inventory) installRoot() string {
 	if inv.install != "" {
 		return inv.install
 	}
-	return unity.DefaultInstallRoot(inv.goos, inv.home)
+	return unity.DefaultInstallRoot(inv.goos, inv.home, inv.getenv)
 }
 
 // setInstallRoot takes in where the CLI installs new Editors.
