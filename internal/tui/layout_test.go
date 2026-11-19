@@ -29,7 +29,7 @@ func covered(t *testing.T, g geometry, w, mainH int) {
 }
 
 func TestGeometryNormal(t *testing.T) {
-	g := computeGeometry(120, 40, 0.45, modeFull, 0, true, [numPanels]int{})
+	g := computeGeometry(120, 40, 0.45, modeFull, false, 0, true, [numPanels]int{})
 	if !g.ok {
 		t.Fatal("120x40 must fit")
 	}
@@ -53,13 +53,13 @@ func TestGeometryNormal(t *testing.T) {
 }
 
 func TestGeometryTasksFrameAndNoBar(t *testing.T) {
-	g := computeGeometry(120, 40, 0.45, modeFull, 3, true, [numPanels]int{})
+	g := computeGeometry(120, 40, 0.45, modeFull, false, 3, true, [numPanels]int{})
 	if g.tasks != (rect{0, 36, 120, 3}) || g.bar != (rect{0, 39, 120, 1}) {
 		t.Errorf("tasks %+v bar %+v", g.tasks, g.bar)
 	}
 	covered(t, g, 120, 36)
 
-	g = computeGeometry(120, 40, 0.45, modeFull, 0, false, [numPanels]int{})
+	g = computeGeometry(120, 40, 0.45, modeFull, false, 0, false, [numPanels]int{})
 	if !g.bar.empty() {
 		t.Errorf("bar = %+v", g.bar)
 	}
@@ -67,11 +67,11 @@ func TestGeometryTasksFrameAndNoBar(t *testing.T) {
 }
 
 func TestGeometryModes(t *testing.T) {
-	proj := computeGeometry(100, 30, 0.45, modeProjects, 0, true, [numPanels]int{})
+	proj := computeGeometry(100, 30, 0.45, modeProjects, false, 0, true, [numPanels]int{})
 	if proj.panels[panelProjects] != (rect{0, 0, 100, 29}) || !proj.panels[panelEditors].empty() || !proj.panels[panelOptions].empty() {
 		t.Errorf("projects mode: %+v", proj.panels)
 	}
-	eds := computeGeometry(100, 30, 0.45, modeEditors, 0, true, [numPanels]int{})
+	eds := computeGeometry(100, 30, 0.45, modeEditors, false, 0, true, [numPanels]int{})
 	if !eds.panels[panelProjects].empty() || eds.panels[panelEditors].w != 100 || eds.panels[panelOptions].w != 100 ||
 		eds.panels[panelEditors].y != 0 || eds.panels[panelOptions].y != eds.panels[panelEditors].h {
 		t.Errorf("editors mode: %+v", eds.panels)
@@ -82,21 +82,21 @@ func TestGeometryModes(t *testing.T) {
 
 func TestGeometryTooSmall(t *testing.T) {
 	for _, sz := range [][2]int{{minScreenW - 1, 40}, {120, 10}, {20, 5}, {0, 0}} {
-		if g := computeGeometry(sz[0], sz[1], 0.45, modeFull, 0, true, [numPanels]int{}); g.ok {
+		if g := computeGeometry(sz[0], sz[1], 0.45, modeFull, false, 0, true, [numPanels]int{}); g.ok {
 			t.Errorf("%dx%d must be too small", sz[0], sz[1])
 		}
 	}
 	// a task frame eats into the height the panels need
-	if g := computeGeometry(120, 14, 0.45, modeFull, 3, true, [numPanels]int{}); g.ok {
+	if g := computeGeometry(120, 14, 0.45, modeFull, false, 3, true, [numPanels]int{}); g.ok {
 		t.Error("14 rows with a 3-row task frame and a hint line leaves too little")
 	}
-	if g := computeGeometry(minScreenW, minScreenH+1, 0.45, modeFull, 0, true, [numPanels]int{}); !g.ok {
+	if g := computeGeometry(minScreenW, minScreenH+1, 0.45, modeFull, false, 0, true, [numPanels]int{}); !g.ok {
 		t.Error("the minimum size must fit")
 	}
 }
 
 func TestGeometrySmallestStillTiles(t *testing.T) {
-	g := computeGeometry(minScreenW, minScreenH+1, 0.45, modeFull, 0, true, [numPanels]int{})
+	g := computeGeometry(minScreenW, minScreenH+1, 0.45, modeFull, false, 0, true, [numPanels]int{})
 	covered(t, g, minScreenW, minScreenH)
 	for i, r := range g.panels {
 		if r.h < 3 || r.w < 20 {
@@ -106,18 +106,18 @@ func TestGeometrySmallestStillTiles(t *testing.T) {
 }
 
 func TestGeometrySidePanelWidthIsBounded(t *testing.T) {
-	narrow := computeGeometry(100, 30, 0.2, modeFull, 0, true, [numPanels]int{})
+	narrow := computeGeometry(100, 30, 0.2, modeFull, false, 0, true, [numPanels]int{})
 	if narrow.panels[panelProjects].w < 28 {
 		t.Errorf("projects panel = %d wide", narrow.panels[panelProjects].w)
 	}
-	wide := computeGeometry(100, 30, 0.8, modeFull, 0, true, [numPanels]int{})
+	wide := computeGeometry(100, 30, 0.8, modeFull, false, 0, true, [numPanels]int{})
 	if wide.panels[panelEditors].w < 24 {
 		t.Errorf("right column = %d wide", wide.panels[panelEditors].w)
 	}
 }
 
 func TestPanelAtAndRect(t *testing.T) {
-	g := computeGeometry(120, 40, 0.45, modeFull, 0, true, [numPanels]int{})
+	g := computeGeometry(120, 40, 0.45, modeFull, false, 0, true, [numPanels]int{})
 	cases := []struct{ x, y, want int }{
 		{0, 0, panelProjects}, {53, 38, panelProjects},
 		{54, 0, panelEditors}, {119, 5, panelEditors},
@@ -158,7 +158,7 @@ func TestGeometryOptionsTakesEmptyEditorRows(t *testing.T) {
 	split := func(edNeed, opNeed int) (int, int) {
 		var need [numPanels]int
 		need[panelEditors], need[panelOptions] = edNeed, opNeed
-		g := computeGeometry(120, 40, 0.45, modeFull, 0, true, need)
+		g := computeGeometry(120, 40, 0.45, modeFull, false, 0, true, need)
 		covered(t, g, 120, 39)
 		return g.panels[panelEditors].h, g.panels[panelOptions].h
 	}
@@ -176,5 +176,42 @@ func TestGeometryOptionsTakesEmptyEditorRows(t *testing.T) {
 	}
 	if ed, op := split(1, 60); ed != 4 || op != 35 {
 		t.Errorf("Editors keeps its smallest size: %d/%d", ed, op)
+	}
+}
+
+func TestGeometryPortrait(t *testing.T) {
+	g := computeGeometry(80, 50, 0.45, modeFull, true, 3, true, [numPanels]int{})
+	if !g.ok {
+		t.Fatal("80x50 must fit")
+	}
+	pr, ed, op := g.panels[panelProjects], g.panels[panelEditors], g.panels[panelOptions]
+	for i, r := range g.panels {
+		if r.x != 0 || r.w != 80 {
+			t.Errorf("panel %d does not span the width: %+v", i, r)
+		}
+	}
+	if pr.y != 0 || pr.h != 21 || ed.y != pr.h || op.y != ed.y+ed.h || ed.h <= op.h {
+		t.Errorf("projects %+v editors %+v options %+v", pr, ed, op)
+	}
+	covered(t, g, 80, 46)
+
+	// one column fits where two columns do not
+	if g := computeGeometry(minPortraitW, minScreenH+1, 0.45, modeFull, true, 0, true, [numPanels]int{}); !g.ok {
+		t.Error("the smallest portrait screen must fit")
+	} else {
+		covered(t, g, minPortraitW, minScreenH)
+		for i, r := range g.panels {
+			if r.h < 3 {
+				t.Errorf("panel %d is too small to use: %+v", i, r)
+			}
+		}
+	}
+	if g := computeGeometry(minPortraitW-1, 50, 0.45, modeFull, true, 0, true, [numPanels]int{}); g.ok {
+		t.Error("narrower than the portrait minimum must not fit")
+	}
+	// the other screen modes are one column already
+	eds := computeGeometry(80, 50, 0.45, modeEditors, true, 0, true, [numPanels]int{})
+	if !eds.panels[panelProjects].empty() || eds.panels[panelEditors].y != 0 {
+		t.Errorf("editors mode: %+v", eds.panels)
 	}
 }

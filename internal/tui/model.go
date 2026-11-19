@@ -274,7 +274,7 @@ func (m *Model) relayout() {
 	for i, p := range m.panels {
 		need[i] = p.need()
 	}
-	m.geo = computeGeometry(m.w, m.h, m.cfg.GUI.SidePanelWidth, m.mode, m.tasksHeight(), m.cfg.GUI.ShowBottomLine, need)
+	m.geo = computeGeometry(m.w, m.h, m.cfg.GUI.SidePanelWidth, m.mode, m.cfg.GUI.Portrait(m.w, m.h), m.tasksHeight(), m.cfg.GUI.ShowBottomLine, need)
 	for i, p := range m.panels {
 		if r := m.geo.panels[i]; !r.empty() {
 			p.setHeight(r.h - 2)
@@ -560,7 +560,7 @@ func (m *Model) View() tea.View {
 
 func (m *Model) tooSmallView() string {
 	msg := "Not enough space to render panels"
-	hint := fmt.Sprintf("need at least %dx%d", minScreenW, minScreenH)
+	hint := fmt.Sprintf("need at least %dx%d", m.geo.minWidth(), minScreenH)
 	return lipgloss.Place(m.w, m.h, lipgloss.Center, lipgloss.Center, msg+"\n"+m.th.Dim.Render(hint))
 }
 
@@ -619,11 +619,13 @@ func (m *Model) panelsView() string {
 			frames[i] = m.renderPanel(i, g.panels[i])
 		}
 	}
-	switch m.mode {
-	case modeProjects:
+	switch {
+	case m.mode == modeProjects:
 		return frames[panelProjects]
-	case modeEditors:
+	case m.mode == modeEditors:
 		return lipgloss.JoinVertical(lipgloss.Left, frames[panelEditors], frames[panelOptions])
+	case g.portrait:
+		return lipgloss.JoinVertical(lipgloss.Left, frames[panelProjects], frames[panelEditors], frames[panelOptions])
 	}
 	right := lipgloss.JoinVertical(lipgloss.Left, frames[panelEditors], frames[panelOptions])
 	return lipgloss.JoinHorizontal(lipgloss.Top, frames[panelProjects], right)

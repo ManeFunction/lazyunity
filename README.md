@@ -115,6 +115,9 @@ gui:
   showPanelJumps: true
   showListFooter: true       # "1 of 20" on a list's bottom border
   screenMode: full           # full, projects, editors
+  portraitMode: auto         # one column of panels: auto, always, never
+  portraitModeAutoMaxWidth: 84   # auto: when the window is at most this wide
+  portraitModeAutoMinHeight: 46  # and at least this tall
   theme:                     # a colour and modifiers: [brightblue, bold], '#5c9dff', ...
     activeBorderColor: [brightblue, bold]
     selectedLineBgColor: [blue]

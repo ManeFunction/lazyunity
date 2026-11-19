@@ -226,3 +226,23 @@ func TestRetiredSettingsWarn(t *testing.T) {
 		t.Errorf("a current config must not warn: %v", cfg.Warnings)
 	}
 }
+
+func TestPortrait(t *testing.T) {
+	g := Default().GUI
+	if !g.Portrait(84, 46) || g.Portrait(85, 46) || g.Portrait(84, 45) {
+		t.Error("auto follows lazygit: at most 84 wide and at least 46 tall")
+	}
+	g.PortraitMode = "always"
+	if !g.Portrait(200, 10) {
+		t.Error("always")
+	}
+	g.PortraitMode = "never"
+	if g.Portrait(40, 100) {
+		t.Error("never")
+	}
+	c := Default()
+	c.GUI.PortraitMode = "sideways"
+	if c.validate() == nil {
+		t.Error("an unknown portraitMode must be refused")
+	}
+}

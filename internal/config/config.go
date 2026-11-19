@@ -65,6 +65,23 @@ type GUI struct {
 	// ScreenMode is the mode at startup: full (every panel), projects (only
 	// Projects) or editors (Editors and Options).
 	ScreenMode string `yaml:"screenMode"`
+	// PortraitMode stacks every panel in one column, as lazygit does: auto
+	// (when the window is at most PortraitModeAutoMaxWidth wide and at least
+	// PortraitModeAutoMinHeight tall), always or never.
+	PortraitMode              string `yaml:"portraitMode"`
+	PortraitModeAutoMaxWidth  int    `yaml:"portraitModeAutoMaxWidth"`
+	PortraitModeAutoMinHeight int    `yaml:"portraitModeAutoMinHeight"`
+}
+
+// Portrait reports whether a w x h window stacks its panels in one column.
+func (g GUI) Portrait(w, h int) bool {
+	switch g.PortraitMode {
+	case "always":
+		return true
+	case "never":
+		return false
+	}
+	return w <= g.PortraitModeAutoMaxWidth && h >= g.PortraitModeAutoMinHeight
 }
 
 // Theme holds colours. Each entry is a list of a colour and modifiers, as in
@@ -187,6 +204,10 @@ func Default() Config {
 			ShowPanelJumps: true,
 			ShowBottomLine: true,
 			ScreenMode:     "full",
+			// lazygit's defaults
+			PortraitMode:              "auto",
+			PortraitModeAutoMaxWidth:  84,
+			PortraitModeAutoMinHeight: 46,
 		},
 	}
 }
@@ -239,6 +260,11 @@ func (c *Config) validate() error {
 	case "full", "projects", "editors":
 	default:
 		return fmt.Errorf("gui.screenMode: %q is not one of full, projects, editors", c.GUI.ScreenMode)
+	}
+	switch c.GUI.PortraitMode {
+	case "auto", "always", "never":
+	default:
+		return fmt.Errorf("gui.portraitMode: %q is not one of auto, always, never", c.GUI.PortraitMode)
 	}
 	if strings.HasPrefix(strings.TrimSpace(c.OpenUPM.Repo), "-") || strings.HasPrefix(strings.TrimSpace(c.OpenUPM.Ref), "-") {
 		return fmt.Errorf("openupm: repo and ref cannot start with '-'")

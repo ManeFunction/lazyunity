@@ -70,17 +70,20 @@ const (
 
 const (
 	minScreenW = 52 // 28 for Projects and 24 for the right column
-	minScreenH = 11
+	// minPortraitW is the width of the one column in portrait mode.
+	minPortraitW = 28
+	minScreenH   = 11
 	// editorShare is the part of the right column the Editors panel takes.
 	editorShare = 0.65
 )
 
 // geometry is where everything goes on screen.
 type geometry struct {
-	ok     bool // false when the terminal is too small
-	panels [numPanels]rect
-	tasks  rect // empty when no task is running
-	bar    rect // the hint line, empty when switched off
+	ok       bool // false when the terminal is too small
+	portrait bool // every panel in one column
+	panels   [numPanels]rect
+	tasks    rect // empty when no task is running
+	bar      rect // the hint line, empty when switched off
 }
 
 func (g geometry) panelAt(x, y int) int {
@@ -98,16 +101,20 @@ func (g geometry) panelAt(x, y int) int {
 // right; the other modes give their panels the whole width. A task frame, when
 // there is one, spans the width above the hint line.
 //
+// In portrait mode, as in lazygit, the panels are stacked in one column
+// instead: Projects on top with sideWidth of the height, then Editors above
+// Options.
+//
 // need is how many content rows each panel has to show. The Options panel
 // takes rows from the Editors panel when its content does not fit in its
 // share, but only rows the Editors panel leaves empty.
-func computeGeometry(w, h int, sideWidth float64, mode screenMode, tasksH int, showBar bool, need [numPanels]int) geometry {
-	var g geometry
+func computeGeometry(w, h int, sideWidth float64, mode screenMode, portrait bool, tasksH int, showBar bool, need [numPanels]int) geometry {
+	g := geometry{portrait: portrait}
 	barH := 0
 	if showBar {
 		barH = 1
 	}
-	if w < minScreenW || h < minScreenH+tasksH+barH {
+	if w < g.minWidth() || h < minScreenH+tasksH+barH {
 		return g
 	}
 	g.ok = true
@@ -120,25 +127,37 @@ func computeGeometry(w, h int, sideWidth float64, mode screenMode, tasksH int, s
 	}
 
 	// splitColumn stacks two panels in a column, the first taking the share.
-	splitColumn := func(x, colW int, first, second int) {
-		top := int(math.Round(float64(mainH) * editorShare))
-		if want := mainH - (need[second] + 2); want < top {
+	splitColumn := func(x, y, colW, colH int, first, second int) {
+		top := int(math.Round(float64(colH) * editorShare))
+		if want := colH - (need[second] + 2); want < top {
 			top = min(top, max(want, need[first]+2))
 		}
-		top = clamp(top, 4, mainH-3)
-		g.panels[first] = rect{x, 0, colW, top}
-		g.panels[second] = rect{x, top, colW, mainH - top}
+		top = clamp(top, 4, colH-3)
+		g.panels[first] = rect{x, y, colW, top}
+		g.panels[second] = rect{x, y + top, colW, colH - top}
 	}
 
-	switch mode {
-	case modeProjects:
+	switch {
+	case mode == modeProjects:
 		g.panels[panelProjects] = rect{0, 0, w, mainH}
-	case modeEditors:
-		splitColumn(0, w, panelEditors, panelOptions)
+	case mode == modeEditors:
+		splitColumn(0, 0, w, mainH, panelEditors, panelOptions)
+	case portrait:
+		top := clamp(int(math.Round(float64(mainH)*sideWidth)), 4, mainH-7)
+		g.panels[panelProjects] = rect{0, 0, w, top}
+		splitColumn(0, top, w, mainH-top, panelEditors, panelOptions)
 	default:
 		left := clamp(int(math.Round(float64(w)*sideWidth)), 28, w-24)
 		g.panels[panelProjects] = rect{0, 0, left, mainH}
-		splitColumn(left, w-left, panelEditors, panelOptions)
+		splitColumn(left, 0, w-left, mainH, panelEditors, panelOptions)
 	}
 	return g
+}
+
+// minWidth is the narrowest screen the layout fits in.
+func (g geometry) minWidth() int {
+	if g.portrait {
+		return minPortraitW
+	}
+	return minScreenW
 }
