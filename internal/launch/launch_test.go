@@ -33,7 +33,7 @@ func TestSplit(t *testing.T) {
 		{`echo\`, nil, true},
 	}
 	for _, c := range cases {
-		got, err := Split(c.in)
+		got, err := Split("linux", c.in)
 		if (err != nil) != c.err {
 			t.Errorf("Split(%q) error = %v, want error %v", c.in, err, c.err)
 			continue
@@ -44,8 +44,35 @@ func TestSplit(t *testing.T) {
 	}
 }
 
+// On Windows a backslash separates folders: it escapes nothing.
+func TestSplitKeepsWindowsPaths(t *testing.T) {
+	cases := []struct {
+		in   string
+		want []string
+	}{
+		{`C:\Tools\nvim.exe {{dir}}`, []string{`C:\Tools\nvim.exe`, "{{dir}}"}},
+		{`"C:\Program Files\Microsoft VS Code\Code.exe" -n {{dir}}`, []string{`C:\Program Files\Microsoft VS Code\Code.exe`, "-n", "{{dir}}"}},
+		{`'C:\Program Files\x.exe' {{dir}}`, []string{`C:\Program Files\x.exe`, "{{dir}}"}},
+		{`explorer \\server\share\`, []string{"explorer", `\\server\share\`}},
+		{`code --goto "{{dir}}\Assets"`, []string{"code", "--goto", `{{dir}}\Assets`}},
+	}
+	for _, c := range cases {
+		got, err := Split("windows", c.in)
+		if err != nil || !reflect.DeepEqual(got, c.want) {
+			t.Errorf("Split(windows, %q) = %q, %v; want %q", c.in, got, err, c.want)
+		}
+	}
+	if _, err := Split("windows", `"C:\open`); err == nil {
+		t.Error("an unterminated quote is still an error on Windows")
+	}
+	// the same line on Unix escapes
+	if got, _ := Split("linux", `C:\Tools\nvim.exe`); got[0] != "C:Toolsnvim.exe" {
+		t.Errorf("Unix splitting changed: %q", got)
+	}
+}
+
 func TestExpandKeepsFolderNamesWhole(t *testing.T) {
-	got, err := Expand("code --goto {{dir}}/Assets", "/home/u/My Game")
+	got, err := Expand("linux", "code --goto {{dir}}/Assets", "/home/u/My Game")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,10 +80,10 @@ func TestExpandKeepsFolderNamesWhole(t *testing.T) {
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got %q, want %q", got, want)
 	}
-	if _, err := Expand("   ", "/x"); err == nil {
+	if _, err := Expand("linux", "   ", "/x"); err == nil {
 		t.Error("an empty command must be an error")
 	}
-	if _, err := Expand(`code "{{dir}}`, "/x"); err == nil {
+	if _, err := Expand("linux", `code "{{dir}}`, "/x"); err == nil {
 		t.Error("a broken command must be an error")
 	}
 }
@@ -100,14 +127,14 @@ func TestRunStartsADetachedProcess(t *testing.T) {
 	}
 	dir := t.TempDir()
 	marker := filepath.Join(dir, "marker")
-	if err := Run(`sh -c "echo started > '`+marker+`'"`, dir); err != nil {
+	if err := Run(runtime.GOOS, `sh -c "echo started > '`+marker+`'"`, dir); err != nil {
 		t.Fatal(err)
 	}
 	waitForFile(t, marker)
 }
 
 func TestRunReportsAMissingProgram(t *testing.T) {
-	if err := Run("definitely-not-a-program-xyz {{dir}}", "/x"); err == nil {
+	if err := Run(runtime.GOOS, "definitely-not-a-program-xyz {{dir}}", "/x"); err == nil {
 		t.Error("starting a missing program must fail")
 	}
 	if err := Editor("/definitely/not/here/Unity", "/p", ""); err == nil {
@@ -139,7 +166,7 @@ func TestStartedProgramsAreReaped(t *testing.T) {
 		t.Skip("reads /proc")
 	}
 	for range 3 {
-		if err := Run("true", ""); err != nil {
+		if err := Run(runtime.GOOS, "true", ""); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -179,22 +206,26 @@ func TestEdit(t *testing.T) {
 	env := func(vars map[string]string) func(string) string {
 		return func(k string) string { return vars[k] }
 	}
-	cmd, err := Edit("", "/p/config.yml", "/p", env(map[string]string{"EDITOR": `nvim -c "set nu"`}))
+	cmd, err := Edit("linux", "", "/p/config.yml", "/p", env(map[string]string{"EDITOR": `nvim -c "set nu"`}))
 	if err != nil || !reflect.DeepEqual(cmd.Args, []string{"nvim", "-c", "set nu", "/p/config.yml"}) || cmd.Dir != "/p" {
 		t.Errorf("$EDITOR runs on the path, in dir: %v %v", cmd, err)
 	}
-	cmd, _ = Edit("", "/p", "/p", env(map[string]string{"EDITOR": "nano", "VISUAL": "code -w"}))
+	cmd, _ = Edit("linux", "", "/p", "/p", env(map[string]string{"EDITOR": "nano", "VISUAL": "code -w"}))
 	if cmd.Args[0] != "code" {
 		t.Errorf("$VISUAL comes first: %v", cmd.Args)
 	}
-	if _, err := Edit("", "/p", "/p", env(nil)); !errors.Is(err, ErrNoEditor) {
+	cmd, _ = Edit("windows", "", `C:\p\config.yml`, `C:\p`, env(map[string]string{"EDITOR": `C:\Tools\nvim.exe`}))
+	if !reflect.DeepEqual(cmd.Args, []string{`C:\Tools\nvim.exe`, `C:\p\config.yml`}) {
+		t.Errorf("a Windows $EDITOR keeps its backslashes: %v", cmd.Args)
+	}
+	if _, err := Edit("linux", "", "/p", "/p", env(nil)); !errors.Is(err, ErrNoEditor) {
 		t.Errorf("no editor set: %v", err)
 	}
-	if _, err := Edit("", "/p", "/p", env(map[string]string{"EDITOR": `vim "`})); err == nil || errors.Is(err, ErrNoEditor) {
+	if _, err := Edit("linux", "", "/p", "/p", env(map[string]string{"EDITOR": `vim "`})); err == nil || errors.Is(err, ErrNoEditor) {
 		t.Errorf("a broken $EDITOR is an error of its own: %v", err)
 	}
 	if runtime.GOOS != "windows" {
-		if cmd, err := Edit("true {{dir}}", "/p", "/p", env(map[string]string{"EDITOR": "vim"})); cmd != nil || err != nil {
+		if cmd, err := Edit("linux", "true {{dir}}", "/p", "/p", env(map[string]string{"EDITOR": "vim"})); cmd != nil || err != nil {
 			t.Errorf("os.edit starts the editor on its own and wins over $EDITOR: %v %v", cmd, err)
 		}
 	}

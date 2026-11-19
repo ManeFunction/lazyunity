@@ -68,7 +68,7 @@ func OpenURL(goos, link string) error {
 // FolderCommand is the command OpenFolder runs.
 func FolderCommand(goos, tmpl, dir string) ([]string, error) {
 	if strings.TrimSpace(tmpl) != "" {
-		return Expand(tmpl, dir)
+		return Expand(goos, tmpl, dir)
 	}
 	switch goos {
 	case "windows":
@@ -79,9 +79,10 @@ func FolderCommand(goos, tmpl, dir string) ([]string, error) {
 	return []string{"xdg-open", dir}, nil
 }
 
-// Run starts a command line detached. {{dir}} in tmpl stands for dir.
-func Run(tmpl, dir string) error {
-	argv, err := Expand(tmpl, dir)
+// Run starts a command line detached. {{dir}} in tmpl stands for dir; goos
+// decides how the line is split (see Split).
+func Run(goos, tmpl, dir string) error {
+	argv, err := Expand(goos, tmpl, dir)
 	if err != nil {
 		return err
 	}
@@ -95,10 +96,11 @@ var ErrNoEditor = errors.New("no code editor is set")
 // config.yml ({{dir}} standing for path), the editor is started on its own and
 // the returned command is nil. Otherwise it is $VISUAL or $EDITOR, as read by
 // getenv: the command returned runs it on path, in dir, and is meant to be run
-// with the terminal handed over. ErrNoEditor means neither is set.
-func Edit(tmpl, path, dir string, getenv func(string) string) (*exec.Cmd, error) {
+// with the terminal handed over. ErrNoEditor means neither is set. goos decides
+// how the command lines are split (see Split).
+func Edit(goos, tmpl, path, dir string, getenv func(string) string) (*exec.Cmd, error) {
 	if strings.TrimSpace(tmpl) != "" {
-		return nil, Run(tmpl, path)
+		return nil, Run(goos, tmpl, path)
 	}
 	editor := getenv("VISUAL")
 	if editor == "" {
@@ -107,7 +109,7 @@ func Edit(tmpl, path, dir string, getenv func(string) string) (*exec.Cmd, error)
 	if strings.TrimSpace(editor) == "" {
 		return nil, ErrNoEditor
 	}
-	words, err := Split(editor)
+	words, err := Split(goos, editor)
 	if err != nil {
 		return nil, fmt.Errorf("$EDITOR: %w", err)
 	}
@@ -155,8 +157,8 @@ func ShellCommand(goos, shell, text, dir string, getenv func(string) string) *ex
 // Expand splits a command line into words and puts dir where {{dir}} is. The
 // substitution happens after the splitting, so a folder with spaces in its name
 // stays one argument.
-func Expand(tmpl, dir string) ([]string, error) {
-	words, err := Split(tmpl)
+func Expand(goos, tmpl, dir string) ([]string, error) {
+	words, err := Split(goos, tmpl)
 	if err != nil {
 		return nil, err
 	}
@@ -169,10 +171,12 @@ func Expand(tmpl, dir string) ([]string, error) {
 	return words, nil
 }
 
-// Split cuts a command line into words. Single and double quotes group words
-// and a backslash escapes the next character, as in a shell, but nothing is
-// ever expanded.
-func Split(s string) ([]string, error) {
+// Split cuts a command line into words. Single and double quotes group words,
+// as in a shell, but nothing is ever expanded. On Unix a backslash escapes the
+// next character. On Windows it is an ordinary character, since it separates
+// the folders of a path: C:\Tools\nvim.exe stays as it is written.
+func Split(goos, s string) ([]string, error) {
+	escapes := goos != "windows"
 	var words []string
 	var cur strings.Builder
 	inWord := false
@@ -183,7 +187,7 @@ func Split(s string) ([]string, error) {
 		case escaped:
 			cur.WriteRune(r)
 			escaped = false
-		case r == '\\' && quote != '\'':
+		case escapes && r == '\\' && quote != '\'':
 			escaped = true
 			inWord = true
 		case quote != 0:

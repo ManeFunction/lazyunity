@@ -102,7 +102,7 @@ func (h *hostRecorder) Edit(tmpl, path, dir string, getenv func(string) string) 
 		h.editors = append(h.editors, tmpl+" "+path)
 		return nil, h.err
 	}
-	return launch.Edit("", path, dir, getenv)
+	return launch.Edit("linux", "", path, dir, getenv) // Unix splitting on every host, as the tests expect
 }
 
 func (h *hostRecorder) FindOpenUPM(context.Context) (string, string) {

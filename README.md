@@ -140,6 +140,8 @@ projects:
 quitAfterOpen: false
 ```
 
+**Command lines** (`os.edit`, `os.openFolder`, `$VISUAL` / `$EDITOR`) are cut into words as a shell would, with quotes grouping words, but nothing in them is expanded. On Windows a backslash is part of the path, so `C:\Tools\nvim.exe {{dir}}` works as written; on Unix it escapes the next character.
+
 **OpenUPM CLI fork.** Until [openupm/openupm-cli#430](https://github.com/openupm/openupm-cli/pull/430) is merged (it is not accepted yet), the fork in the `openupm` block above is the recommended build. It drops deprecated dependencies, so npm no longer floods the install with deprecation warnings. It also cuts the `npm audit` findings from 19 vulnerable production packages (one critical) to 5, and fixes `openupm login` with a username and password, which sent the email as the password and logged in to registry.npmjs.org instead of the registry you asked for. It needs Node.js 20.17+ or 22.9+. Uncomment the block to use it; leave it commented out for the official npm release.
 
 ## Safety

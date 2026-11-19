@@ -46,7 +46,7 @@ func (h machine) StartEditor(exe, project, buildTarget string) error {
 }
 
 func (h machine) Edit(tmpl, path, dir string, getenv func(string) string) (*exec.Cmd, error) {
-	return launch.Edit(tmpl, path, dir, getenv)
+	return launch.Edit(h.env.GOOS, tmpl, path, dir, getenv)
 }
 
 func (h machine) FindOpenUPM(ctx context.Context) (string, string) {
