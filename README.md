@@ -75,7 +75,7 @@ Everything follows lazygit where lazygit has an equivalent. `?` shows the keys t
 | `:` | run a shell command |
 | `ctrl+o` | copy the selected path |
 | `X` | cancel the running task |
-| `ctrl+z` | suspend to the shell |
+| `ctrl+z` | suspend to the shell (not on Windows) |
 | `esc` | clear a filter, or leave an Editor's modules |
 
 **Projects**

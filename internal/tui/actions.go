@@ -62,7 +62,8 @@ func globalActions() []*action {
 		{id: "universal.cancelTask", ctx: ctxGlobal, keys: []string{"X"}, desc: "Cancel the running task", hint: "Cancel task",
 			enabled: func(m *Model) bool { return m.cancellable() },
 			run:     func(m *Model) tea.Cmd { m.confirmCancelRunning(); return nil }},
-		{id: "universal.suspend", ctx: ctxGlobal, keys: []string{"ctrl+z"}, desc: "Suspend to the shell",
+		// Windows consoles have no job control: Bubble Tea's suspend does nothing there.
+		{id: "universal.suspend", ctx: ctxGlobal, keys: []string{"ctrl+z"}, desc: "Suspend to the shell", notOn: "windows",
 			run: func(m *Model) tea.Cmd { return tea.Suspend }},
 
 		{id: "universal.nextPanel", ctx: ctxGlobal, keys: []string{"tab", "l", "right"}, desc: "Next panel", nav: true,
@@ -151,7 +152,7 @@ func (m *Model) openKeybindings() {
 	var local, global, navs []menuItem
 	ctx := m.focusCtx()
 	for _, a := range m.keymap.actions {
-		if len(m.keymap.keys[a]) == 0 {
+		if len(m.keymap.keys[a]) == 0 || a.notOn == m.goos {
 			continue
 		}
 		it := menuItem{label: a.desc, key: m.keymap.allKeys(a)}

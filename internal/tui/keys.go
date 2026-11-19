@@ -45,13 +45,18 @@ type action struct {
 	nav bool
 	// enabled decides whether the action is available right now. nil: always.
 	enabled func(*Model) bool
-	run     func(*Model) tea.Cmd
+	// notOn is an operating system (a GOOS) the action cannot work on. There
+	// the action is never available and the ? menu leaves it out.
+	notOn string
+	run   func(*Model) tea.Cmd
 }
 
 func (a *action) name() string { return a.id[strings.IndexByte(a.id, '.')+1:] }
 
 // available reports whether the action can run right now.
-func (a *action) available(m *Model) bool { return a.enabled == nil || a.enabled(m) }
+func (a *action) available(m *Model) bool {
+	return a.notOn != m.goos && (a.enabled == nil || a.enabled(m))
+}
 
 // onSelected returns a function that completes an action working on the item
 // selected in a list: the action is enabled while there is one (and its own

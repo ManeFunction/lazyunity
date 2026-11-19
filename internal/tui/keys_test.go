@@ -222,3 +222,20 @@ func TestReadmeSampleConfigIsClean(t *testing.T) {
 		t.Errorf("the sample config's keybindings warn: %q", warnings)
 	}
 }
+
+// Ctrl+Z cannot suspend on Windows: there the action is not offered at all.
+func TestSuspendIsNotOfferedOnWindows(t *testing.T) {
+	for goos, want := range map[string]bool{"linux": true, "darwin": true, "windows": false} {
+		m := newTestModel(t)
+		m.goos = goos
+		resize(m, 120, 80)
+		a := m.keymap.lookup(ctxGlobal, "ctrl+z")
+		if a == nil || a.available(m) != want {
+			t.Errorf("%s: suspend available = %v, want %v", goos, a != nil && a.available(m), want)
+		}
+		press(m, "?")
+		if got := strings.Contains(screenText(m), "Suspend to the shell"); got != want {
+			t.Errorf("%s: suspend in the ? menu = %v, want %v", goos, got, want)
+		}
+	}
+}
