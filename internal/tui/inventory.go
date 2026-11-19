@@ -2,6 +2,7 @@ package tui
 
 import (
 	"sort"
+	"strings"
 
 	"github.com/ManeFunction/lazyunity/internal/unity"
 	"github.com/ManeFunction/lazyunity/internal/unitycli"
@@ -106,7 +107,7 @@ func (inv *inventory) setListed(listed []listedEditor) {
 }
 
 func (inv *inventory) merge() {
-	inv.all = mergeEditors(inv.found, inv.listed)
+	inv.all = mergeEditors(inv.goos, inv.found, inv.listed)
 	inv.versions = map[string]bool{}
 	for _, e := range inv.all {
 		inv.versions[e.Version] = true
@@ -137,11 +138,11 @@ func (inv *inventory) strays() []string {
 	}
 	known := map[string]bool{}
 	for _, e := range inv.listed {
-		known[e.Location] = true
+		known[locationKey(inv.goos, e.Location)] = true
 	}
 	var out []string
 	for _, e := range inv.found {
-		if !known[e.Location] && !inv.registered[e.Location] {
+		if !known[locationKey(inv.goos, e.Location)] && !inv.registered[e.Location] {
 			out = append(out, e.Location)
 		}
 	}
@@ -156,11 +157,21 @@ func (inv *inventory) told(locations []string) {
 	}
 }
 
+// locationKey is what two locations of one Editor have in common. On Windows
+// paths ignore case and take either slash, so the CLI and a scan can write
+// the same Editor differently; elsewhere the path is the key.
+func locationKey(goos, location string) string {
+	if goos != "windows" {
+		return location
+	}
+	return strings.ToLower(strings.ReplaceAll(location, "/", `\`))
+}
+
 // mergeEditors combines what a scan of the disk found with what the CLI
 // reports. The scan decides what is installed; the CLI adds the default Editor,
 // the real version of an Editor whose folder is not named after it, and the
 // Editors that live outside the Editors folder.
-func mergeEditors(found []foundEditor, listed []listedEditor) []editorRow {
+func mergeEditors(goos string, found []foundEditor, listed []listedEditor) []editorRow {
 	byLoc := map[string]*editorRow{}
 	var rows []*editorRow
 	for _, e := range found {
@@ -168,11 +179,11 @@ func mergeEditors(found []foundEditor, listed []listedEditor) []editorRow {
 			Version: e.Version, Arch: e.Architecture, Location: e.Location, Dir: e.Dir, LTS: e.LTS,
 			Platforms: e.platforms,
 		}
-		byLoc[e.Location] = r
+		byLoc[locationKey(goos, e.Location)] = r
 		rows = append(rows, r)
 	}
 	for _, e := range listed {
-		if r, ok := byLoc[e.Location]; ok {
+		if r, ok := byLoc[locationKey(goos, e.Location)]; ok {
 			r.Default = e.Default
 			if e.Version != "" {
 				r.Version = e.Version // the scan only knows the folder's name
@@ -186,7 +197,7 @@ func mergeEditors(found []foundEditor, listed []listedEditor) []editorRow {
 			Version: e.Version, Arch: e.Architecture, Location: e.Location, Dir: e.dir, Default: e.Default,
 			Platforms: e.platforms,
 		}
-		byLoc[e.Location] = r
+		byLoc[locationKey(goos, e.Location)] = r
 		rows = append(rows, r)
 	}
 	sort.SliceStable(rows, func(i, j int) bool { return unity.CompareStrings(rows[i].Version, rows[j].Version) > 0 })

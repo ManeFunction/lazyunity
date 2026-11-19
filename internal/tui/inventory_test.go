@@ -91,11 +91,36 @@ func TestInventoryStraysAreToldOnce(t *testing.T) {
 func TestMergeEditorsTakesTheVersionFromTheCLI(t *testing.T) {
 	found := []foundEditor{{Installed: unity.Installed{Version: "unity-2022.3", Location: "/opt/unity-2022.3/Editor/Unity", Dir: "/opt/unity-2022.3"}}}
 	listed := []listedEditor{{Editor: unitycli.Editor{Version: "2022.3.62f1", Location: "/opt/unity-2022.3/Editor/Unity", Architecture: "x86_64", Default: true}}}
-	got := mergeEditors(found, listed)
+	got := mergeEditors("linux", found, listed)
 	if len(got) != 1 {
 		t.Fatalf("one Editor, listed once: %+v", got)
 	}
 	if e := got[0]; e.Version != "2022.3.62f1" || !e.Default || e.Arch != "x86_64" {
 		t.Errorf("the CLI knows the real version of an Editor in a folder not named after it: %+v", e)
+	}
+}
+
+// Windows paths ignore case and take either slash: the CLI and a scan that
+// write one Editor differently still mean the same one.
+func TestEditorLocationsOnWindowsIgnoreCaseAndSlashes(t *testing.T) {
+	scanned := `C:\Program Files\Unity\Hub\Editor\6000.6.8f1\Editor\Unity.exe`
+	listed := `c:/program files/Unity/Hub/Editor/6000.6.8f1/Editor/Unity.exe`
+	inv := newInventory("windows", "", `C:\Program Files\Unity\Hub\Editor`, noEnv)
+	inv.setFound([]foundEditor{{Installed: unity.Installed{Version: "6000.6.8f1", Location: scanned}}})
+	inv.setListed([]listedEditor{{Editor: unitycli.Editor{Version: "6000.6.8f1", Location: listed, Default: true}}})
+	eds := inv.editors()
+	if len(eds) != 1 || !eds[0].Default || eds[0].Location != scanned {
+		t.Errorf("one Editor, with the scan's path: %+v", eds)
+	}
+	if got := inv.strays(); got != nil {
+		t.Errorf("an Editor the CLI lists is not a stray: %q", got)
+	}
+
+	// elsewhere case matters: these are two folders
+	linux := mergeEditors("linux",
+		[]foundEditor{{Installed: unity.Installed{Version: "a", Location: "/opt/A/Editor/Unity"}}},
+		[]listedEditor{{Editor: unitycli.Editor{Version: "a", Location: "/opt/a/Editor/Unity"}}})
+	if len(linux) != 2 {
+		t.Errorf("on Linux paths that differ in case are different Editors: %+v", linux)
 	}
 }
