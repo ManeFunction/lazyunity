@@ -270,7 +270,11 @@ func (m *Model) pop() {
 
 // relayout recomputes the geometry and tells every list its height.
 func (m *Model) relayout() {
-	m.geo = computeGeometry(m.w, m.h, m.cfg.GUI.SidePanelWidth, m.mode, m.tasksHeight(), m.cfg.GUI.ShowBottomLine)
+	var need [numPanels]int
+	for i, p := range m.panels {
+		need[i] = p.need()
+	}
+	m.geo = computeGeometry(m.w, m.h, m.cfg.GUI.SidePanelWidth, m.mode, m.tasksHeight(), m.cfg.GUI.ShowBottomLine, need)
 	for i, p := range m.panels {
 		if r := m.geo.panels[i]; !r.empty() {
 			p.setHeight(r.h - 2)
@@ -358,7 +362,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // finish runs after every update, any of which may have asked to quit.
+// It also lays the screen out again, since what changed may be how many rows a
+// panel has to show.
 func (m *Model) finish(cmd tea.Cmd) tea.Cmd {
+	m.relayout()
 	if m.quit {
 		return tea.Sequence(cmd, tea.Quit)
 	}

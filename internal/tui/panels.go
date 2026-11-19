@@ -17,6 +17,8 @@ type tab interface {
 	footer() string
 	scrollbar() scrollbar
 	setHeight(h int)
+	// need is how many rows the tab takes to show all of its content.
+	need() int
 	setFilter(s string)
 	filter() string
 	click(row int) bool
@@ -58,6 +60,7 @@ func (t *listTab[T]) nav() navigable       { return t.list }
 func (t *listTab[T]) footer() string       { return t.list.footer() }
 func (t *listTab[T]) scrollbar() scrollbar { return t.list.scrollbar() }
 func (t *listTab[T]) setHeight(h int)      { t.list.SetHeight(h - b2i(t.filterLine)) }
+func (t *listTab[T]) need() int            { return max(t.list.Len(), 1) + b2i(t.filterLine) }
 func (t *listTab[T]) filterRow() bool      { return t.filterLine }
 func (t *listTab[T]) setFilter(s string)   { t.list.SetFilter(s) }
 func (t *listTab[T]) filter() string       { return t.list.Filter() }
@@ -137,6 +140,9 @@ func (p *panel) setHeight(h int) {
 		p.drill.tab.setHeight(h)
 	}
 }
+
+// need is how many rows the panel takes to show all of what is on it now.
+func (p *panel) need() int { return p.active().need() }
 
 // switchTab moves to another tab; it does nothing while drilled in.
 func (p *panel) switchTab(delta int) bool {

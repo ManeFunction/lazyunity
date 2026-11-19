@@ -97,7 +97,11 @@ func (g geometry) panelAt(x, y int) int {
 // In full mode the Projects panel is on the left, Editors above Options on the
 // right; the other modes give their panels the whole width. A task frame, when
 // there is one, spans the width above the hint line.
-func computeGeometry(w, h int, sideWidth float64, mode screenMode, tasksH int, showBar bool) geometry {
+//
+// need is how many content rows each panel has to show. The Options panel
+// takes rows from the Editors panel when its content does not fit in its
+// share, but only rows the Editors panel leaves empty.
+func computeGeometry(w, h int, sideWidth float64, mode screenMode, tasksH int, showBar bool, need [numPanels]int) geometry {
 	var g geometry
 	barH := 0
 	if showBar {
@@ -117,7 +121,11 @@ func computeGeometry(w, h int, sideWidth float64, mode screenMode, tasksH int, s
 
 	// splitColumn stacks two panels in a column, the first taking the share.
 	splitColumn := func(x, colW int, first, second int) {
-		top := clamp(int(math.Round(float64(mainH)*editorShare)), 4, mainH-3)
+		top := int(math.Round(float64(mainH) * editorShare))
+		if want := mainH - (need[second] + 2); want < top {
+			top = min(top, max(want, need[first]+2))
+		}
+		top = clamp(top, 4, mainH-3)
 		g.panels[first] = rect{x, 0, colW, top}
 		g.panels[second] = rect{x, top, colW, mainH - top}
 	}
