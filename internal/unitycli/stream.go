@@ -69,6 +69,24 @@ func FinishedStream(err error, frames ...Frame) *Stream {
 	return &Stream{Frames: ch, done: done, err: err}
 }
 
+// HeldStream is a stream that reports frames and then stays open, as if its
+// command were still running, until ctx is done; Wait then returns ctx's
+// error. It stands in for a long install in lazyunity's fake mode.
+func HeldStream(ctx context.Context, frames ...Frame) *Stream {
+	ch := make(chan Frame, len(frames))
+	for _, f := range frames {
+		ch <- f
+	}
+	s := &Stream{Frames: ch, done: make(chan struct{})}
+	go func() {
+		<-ctx.Done()
+		s.err = ctx.Err()
+		close(ch)
+		close(s.done)
+	}()
+	return s
+}
+
 // pipeGrace is how long to keep reading after the process has exited. The CLI's
 // helpers may hold the pipe open forever, so reading to EOF is not an option.
 const pipeGrace = 500 * time.Millisecond

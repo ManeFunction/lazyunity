@@ -99,7 +99,7 @@ type cliStatusMsg struct {
 // cliTool installs or updates the Unity CLI.
 func (m *Model) cliTool() tea.Cmd {
 	install := func(m *Model) tea.Cmd {
-		if m.refuseWhileBusy("installing the Unity CLI") {
+		if m.refuseFake("installing the Unity CLI") || m.refuseWhileBusy("installing the Unity CLI") {
 			return nil
 		}
 		note := ""
@@ -182,6 +182,9 @@ func (m *Model) cliChannel() string {
 
 // reprobeCLI looks for the CLI again, after it was installed or updated.
 func (m *Model) reprobeCLI(updated bool) tea.Cmd {
+	if m.fake != nil { // the made-up CLI stays as it is
+		return nil
+	}
 	env, configured := m.env, m.cfg.Unity.CLIPath
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

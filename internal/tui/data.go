@@ -65,21 +65,28 @@ type toastMsg struct {
 // ---- commands -----------------------------------------------------------------
 
 func (m *Model) loadProjectsCmd() tea.Cmd {
+	exists := m.exists
 	return m.cliCmd(func(ctx context.Context, c unityCLI) tea.Msg {
 		ps, err := c.Projects(ctx)
-		return projectsMsg{projects: ps, missing: missingPaths(ps), err: err}
+		return projectsMsg{projects: ps, missing: missingPaths(ps, exists), err: err}
 	})
 }
 
 // missingPaths are the projects whose folder is not there.
-func missingPaths(ps []unitycli.Project) map[string]bool {
+func missingPaths(ps []unitycli.Project, exists func(path string) bool) map[string]bool {
 	missing := map[string]bool{}
 	for _, p := range ps {
-		if _, err := os.Stat(p.Path); err != nil {
+		if !exists(p.Path) {
 			missing[p.Path] = true
 		}
 	}
 	return missing
+}
+
+// pathExists reports whether something is at path.
+func pathExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }
 
 func (m *Model) loadEditorsCmd() tea.Cmd {
@@ -91,9 +98,9 @@ func (m *Model) loadEditorsCmd() tea.Cmd {
 }
 
 func (m *Model) scanEditorsCmd() tea.Cmd {
-	goos, root := m.goos, m.inv.installRoot()
+	goos, root, scan := m.goos, m.inv.installRoot(), m.scan
 	return func() tea.Msg {
-		return localEditorsMsg{found: scanEditors(goos, root)}
+		return localEditorsMsg{found: scan(goos, root)}
 	}
 }
 

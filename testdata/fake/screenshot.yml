@@ -1,0 +1,121 @@
+# A made-up machine for promotional screenshots:
+#
+#   lazyunity --fake testdata/fake/screenshot.yml
+#
+# Nothing here is read from the Unity CLI or the disk, and nothing done in the
+# interface reaches them. Your config.yml still applies (theme, keys), but
+# state.yml is neither read nor written.
+
+# The Unity CLI. version: "" or "missing" shows it as not installed; a latest
+# newer than version offers an update. channel: stable (default) or beta.
+cli:
+  version: 1.0.0
+  latest: 1.0.0
+  channel: stable
+
+account:
+  signedIn: true
+  email: alex@example.com
+  name: Alex Example
+
+# The OpenUPM CLI. version: "" shows it as not installed; a latest newer than
+# version offers an update. With openupm.repo set in your config.yml, it is a
+# build of that repository instead: commit is the one built (a made-up one if
+# left out), and a different latestCommit offers an update.
+openupm:
+  version: 4.5.3
+  latest: 4.5.3
+  # commit: 3f9c2a71d4e8b05a6c1f7e92d3b84a0c5e6f1d27
+  # latestCommit: 3f9c2a71d4e8b05a6c1f7e92d3b84a0c5e6f1d27
+
+# ~ is your home folder. Without editorsFolder, the platform's default.
+editorsFolder: ~/Unity/Hub/Editor
+projectsFolder: ~/Projects
+
+# platform is a platform id (windows, macos, linux, android, ios, webgl, tvos,
+# visionos, uwp), its label (Android, iOS ...) or a BuildTarget
+# (StandaloneLinux64 ...). opened is how long ago: 45m, 2h, 3d, 2w.
+# pending is a version or platform chosen but not applied yet.
+projects:
+  - title: Space Shooter
+    path: ~/Projects/SpaceShooter
+    version: 6000.6.8f1
+    platform: linux
+    opened: 2h
+    pinned: true
+  - title: Neon Drift
+    path: ~/Projects/NeonDrift
+    version: 6000.6.8f1
+    platform: android
+    opened: 5h
+    pinned: true
+  - title: Tiny Kingdoms
+    path: ~/Projects/TinyKingdoms
+    version: 6000.3.28f1
+    platform: webgl
+    opened: 1d
+  - title: Lighthouse VR
+    path: ~/Projects/LighthouseVR
+    version: 6000.3.28f1
+    platform: android
+    opened: 3d
+    pending:
+      version: 6000.6.8f1
+  - title: Puzzle Garden
+    path: ~/Projects/PuzzleGarden
+    version: 2022.3.62f1
+    platform: ios
+    opened: 6d
+    pending:
+      platform: android
+  - title: Old Platformer
+    path: ~/Projects/OldPlatformer
+    version: 2022.3.62f1
+    platform: windows
+    opened: 3w
+  - title: Ancient Thing
+    path: ~/Projects/Archive/AncientThing
+    version: 2019.4.40f1
+    platform: linux
+    opened: 30w
+    missing: true
+
+# Installed Editors; the newest is listed first whatever the order here.
+editors:
+  - version: 6000.6.8f1
+    arch: x86_64
+    default: true
+    platforms: [linux, android, webgl]
+  - version: 6000.3.28f1
+    arch: x86_64
+    lts: true
+    platforms: [linux, android, webgl]
+  - version: 2022.3.62f1
+    arch: x86_64
+    lts: true
+    platforms: [linux, windows, android, ios]
+
+# The Releases tab. stream: LTS, SUPPORTED, BETA or ALPHA. Without this block,
+# the real releases are listed by your Unity CLI, if it is installed (with
+# none, the tab is empty); they are marked installed by the editors above.
+releases:
+  - {version: 6000.7.0b8, stream: BETA}
+  - {version: 6000.7.0b7, stream: BETA}
+  - {version: 6000.6.8f1, stream: SUPPORTED}
+  - {version: 6000.6.7f1, stream: SUPPORTED}
+  - {version: 6000.5.12f1, stream: SUPPORTED}
+  - {version: 6000.3.28f1, stream: LTS}
+  - {version: 6000.3.27f1, stream: LTS}
+  - {version: 6000.0.64f1, stream: LTS}
+  - {version: 2022.3.62f1, stream: LTS}
+  - {version: 2021.3.45f2, stream: LTS}
+  - {version: 6000.8.0a3, stream: ALPHA}
+
+# Tasks: the first runs, stuck at pct (0 to 100; leave it out to only spin);
+# the others wait in the queue. Each can be cancelled.
+tasks:
+  - title: Installing 6000.7.0b8 + Web Build Support
+    pct: 42
+    phase: download
+    message: Downloading Web Build Support
+  - title: Installing iOS Build Support for 6000.6.8f1

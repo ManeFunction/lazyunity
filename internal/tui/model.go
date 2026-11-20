@@ -45,6 +45,10 @@ type Options struct {
 	InstallRoot string
 	// Warnings are shown to the user once the interface is up.
 	Warnings []string
+
+	// Fake, when set, replaces the Unity CLI, the disk and the OpenUPM CLI
+	// with what it describes, for screenshots (the undocumented --fake flag).
+	Fake *Fake
 }
 
 type toastKind int
@@ -83,6 +87,14 @@ type Model struct {
 	host      host
 	goos      string
 	now       func() time.Time
+	// exists and scan look at the disk: whether a project folder is there, and
+	// which Editors an Editors folder holds. The fake mode replaces them.
+	exists func(path string) bool
+	scan   func(goos, root string) []foundEditor
+	// fake is the file of the fake mode, nil on a real machine.
+	fake *Fake
+	// startCmd is run by Init, such as the fake mode's tasks.
+	startCmd tea.Cmd
 
 	w, h   int
 	mode   screenMode
@@ -137,6 +149,7 @@ func New(o Options) (*Model, error) {
 		cfg: o.Config, st: o.State, th: th, configDir: o.ConfigDir, version: o.Version,
 		cliStatus: o.CLI, env: o.Env, goos: o.GOOS, now: o.Now,
 		mode: parseScreenMode(o.Config.GUI.ScreenMode), missing: map[string]bool{},
+		exists: pathExists, scan: scanEditors,
 	}
 	if o.Client != nil { // a nil *Client in the interface would not be nil
 		m.cli = o.Client
@@ -177,12 +190,17 @@ func New(o Options) (*Model, error) {
 		m.focus = m.mode.firstPanel()
 	}
 
-	if o.Local != nil {
+	switch {
+	case o.Fake != nil:
+		m.useFake(o.Fake)
+	case o.Local != nil:
 		m.inv.setFound(withPlatforms(m.goos, o.Local))
-	} else {
-		m.inv.setFound(scanEditors(m.goos, m.inv.installRoot()))
+	default:
+		m.inv.setFound(m.scan(m.goos, m.inv.installRoot()))
 	}
-	m.rawProjects, m.missing = o.Projects, missingPaths(o.Projects)
+	if o.Fake == nil {
+		m.rawProjects, m.missing = o.Projects, missingPaths(o.Projects, m.exists)
+	}
 	m.refreshEditors()
 	m.refreshProjects()
 	m.refreshTools()
@@ -309,7 +327,7 @@ func (m *Model) Restart() bool { return m.restart }
 
 // Init starts the slow loads.
 func (m *Model) Init() tea.Cmd {
-	return tea.Batch(tick(), m.reload(m.launchLoads()), queryPaletteCmd(), tea.RequestBackgroundColor)
+	return tea.Batch(tick(), m.reload(m.launchLoads()), queryPaletteCmd(), tea.RequestBackgroundColor, m.startCmd)
 }
 
 // launchLoads is what Init loads: everything but what was cheap enough to load

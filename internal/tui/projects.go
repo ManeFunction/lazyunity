@@ -441,6 +441,9 @@ func safeToDelete(path string) string {
 }
 
 func (m *Model) deleteProjectFlow(r projectRow) {
+	if m.refuseFake("deleting projects") { // a made-up path may be a real folder
+		return
+	}
 	if why := safeToDelete(r.Path); why != "" {
 		m.toastf(toastError, "Not deleting %s: %s", displayPath(r.Path), why)
 		return

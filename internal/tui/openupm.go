@@ -209,7 +209,7 @@ func repoName(repo, ref string) string {
 
 // openupmTool installs the OpenUPM CLI, after saying how.
 func (m *Model) openupmTool() tea.Cmd {
-	if m.refuseWhileBusy("installing the OpenUPM CLI") {
+	if m.refuseFake("installing the OpenUPM CLI") || m.refuseWhileBusy("installing the OpenUPM CLI") {
 		return nil
 	}
 	src := m.cfg.OpenUPM
