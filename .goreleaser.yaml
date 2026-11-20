@@ -1,0 +1,95 @@
+# GoReleaser: builds the release binaries, creates the GitHub release, writes the
+# Scoop manifest into ManeFunction/scoop-bucket and opens the WinGet pull request
+# against microsoft/winget-pkgs. release.yml runs it on a vX.Y.Z tag, with the
+# release notes taken from CHANGELOG.md. The Homebrew formula builds from source
+# and is bumped by release.yml itself, so there is no brews/homebrew_casks here.
+#
+# Try it locally without publishing anything: goreleaser release --snapshot --clean
+version: 2
+
+project_name: lazyunity
+
+builds:
+  - id: lazyunity
+    main: ./cmd/lazyunity
+    binary: lazyunity
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w # the version is in cmd/lazyunity/main.go, checked against the tag
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+archives:
+  - id: lazyunity
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - README.md
+      - CHANGELOG.md
+      - LICENSE
+
+checksum:
+  name_template: checksums.txt
+
+# The release notes come from CHANGELOG.md (--release-notes in release.yml).
+changelog:
+  disable: true
+
+release:
+  github:
+    owner: ManeFunction
+    name: lazyunity
+  name_template: "{{ .Tag }}"
+
+scoops:
+  - name: lazyunity
+    ids: [lazyunity]
+    repository:
+      owner: ManeFunction
+      name: scoop-bucket
+      token: "{{ index .Env \"PACKAGES_TOKEN\" }}" # empty in the CI snapshot, which publishes nothing
+    directory: bucket
+    commit_msg_template: "{{ .ProjectName }} {{ .Version }}"
+    homepage: https://github.com/ManeFunction/lazyunity
+    description: A terminal interface for Unity projects and Editors, driven with lazygit's keys.
+    license: MIT
+    skip_upload: auto # not for pre-release tags such as v0.2.0-rc1
+
+winget:
+  - name: lazyunity
+    ids: [lazyunity]
+    package_identifier: ManeFunction.lazyunity
+    publisher: Mane Function
+    publisher_url: https://github.com/ManeFunction
+    publisher_support_url: https://github.com/ManeFunction/lazyunity/issues
+    homepage: https://github.com/ManeFunction/lazyunity
+    short_description: A terminal interface for Unity projects and Editors, driven with lazygit's keys.
+    description: |-
+      lazyunity replaces the Unity Hub with a terminal interface in the style of lazygit.
+      It drives the official Unity CLI, so it shares the Hub's project list and install
+      location, and Editors opened from it start signed in.
+    license: MIT
+    license_url: https://github.com/ManeFunction/lazyunity/blob/main/LICENSE
+    copyright: Copyright (c) 2026 Ilia Petrov-Komotskii (Mane Function)
+    release_notes_url: "https://github.com/ManeFunction/lazyunity/releases/tag/{{ .Tag }}"
+    tags: [unity, unity-hub, gamedev, tui, terminal, cli]
+    skip_upload: auto
+    repository:
+      owner: ManeFunction
+      name: winget-pkgs
+      branch: "lazyunity-{{ .Version }}"
+      token: "{{ index .Env \"PACKAGES_TOKEN\" }}" # empty in the CI snapshot, which publishes nothing
+      pull_request:
+        enabled: true
+        draft: false
+        base:
+          owner: microsoft
+          name: winget-pkgs
+          branch: master

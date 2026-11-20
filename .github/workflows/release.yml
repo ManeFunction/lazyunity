@@ -1,0 +1,73 @@
+# Tag vX.Y.Z -> tests -> version check -> GoReleaser (binaries, GitHub release, Scoop bucket, WinGet PR)
+# -> Homebrew tap bump.
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    uses: ./.github/workflows/ci.yml
+
+  check-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Check the tag matches the project version
+        run: python3 .github/scripts/check_version.py --file cmd/lazyunity/main.go --regex 'var version = "([^"]+)"'
+
+      - name: Check CHANGELOG.md has a section for this version
+        run: python3 .github/scripts/release_notes.py --check
+
+  release:
+    needs: [test, check-version]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # required to create the GitHub Release
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # tags -- needed by GoReleaser and for the Full Changelog link
+
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version-file: go.mod
+
+      - name: Check the binary reports the tag's version
+        run: |
+          out=$(go run ./cmd/lazyunity --version)
+          echo "$out"
+          test "$out" = "lazyunity $GITHUB_REF_NAME"
+
+      - name: Build release notes
+        # This version's whole section from CHANGELOG.md, then the Full Changelog compare link.
+        # Written outside the checkout: GoReleaser refuses to release from a dirty tree.
+        run: python3 .github/scripts/release_notes.py > "$RUNNER_TEMP/release_notes.md"
+
+      - uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
+        with:
+          distribution: goreleaser
+          version: v2.20.2 # an exact release, not "latest": the binary is not pinned by the action's SHA
+          args: release --clean --release-notes ${{ runner.temp }}/release_notes.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Classic PAT (public_repo): writes the Scoop manifest to ManeFunction/scoop-bucket, pushes the
+          # WinGet branch to ManeFunction/winget-pkgs and opens the pull request on microsoft/winget-pkgs.
+          PACKAGES_TOKEN: ${{ secrets.PACKAGES_TOKEN }}
+
+  bump-homebrew-formula:
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: dawidd6/action-homebrew-bump-formula@346ef10bbd55df1c9c70fbaa6b016d26876eefb1 # v11
+        with:
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          tap: ManeFunction/homebrew-tap
+          formula: lazyunity
+          no_fork: "true"

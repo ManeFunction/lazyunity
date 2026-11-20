@@ -13,3 +13,6 @@ coverage.*
 .idea/
 .vscode/
 .DS_Store
+
+# Private release notes and the draft Homebrew formula (mane-publishing); never committed
+packaging/

@@ -1,6 +1,5 @@
 BINARY  := lazyunity
-VERSION ?= 0.1.0
-LDFLAGS := -s -w -X main.version=$(VERSION)
+LDFLAGS := -s -w # the version is in cmd/lazyunity/main.go
 
 .PHONY: build run test vet fmt lint check
 

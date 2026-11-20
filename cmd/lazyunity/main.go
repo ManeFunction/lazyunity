@@ -18,7 +18,9 @@ import (
 	"github.com/ManeFunction/lazyunity/internal/unitycli"
 )
 
-// version is set at build time with -ldflags "-X main.version=...".
+// version is the one place the version is written. The release workflow checks
+// that the tag (vX.Y.Z) matches it, so every build, go install included,
+// reports the same version.
 var version = "0.1.0"
 
 func main() {
@@ -41,7 +43,7 @@ func run() error {
 	}
 	flag.Parse()
 	if *showVersion {
-		fmt.Println("lazyunity", version)
+		fmt.Println("lazyunity v" + version)
 		return nil
 	}
 

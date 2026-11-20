@@ -1,6 +1,7 @@
 # lazyunity
 
-A terminal interface for Unity projects and Editors, driven with [lazygit](https://github.com/jesseduffield/lazygit)'s keys. It replaces the Unity Hub: you do not need to install the Hub at all.
+a lazygit-style terminal interface for Unity projects and Editors, born of an urge to get rid of the slow, bloated, half-a-gig official Unity Hub.
+It replaces the Unity Hub completely: you do not need to install the Hub at all.
 
 lazyunity is a thin, fast front end for the official [Unity CLI](https://docs.unity.com/en-us/unity-cli). Every change goes through the CLI, so it shares the Hub's project list and install location, and Editors you open from it start **signed in**, without the Hub running.
 
@@ -30,14 +31,45 @@ Open: <enter> | Version: v | Platform: p | Pin: f | New: n | Add: a | Remove: d 
 - The Unity CLI, version 1.0.0 or newer. If it is missing, lazyunity offers to install it with Unity's official installer (Tools tab, `3`).
 - Linux, macOS or Windows. A terminal with colours and, ideally, mouse support.
 
-## Build
+## Installation
 
-```sh
-make build        # bin/lazyunity
-make check        # vet, gofmt and the tests
-```
+**lazyunity** is available from a variety of sources.
+`brew`, `scoop` or `winget` is recommended, because they have a convenient way to manage updates automatically.
 
-Go 1.27.3 or newer (what `go.mod` requires). There are no releases yet.
+1) **brew (Recommended for Mac and Linux users)**
+    - Type `brew tap manefunction/tap` in your Terminal to add my custom tap (app source) to your brew sources,
+      if you haven't already.
+    - Type `brew install lazyunity` to install the application itself.
+    - Verify the installation with `lazyunity --version`.
+    - You are perfect, you can use the app with `lazyunity` from any folder in your system.
+2) **Scoop (Recommended for Windows users)**
+    - If you don't have Scoop yet, install it as [scoop.sh](https://scoop.sh) shows: one line in PowerShell.
+    - Type `scoop bucket add manefunction https://github.com/ManeFunction/scoop-bucket` in PowerShell to add my
+      bucket (app source) to your Scoop sources, if you haven't already.
+    - Type `scoop install lazyunity` to install the application itself.
+    - Verify the installation with `lazyunity --version`.
+    - You are perfect, you can use the app with `lazyunity` from any folder in your system.
+3) **WinGet (built into Windows 10 and 11)**
+    - Type `winget install ManeFunction.lazyunity` in PowerShell or cmd. A new package waits for Microsoft's review
+      before it shows up in WinGet, so the newest version can be a few days behind the other options.
+    - Verify the installation with `lazyunity --version` in a new terminal window.
+    - You are perfect, you can use the app with `lazyunity` from any folder in your system.
+    - Update it with `winget upgrade ManeFunction.lazyunity`.
+4) **go install (for Go developers)**
+    - Type `go install github.com/ManeFunction/lazyunity/cmd/lazyunity@latest`. It needs Go 1.27.3 or newer and
+      puts the app into `$(go env GOPATH)/bin`, which should be on your `PATH`.
+    - Verify the installation with `lazyunity --version`.
+5) **Ready-to-use binaries (manual installation)**
+    - Download the archive for your system from the [GitHub Releases](https://github.com/ManeFunction/lazyunity/releases)
+      page: `darwin` is macOS, `arm64` is Apple Silicon and Windows on ARM, `amd64` is Intel and AMD.
+    - Unpack it and put `lazyunity` (`lazyunity.exe` on Windows) into a folder on your `PATH`.
+    - The binaries are not code-signed. On macOS a downloaded binary is blocked until you run
+      `xattr -d com.apple.quarantine lazyunity` once.
+    - Verify the installation with `lazyunity --version`.
+6) **From source (for advanced users)**
+    - Clone the repository or download the source code from GitHub.
+    - Go to the folder with the code in your Terminal and run `make build` (Go 1.27.3 or newer).
+    - Run `bin/lazyunity --version` to verify the build.
 
 ## Layout
 
@@ -155,8 +187,15 @@ quitAfterOpen: false
 
 - Opening an Editor that is older than 2019.1, or opening without the CLI, launches it directly. That works, but the Editor starts signed out.
 - A project moving to Unity 6.7 or later is upgraded with `unity projects upgrade`, since `unity open` refuses to do that.
-- `-buildTarget` values are the ones Unity documents (`linux64`, `android`, `webgl` ...).
 
 ## Author
 
 lazyunity is made by Ilia Petrov-Komotskii ([Mane Function](https://github.com/ManeFunction)). If it saves you time, you can [support it on GitHub Sponsors](https://github.com/sponsors/ManeFunction).
+
+## Repository info
+
+This repo follows the [Conventional Commits](https://www.conventionalcommits.org/) specification.
+
+[![GitHub release (latest by date)](https://img.shields.io/github/v/release/ManeFunction/lazyunity)](https://github.com/ManeFunction/lazyunity/releases/latest)
+[![GitHub All Releases](https://img.shields.io/github/downloads/ManeFunction/lazyunity/total)](https://github.com/ManeFunction/lazyunity/releases)
+[![GitHub Sponsors](https://img.shields.io/github/sponsors/ManeFunction?label=Sponsor&logo=GitHubSponsors&style=flat)](https://github.com/sponsors/ManeFunction)
