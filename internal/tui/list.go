@@ -45,17 +45,7 @@ func (l *list[T]) skipping(skip func(T) bool) *list[T] {
 // SetItems replaces the items. The cursor stays on the same item when it is
 // still there, and the filter is kept.
 func (l *list[T]) SetItems(items []T) {
-	var keep string
-	var had bool
-	if cur, ok := l.Selected(); ok && l.key != nil {
-		keep, had = l.key(cur), true
-	}
-	l.items = items
-	l.refilter()
-	if had {
-		l.SelectKey(keep)
-	}
-	l.clamp()
+	l.keepCursor(func() { l.items = items })
 }
 
 // Items returns every item, filtered or not.
@@ -63,12 +53,18 @@ func (l *list[T]) Items() []T { return l.items }
 
 // SetFilter shows only items whose text contains s, ignoring case.
 func (l *list[T]) SetFilter(s string) {
+	l.keepCursor(func() { l.filter = s })
+}
+
+// keepCursor runs change, which alters the items or the filter, then filters
+// again and puts the cursor back on the item it was on, if that is still shown.
+func (l *list[T]) keepCursor(change func()) {
 	var keep string
 	var had bool
 	if cur, ok := l.Selected(); ok && l.key != nil {
 		keep, had = l.key(cur), true
 	}
-	l.filter = s
+	change()
 	l.refilter()
 	if had {
 		l.SelectKey(keep)
