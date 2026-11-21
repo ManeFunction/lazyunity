@@ -20,6 +20,15 @@ func completeDir(text string) []string {
 	return out
 }
 
+// validFolder is the validator of a prompt that asks for an existing folder:
+// empty when text, ~ expanded, is one.
+func validFolder(text string) string {
+	if st, err := os.Stat(config.ExpandHome(text)); err != nil || !st.IsDir() {
+		return "That folder does not exist"
+	}
+	return ""
+}
+
 // dirMatches lists the folders (full text expanded) whose names continue text,
 // and the folder they are in. Hidden folders show only once a dot is typed.
 func dirMatches(text string) (dir string, names []string) {

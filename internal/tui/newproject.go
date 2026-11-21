@@ -74,11 +74,10 @@ func (m *Model) newProjectLocation(w newProject) {
 		in:       newInput(displayPath(m.projectsDir()) + string(filepath.Separator)),
 		complete: completeDir,
 		validate: func(text string) string {
-			p := config.ExpandHome(text)
-			if st, err := os.Stat(p); err != nil || !st.IsDir() {
-				return "That folder does not exist"
+			if why := validFolder(text); why != "" {
+				return why
 			}
-			if _, err := os.Stat(filepath.Join(p, w.name)); err == nil {
+			if _, err := os.Stat(filepath.Join(config.ExpandHome(text), w.name)); err == nil {
 				return "There is already something called " + w.name + " there"
 			}
 			return ""

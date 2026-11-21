@@ -495,11 +495,10 @@ func (m *Model) addProjectPrompt() {
 		in:       newInput(displayPath(m.projectsDir()) + string(filepath.Separator)),
 		complete: completeDir,
 		validate: func(text string) string {
-			p := config.ExpandHome(text)
-			if st, err := os.Stat(p); err != nil || !st.IsDir() {
-				return "That folder does not exist"
+			if why := validFolder(text); why != "" {
+				return why
 			}
-			if _, err := unity.ReadProjectVersion(p); err != nil {
+			if _, err := unity.ReadProjectVersion(config.ExpandHome(text)); err != nil {
 				return "Not a Unity project: no ProjectSettings/ProjectVersion.txt"
 			}
 			return ""

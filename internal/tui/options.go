@@ -29,12 +29,7 @@ func (m *Model) editorsFolderPrompt() {
 	m.push(&promptPopup{
 		title: "Editors folder", label: "New Editors install into this folder, and installed Editors are looked for here:",
 		in: newInput(displayPath(m.inv.installRoot()) + string(filepath.Separator)), complete: completeDir,
-		validate: func(text string) string {
-			if st, err := os.Stat(config.ExpandHome(text)); err != nil || !st.IsDir() {
-				return "That folder does not exist"
-			}
-			return ""
-		},
+		validate: validFolder,
 		onSubmit: func(m *Model, text string) tea.Cmd {
 			path := filepath.Clean(config.ExpandHome(text))
 			if path == m.inv.installRoot() {
@@ -232,12 +227,7 @@ func (m *Model) projectDirPrompt() {
 	m.push(&promptPopup{
 		title: "Default project folder", label: "New projects are created in this folder:",
 		in: newInput(displayPath(m.projectsDir())), complete: completeDir,
-		validate: func(text string) string {
-			if st, err := os.Stat(config.ExpandHome(text)); err != nil || !st.IsDir() {
-				return "That folder does not exist"
-			}
-			return ""
-		},
+		validate: validFolder,
 		onSubmit: func(m *Model, text string) tea.Cmd {
 			m.st.DefaultProjectDir = filepath.Clean(config.ExpandHome(text))
 			m.saveState()
