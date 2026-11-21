@@ -49,6 +49,9 @@ type Options struct {
 	// Fake, when set, replaces the Unity CLI, the disk and the OpenUPM CLI
 	// with what it describes, for screenshots (the undocumented --fake flag).
 	Fake *Fake
+	// Safe starts lazyunity in safe mode (the --safe flag), for a Unity CLI
+	// that breaks it without a launch load failing.
+	Safe bool
 }
 
 type toastKind int
@@ -114,8 +117,12 @@ type Model struct {
 	auth        unitycli.AuthInfo
 	authKnown   bool
 	cliUpdate   unitycli.UpdateInfo // what the launch check found; empty until it answers
-	openupm     openupmState
-	openupmNew  openupmLatest // what the OpenUPM update check found
+	cliVerified unitycli.Version    // the newest verified Unity CLI release; zero until the CDN answers
+	// safe, when set, is why lazyunity runs in safe mode: a Unity CLI beyond
+	// the verified range broke a launch load, and only the CLI tools are shown.
+	safe       *safeMode
+	openupm    openupmState
+	openupmNew openupmLatest // what the OpenUPM update check found
 
 	popups []popup
 	toast  toast
@@ -200,6 +207,9 @@ func New(o Options) (*Model, error) {
 	}
 	if o.Fake == nil {
 		m.rawProjects, m.missing = o.Projects, missingPaths(o.Projects, m.exists)
+	}
+	if o.Safe {
+		m.enterSafeMode(&safeMode{forced: true})
 	}
 	m.refreshEditors()
 	m.refreshProjects()
@@ -306,6 +316,9 @@ func (m *Model) setFocus(i int) {
 	i = clamp(i, 0, numPanels-1)
 	if m.filter.active {
 		m.filter.active = false
+	}
+	if m.safe != nil {
+		i = panelOptions
 	}
 	m.focus = i
 	if !m.mode.shows(i) {
@@ -638,6 +651,8 @@ func (m *Model) panelsView() string {
 		}
 	}
 	switch {
+	case m.mode == modeSafe:
+		return frames[panelOptions]
 	case m.mode == modeProjects:
 		return frames[panelProjects]
 	case m.mode == modeEditors:
@@ -765,12 +780,19 @@ func (m *Model) statusView() string {
 		return th.Warning.Render("filter: "+truncate(f, 20)) + th.Dim.Render("  esc: clear")
 	}
 	var parts []string
-	switch m.cliStatus.State {
-	case unitycli.Missing:
+	switch {
+	case m.safe != nil && m.safe.forced:
+		return th.Missing.Render("safe mode · started with --safe")
+	case m.safe != nil:
+		return th.Missing.Render("safe mode · Unity CLI " + m.cliStatus.Version.String() + " not verified")
+	case m.cliStatus.State == unitycli.Missing:
 		return th.Warning.Render("Unity CLI not installed")
-	case unitycli.Outdated:
-		parts = append(parts, th.Warning.Render("Unity CLI outdated"))
+	case m.cliStatus.State == unitycli.Outdated:
+		parts = append(parts, th.Missing.Render("Unity CLI update required"))
 	default:
+		if m.cliStatus.Unverified() {
+			parts = append(parts, th.Warning.Render("Unity CLI not verified"))
+		}
 		switch {
 		case !m.authKnown:
 			parts = append(parts, th.Dim.Render("…"))

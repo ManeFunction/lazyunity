@@ -49,7 +49,8 @@ type unityCLI interface {
 	LicenseStatus(ctx context.Context) (json.RawMessage, error)
 	ActivatePersonalLicense(ctx context.Context) error
 	ReturnLicense(ctx context.Context) error
-	SelfUpdate(ctx context.Context, channel string) error
+	SelfUpdate(ctx context.Context, o unitycli.UpdateOptions) error
+	Rollback(ctx context.Context) error
 	CheckUpdate(ctx context.Context, channel string) (unitycli.UpdateInfo, error)
 	// Log is the commands run so far, oldest first, for the command log.
 	Log() []unitycli.LogEntry

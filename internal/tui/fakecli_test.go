@@ -259,9 +259,11 @@ func (f *fakeCLI) ActivatePersonalLicense(context.Context) error {
 
 func (f *fakeCLI) ReturnLicense(context.Context) error { return f.record("ReturnLicense") }
 
-func (f *fakeCLI) SelfUpdate(_ context.Context, channel string) error {
-	return f.record("SelfUpdate", channel)
+func (f *fakeCLI) SelfUpdate(_ context.Context, o unitycli.UpdateOptions) error {
+	return f.record("SelfUpdate", o)
 }
+
+func (f *fakeCLI) Rollback(context.Context) error { return f.record("Rollback") }
 
 func (f *fakeCLI) CheckUpdate(_ context.Context, channel string) (unitycli.UpdateInfo, error) {
 	return f.update, f.record("CheckUpdate", channel)

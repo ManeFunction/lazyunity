@@ -5,12 +5,48 @@ If a Unity CLI update changes anything listed here, lazyunity may break. Check t
 
 | | Version |
 |---|---|
-| lazyunity | **0.1.0** |
-| Unity CLI it was checked against | **1.0.0** (`unitycli.MinVersion`, `internal/unitycli/version.go`) |
+| lazyunity | **0.1.0**, plus the unreleased changes in `CHANGELOG.md` |
+| Unity CLI it was checked against | **1.0.0** and **1.0.1** |
+| Verified range | **1.0.*** (`MinVersion` 1.0.0 to `MaxLine` 1.0, in `internal/unitycli/version.go`) |
 
 All calls live in `internal/unitycli`. No other package runs `unity`.
 
 > **Keep this page up to date.** Update it whenever a lazyunity release adds, removes or changes a CLI call or a decoded field, and whenever a new Unity CLI version changes any of them. Bump the versions in the table above when you do.
+
+## Verified range and update rules
+
+Every lazyunity release has a **verified range** of Unity CLI versions: from `MinVersion` up to every patch of `MaxLine`.
+
+- **Patch releases** (N.M.\*) are trusted not to change the commands above, so a whole release line is verified at once.
+- **A new minor or major line** may change them. It counts as verified only once it has been checked against this page and `MaxLine` has been moved up in a lazyunity release.
+
+What the user sees on the **Unity CLI** row (Tools tab, `3`):
+
+| Installed CLI | Row | Updates offered |
+|---|---|---|
+| Missing | yellow: `not installed` | The official installer, pinned to the newest verified release on Linux/macOS |
+| Below `MinVersion` | **red**: `update required` | The same installer |
+| Reports no version | **red**: `not working` | The same installer |
+| Inside the range, no newer **verified** version | **green**: `ready · <version>`, even if a newer unverified version is out | Only in the menu |
+| Inside the range, a newer **verified** version is out | **yellow**: `update available: <version>` | That verified version |
+| Beyond the range | **yellow**: `not verified` | In the menu: go back to the newest verified version |
+| Beyond the range and it broke a launch load | **red**: `safe mode` | Downgrade to the newest verified version, roll back, or reinstall with the installer |
+
+- An update **beyond** the range never reaches the main interface: not the row, the bottom line or a toast. The user only sees it after opening the Unity CLI menu, where it appears as `Not verified update X available`. Installing it asks for confirmation first, with a warning that lazyunity may break. It shows up on the row only once a lazyunity release moves `MaxLine` up to its line.
+- Switching to the beta feed also asks first, because the newest beta may be beyond the range.
+
+**Safe mode.** With a CLI beyond the range, lazyunity goes into safe mode as soon as one of these launch loads fails:
+
+- `projects --all`
+- `editors --installed`
+- `auth status`
+- `install-path --get`
+
+Network errors (exit 7), sign-in errors (exit 3), install locks (exit 9) and cancels or time-outs (exit 130/143) do not count, because they don't mean the CLI changed. In safe mode only the Tools panel is shown, cut down to the Unity CLI, Config file, Report an issue (opens the GitHub issues page) and About rows. Every other CLI use is refused until a probe finds a working CLI again.
+
+**`--safe`** starts lazyunity in safe mode whatever the CLI, for one that breaks lazyunity without any of those loads failing (a hang, wrong data, a crash). The projects are not loaded before the first frame, and nothing but the Unity CLI tools touches the CLI. The menu moves the CLI to the newest verified version (when it is on another one), rolls it back, reinstalls it with the installer, or leaves safe mode and loads everything with the CLI as it is.
+
+**The newest verified release** comes from Unity's CDN, because the CLI cannot list its own versions. lazyunity asks for `<CDNBase><version>/latest.json` (HEAD requests) for each patch of `MaxLine`, from `.0` up. It stops after 3 missing patches in a row, and falls back to older verified lines if `MaxLine` has no releases yet (`unitycli.LatestVerified`). This takes about 1.4 s and runs in the background at launch. Until it answers, `MinVersion` is used as the target.
 
 ## Global flags
 
@@ -81,8 +117,9 @@ Flags are used instead of the `UNITY_*` / `NO_COLOR` environment variables on pu
 | `license status` | action | `LicenseStatus` | Show the license. `data` is printed as indented JSON, unparsed. Exit code 4 means no license | `data` (raw) |
 | `license activate --personal --accept-eula` | action | `ActivatePersonalLicense` | Activate the free Personal license | none |
 | `license return --yes` | action | `ReturnLicense` | Return the license | none |
-| `self-update --check [--channel stable\|beta]` | query | `CheckUpdate` | Check for a newer CLI | `data.currentVersion`, `data.latestVersion` |
-| `self-update --yes [--channel stable\|beta]` | action | `SelfUpdate` | Update the CLI, or switch it to another channel | none |
+| `self-update --check [--channel stable\|beta]` | query | `CheckUpdate` | Check for a newer CLI on the feed | `data.currentVersion`, `data.latestVersion` |
+| `self-update --yes [--channel stable\|beta] [--target <ver>]` | action | `SelfUpdate` | Update the CLI to an exact version, including downgrades back into the verified range, or switch it to another channel. `--target` takes a full semver (`1.0.1`), not a line (`1.0`) | none |
+| `self-update --rollback --yes` | action | `Rollback` | Put back the binary the last update replaced (offered only in safe mode, as the version it restores may be unverified too). It cannot be combined with `--dry-run` | none |
 | `--version` (no global flags, 5 s limit) | probe | `runVersion` (`locate.go`) | Find the CLI version and compare it with `MinVersion` | The last whitespace-separated field on any line that parses as `X.Y.Z` or `X.Y.Z-tag.N` |
 
 ## Output contract
@@ -133,9 +170,9 @@ lazyunity calls no CLI command here. It runs Unity's official installer:
 
 | Platform | What runs |
 |---|---|
-| Linux / macOS | `https://unity.com/install.sh` with `UNITY_NON_INTERACTIVE=1` |
-| Windows | `irm https://unity.com/install.ps1 \| iex` |
-| Both | Checks `https://public-cdn.cloud.unity3d.com/hub/prod/cli/latest.json` first. If it is missing, sets `UNITY_CLI_CHANNEL=beta` |
+| Linux / macOS | `https://unity.com/install.sh` with `UNITY_NON_INTERACTIVE=1` and `UNITY_CLI_VERSION=<newest verified>`, which pins the release |
+| Windows | `irm https://unity.com/install.ps1 \| iex`. `install.ps1` has no `UNITY_CLI_VERSION`, so it always installs the newest release. If that is beyond the range, the row says so and the menu can move it back with `self-update --target` |
+| Both | Checks `https://public-cdn.cloud.unity3d.com/hub/prod/cli/latest.json` first. If it is missing, sets `UNITY_CLI_CHANNEL=beta` (only matters when unpinned) |
 
 The CLI is looked for in `~/.unity/bin/unity[.exe]`, then on `PATH` (`locate.go`).
 
@@ -152,6 +189,8 @@ These are things lazyunity works around. A CLI update may fix them, and then laz
 | `projects pin/unpin` take a glob, not a path | `globEscape` |
 | `unity open` and installs start helper processes that keep stdout open | Output goes to temp files, or the pipe is read for 500 ms after exit |
 | `projects info` takes ~1 s, while `projects --all` takes ~20 ms | Info is loaded only on demand |
+| The CDN has no list of CLI versions (`index.json` and the like return 404) | Patch numbers are probed one by one (`LatestVerified`) |
+| The `--rollback` flag cannot be dry-run | Nothing to work around; it is only offered as a choice in the menu |
 
 ## How to check a new CLI version
 
@@ -161,3 +200,4 @@ These are things lazyunity works around. A CLI update may fix them, and then laz
 4. Run `make check`. Then run the read-only checks against the real CLI: `LAZYUNITY_REAL_CLI=1 go test ./internal/unitycli -run TestRealCLI`.
 5. Recheck the "Known quirks" table and drop any workaround the CLI made unnecessary.
 6. Update this page and the versions at the top. Raise `MinVersion` if lazyunity starts to need the new CLI.
+7. Once a new minor or major line passes these checks, move `MaxLine` up to it in the next lazyunity release. Until then, users see that line as not verified. A new patch of a verified line needs no change, but run steps 2–4 against it when you can.

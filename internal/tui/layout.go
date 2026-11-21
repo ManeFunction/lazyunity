@@ -19,9 +19,17 @@ const (
 	modeProjects                   // only Projects
 	modeEditors                    // Editors above Options
 	numModes
+	// modeSafe shows only the Options panel, in safe mode. It is not in the
+	// cycle of + and _.
+	modeSafe = numModes
 )
 
-func (s screenMode) String() string { return [...]string{"full", "projects", "editors"}[s] }
+func (s screenMode) String() string {
+	if s == modeSafe {
+		return "safe"
+	}
+	return [...]string{"full", "projects", "editors"}[s]
+}
 
 func parseScreenMode(name string) screenMode {
 	switch name {
@@ -36,6 +44,8 @@ func parseScreenMode(name string) screenMode {
 // shows reports whether the mode puts the panel on screen.
 func (s screenMode) shows(panel int) bool {
 	switch s {
+	case modeSafe:
+		return panel == panelOptions
 	case modeProjects:
 		return panel == panelProjects
 	case modeEditors:
@@ -46,8 +56,11 @@ func (s screenMode) shows(panel int) bool {
 
 // firstPanel is where focus goes when the focused panel leaves the screen.
 func (s screenMode) firstPanel() int {
-	if s == modeProjects {
+	switch s {
+	case modeProjects:
 		return panelProjects
+	case modeSafe:
+		return panelOptions
 	}
 	return panelEditors
 }
@@ -138,6 +151,8 @@ func computeGeometry(w, h int, sideWidth float64, mode screenMode, portrait bool
 	}
 
 	switch {
+	case mode == modeSafe:
+		g.panels[panelOptions] = rect{0, 0, w, mainH}
 	case mode == modeProjects:
 		g.panels[panelProjects] = rect{0, 0, w, mainH}
 	case mode == modeEditors:

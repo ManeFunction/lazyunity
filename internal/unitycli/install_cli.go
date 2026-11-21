@@ -1,6 +1,7 @@
 package unitycli
 
 import (
+	"os"
 	"os/exec"
 )
 
@@ -33,10 +34,23 @@ const installScriptWindows = `if (-not $env:UNITY_CLI_CHANNEL) { try { Invoke-We
 // with Unity's official installer. It is meant to be run with the terminal
 // handed over (tea.ExecProcess), because the installer may ask for a sudo
 // password.
-func InstallCommand(goos string) *exec.Cmd {
+//
+// version pins the release to install, through the installer's
+// UNITY_CLI_VERSION; empty installs the newest. Only install.sh can be pinned:
+// install.ps1 always installs the newest, so on Windows version is ignored
+// (PinnedInstall reports which).
+func InstallCommand(goos, version string) *exec.Cmd {
 	if goos == "windows" {
 		return exec.Command("powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass",
 			"-Command", installScriptWindows)
 	}
-	return exec.Command("/bin/sh", "-c", installScriptUnix, "sh", ManifestURL)
+	cmd := exec.Command("/bin/sh", "-c", installScriptUnix, "sh", ManifestURL)
+	if version != "" {
+		cmd.Env = append(os.Environ(), "UNITY_CLI_VERSION="+version)
+	}
+	return cmd
 }
+
+// PinnedInstall reports whether Unity's installer for goos can install a
+// version of choice.
+func PinnedInstall(goos string) bool { return goos != "windows" }

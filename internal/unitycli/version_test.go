@@ -62,10 +62,13 @@ func TestVersionCompare(t *testing.T) {
 	}
 }
 
-func TestMinVersionString(t *testing.T) {
-	if got := MinVersion.String(); got != "1.0.0" {
-		t.Errorf("MinVersion = %s", got)
-	}
+// pinVerified sets the verified range for one test, so tests do not depend on
+// the real one in version.go.
+func pinVerified(t *testing.T, min Version, max Line) {
+	t.Helper()
+	oldMin, oldMax := MinVersion, MaxLine
+	t.Cleanup(func() { MinVersion, MaxLine = oldMin, oldMax })
+	MinVersion, MaxLine = min, max
 }
 
 func TestTail(t *testing.T) {
@@ -79,5 +82,46 @@ func TestTail(t *testing.T) {
 	got := tail("ааааа", 5) // 2-byte runes, 10 bytes
 	if got != "…аа" {
 		t.Errorf("tail on rune boundary = %q", got)
+	}
+}
+
+func TestVerifiedRange(t *testing.T) {
+	pinVerified(t, Version{Major: 1}, Line{Major: 1, Minor: 0})
+
+	cases := []struct {
+		v                string
+		verified, beyond bool
+	}{
+		{"0.9.5", false, false},
+		{"1.0.0-beta.16", false, false}, // older than 1.0.0
+		{"1.0.0", true, false},
+		{"1.0.7", true, false}, // any patch of a verified line
+		{"1.0.8-beta.1", true, false},
+		{"1.1.0-beta.1", false, true},
+		{"1.1.0", false, true},
+		{"2.0.0", false, true},
+	}
+	for _, c := range cases {
+		v, _ := ParseVersion(c.v)
+		if v.Verified() != c.verified || v.BeyondVerified() != c.beyond {
+			t.Errorf("%s: verified %v beyond %v, want %v %v", c.v, v.Verified(), v.BeyondVerified(), c.verified, c.beyond)
+		}
+	}
+	if got := VerifiedRange(); got != "1.0.*" {
+		t.Errorf("range %q", got)
+	}
+	MaxLine = Line{Major: 1, Minor: 2}
+	if got := VerifiedRange(); got != "1.0.* – 1.2.*" {
+		t.Errorf("range %q", got)
+	}
+	MinVersion = Version{Major: 1, Minor: 0, Patch: 3}
+	if got := VerifiedRange(); got != "1.0.3 – 1.2.*" {
+		t.Errorf("range %q", got)
+	}
+	if st := (Status{State: Ready, Version: Version{Major: 1, Minor: 3}}); !st.Unverified() {
+		t.Error("a ready CLI beyond the range is unverified")
+	}
+	if st := (Status{State: Outdated, Version: Version{Major: 1, Minor: 3}}); st.Unverified() {
+		t.Error("only a usable CLI is unverified")
 	}
 }

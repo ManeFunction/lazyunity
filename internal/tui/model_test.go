@@ -77,6 +77,7 @@ type hostRecorder struct {
 	added         [][]string
 	openupm       string // the OpenUPM CLI found, if any
 	openupmLatest string // what LatestOpenUPM answers
+	verifiedCLI   string // what LatestVerifiedCLI answers; empty: the CDN could not tell
 	err           error  // what every start answers
 }
 
@@ -114,6 +115,10 @@ func (h *hostRecorder) FindOpenUPM(context.Context) (string, string) {
 
 func (h *hostRecorder) LatestOpenUPM(context.Context, config.OpenUPM) (string, error) {
 	return h.openupmLatest, nil
+}
+
+func (h *hostRecorder) LatestVerifiedCLI(context.Context) (unitycli.Version, bool) {
+	return unitycli.ParseVersion(h.verifiedCLI)
 }
 
 func (h *hostRecorder) AddPackages(_ context.Context, exe, dir string, packages []string) error {

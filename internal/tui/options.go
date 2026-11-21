@@ -89,84 +89,6 @@ func toolActions() []*action {
 	}
 }
 
-type cliInstalledMsg struct{ err error }
-
-type cliStatusMsg struct {
-	st      unitycli.Status
-	updated bool
-}
-
-// cliTool installs or updates the Unity CLI.
-func (m *Model) cliTool() tea.Cmd {
-	install := func(m *Model) tea.Cmd {
-		if m.refuseFake("installing the Unity CLI") || m.refuseWhileBusy("installing the Unity CLI") {
-			return nil
-		}
-		note := ""
-		if m.goos != "windows" {
-			note = "\n\nThe installer may ask for your sudo password a few times."
-		}
-		m.push(&confirmPopup{
-			title: "Install the Unity CLI", yes: "Install",
-			message: "Run Unity's official installer (https://unity.com/install" + map[bool]string{true: ".ps1", false: ".sh"}[m.goos == "windows"] +
-				")?" + note,
-			onYes: func(m *Model) tea.Cmd {
-				return tea.ExecProcess(unitycli.InstallCommand(m.goos), func(err error) tea.Msg { return cliInstalledMsg{err: err} })
-			},
-		})
-		return nil
-	}
-	if m.cliStatus.State != unitycli.Ready {
-		return install(m)
-	}
-	updateDesc := "Asks the CLI to update itself to the newest release."
-	if m.cliUpdate.Available() {
-		updateDesc = "Updates the CLI to " + m.cliUpdate.Latest + "."
-	}
-	channel := m.cliChannel()
-	other, feed := unitycli.ChannelBeta, "beta"
-	switchDesc := "Follows the CLI's beta builds and installs the newest one, if it is newer."
-	if channel == unitycli.ChannelBeta {
-		other, feed = unitycli.ChannelStable, "release"
-		switchDesc = "Goes back to the CLI's releases and installs the newest one, which may be older than this beta."
-	}
-	menu := newMenu("Unity CLI "+m.cliStatus.Version.String(), []menuItem{
-		{label: "Update (self-update)", desc: updateDesc, run: func(m *Model) tea.Cmd {
-			return m.withCLI(func(c unityCLI) tea.Cmd {
-				return m.enqueue(&task{
-					title: "Updating the Unity CLI",
-					label: "update the Unity CLI",
-					works: []string{workCLI},
-					do:    func(ctx context.Context) error { return c.SelfUpdate(ctx, channel) },
-					after: func(m *Model, err error) tea.Cmd { return m.reprobeCLI(err == nil) },
-				})
-			})
-		}},
-		{label: "Switch to the " + feed + " feed", desc: switchDesc, run: func(m *Model) tea.Cmd {
-			return m.withCLI(func(c unityCLI) tea.Cmd {
-				return m.enqueue(&task{
-					title: "Switching the Unity CLI to the " + feed + " feed",
-					label: "switch the Unity CLI to the " + feed + " feed",
-					works: []string{workCLI},
-					do:    func(ctx context.Context) error { return c.SelfUpdate(ctx, other) },
-					after: func(m *Model, err error) tea.Cmd {
-						if err != nil {
-							return nil
-						}
-						m.st.CLIChannel = other
-						m.saveState()
-						return m.reprobeCLI(true)
-					},
-				})
-			})
-		}},
-		{label: "Reinstall with the official installer", run: install},
-	})
-	menu.wanted = 44
-	m.push(menu)
-	return nil
-}
-
 // cliChannel is the update channel the CLI follows: the one the user switched
 // to, else beta for a pre-release build and stable for a release.
 func (m *Model) cliChannel() string {
@@ -182,8 +104,9 @@ func (m *Model) cliChannel() string {
 
 // reprobeCLI looks for the CLI again, after it was installed or updated.
 func (m *Model) reprobeCLI(updated bool) tea.Cmd {
-	if m.fake != nil { // the made-up CLI stays as it is
-		return nil
+	if d, ok := m.cli.(*demoCLI); ok && m.fake != nil { // the made-up CLI, at the version it was moved to
+		st := d.status()
+		return func() tea.Msg { return cliStatusMsg{st: st, updated: updated} }
 	}
 	env, configured := m.env, m.cfg.Unity.CLIPath
 	return func() tea.Msg {
@@ -195,13 +118,16 @@ func (m *Model) reprobeCLI(updated bool) tea.Cmd {
 
 func (m *Model) onCLIStatus(msg cliStatusMsg) tea.Cmd {
 	m.cliStatus = msg.st
+	m.leaveSafeMode()
 	if msg.st.State != unitycli.Ready {
 		m.cli = nil
 		m.refreshTools()
 		m.toastf(toastWarn, "The Unity CLI is not usable yet")
 		return nil
 	}
-	m.cli = unitycli.New(msg.st.Path)
+	if m.fake == nil {
+		m.cli = unitycli.New(msg.st.Path)
+	}
 	m.cliUpdate = unitycli.UpdateInfo{}
 	m.refreshTools()
 	m.toastf(toastOK, "Unity CLI %s is ready", msg.st.Version)

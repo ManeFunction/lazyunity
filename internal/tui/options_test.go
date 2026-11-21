@@ -92,6 +92,7 @@ func TestStrayEditorsAreRegisteredOnceAndQuietly(t *testing.T) {
 }
 
 func TestToolsTabRows(t *testing.T) {
+	verifiedWith10(t) // the versions below are inside and around 1.0.*
 	m := newTestModel(t)
 	press(m, "3")
 	out := screenText(m)
@@ -120,10 +121,15 @@ func TestToolsTabRows(t *testing.T) {
 	if !strings.Contains(screenText(m), "not installed · press enter to install") || !strings.Contains(screenText(m), "needs the Unity CLI") {
 		t.Errorf("without the CLI:\n%s", screenText(m))
 	}
-	m.cliStatus.State = unitycli.Outdated
+	m.cliStatus = unitycli.Status{State: unitycli.Outdated, Version: unitycli.Version{Minor: 9, Patch: 5}}
 	m.refreshTools()
-	if !strings.Contains(screenText(m), "outdated · press enter to update") {
-		t.Error("an old CLI is flagged")
+	if row := m.toolsTab.Items()[0]; row.status != "update required: 0.9.5 is older than 1.0.* · enter to update" || row.tone != toneBad {
+		t.Errorf("an old CLI must be updated, in red: %+v", row)
+	}
+	m.cliStatus = unitycli.Status{State: unitycli.Outdated, Path: "/x/unity"}
+	m.refreshTools()
+	if row := m.toolsTab.Items()[0]; row.status != "not working · press enter to reinstall" || row.tone != toneBad {
+		t.Errorf("a CLI that reports no version must be reinstalled, in red: %+v", row)
 	}
 	if !strings.Contains(out, "╌ ╌ ╌") {
 		t.Errorf("spacers draw as a sparse dashed rule:\n%s", out)
@@ -161,15 +167,28 @@ func TestCLIToolInstallsWhenMissing(t *testing.T) {
 
 func TestCLIToolOffersUpdateWhenReady(t *testing.T) {
 	m := newTestModel(t)
-	useFakeCLI(t, m)
+	f := useFakeCLI(t, m)
 	runToolRow(m, "cli")
 	out := screenText(m)
-	if !strings.Contains(out, "Update (self-update)") || !strings.Contains(out, "Reinstall with the official installer") {
+	if !strings.Contains(out, "Update") || !strings.Contains(out, "Reinstall with the official installer") {
 		t.Errorf("screen:\n%s", out)
+	}
+	if strings.Contains(out, "Update to") {
+		t.Errorf("without an answer from the update check there is nothing to update to:\n%s", out)
+	}
+
+	m.popups = nil
+	m.cliUpdate = unitycli.UpdateInfo{Current: "1.0.0", Latest: "1.0.4"}
+	runToolRow(m, "cli")
+	_, cmd := m.Update(keyMsg("enter"))
+	drain(m, cmd)
+	if !f.called("SelfUpdate", unitycli.UpdateOptions{Channel: "stable", Target: "1.0.4"}) {
+		t.Errorf("Update installs the verified version it names: %v", f.Calls())
 	}
 }
 
 func TestCLIStatusMessage(t *testing.T) {
+	verifiedWith10(t)
 	m := newTestModel(t)
 	m.cli = nil
 	cmd := m.onCLIStatus(cliStatusMsg{st: unitycli.Status{State: unitycli.Ready, Path: "/x/unity", Version: unitycli.MinVersion}})
@@ -524,29 +543,35 @@ func TestEEditsTheConfigFromTheToolsTab(t *testing.T) {
 }
 
 func TestCLIFeedSwitch(t *testing.T) {
+	verifiedWith10(t)
 	m := newTestModel(t)
 	f := useFakeCLI(t, m)
 	if m.cliChannel() != unitycli.ChannelStable {
 		t.Fatalf("a release build follows the release feed, got %q", m.cliChannel())
 	}
-	runToolRow(m, "cli")
-	if !strings.Contains(screenText(m), "Switch to the beta feed") {
-		t.Fatalf("screen:\n%s", screenText(m))
+	toBeta := unitycli.UpdateOptions{Channel: "beta"}
+	switchToBeta := func() {
+		t.Helper()
+		m.popups = nil
+		runToolRow(m, "cli")
+		if !strings.Contains(screenText(m), "Switch to the beta feed") {
+			t.Fatalf("screen:\n%s", screenText(m))
+		}
+		press(m, "j", "enter") // past Update
+		if !strings.Contains(screenText(m), "may be newer than the versions lazyunity is verified with") {
+			t.Fatalf("the beta feed is asked about first:\n%s", screenText(m))
+		}
+		_, cmd := m.Update(keyMsg("enter"))
+		drain(m, cmd)
 	}
 	f.err["SelfUpdate"] = errors.New("offline")
-	press(m, "j")
-	_, cmd := m.Update(keyMsg("enter"))
-	drain(m, cmd)
-	if !f.called("SelfUpdate", "beta") || m.st.CLIChannel != "" {
+	switchToBeta()
+	if !f.called("SelfUpdate", toBeta) || m.st.CLIChannel != "" {
 		t.Fatalf("a failed switch is not remembered: channel %q, calls %v", m.st.CLIChannel, f.Calls())
 	}
 
 	delete(f.err, "SelfUpdate")
-	m.popups = nil
-	runToolRow(m, "cli")
-	press(m, "j")
-	_, cmd = m.Update(keyMsg("enter"))
-	drain(m, cmd)
+	switchToBeta()
 	if m.st.CLIChannel != unitycli.ChannelBeta || m.cliChannel() != unitycli.ChannelBeta {
 		t.Fatalf("the beta feed is remembered: %q (calls %v)", m.st.CLIChannel, f.Calls())
 	}
@@ -562,14 +587,27 @@ func TestCLIFeedSwitch(t *testing.T) {
 	if !f.called("CheckUpdate", "beta") {
 		t.Errorf("updates are checked on the chosen feed: %v", f.Calls())
 	}
+	m.cliUpdate = unitycli.UpdateInfo{Current: "1.0.0", Latest: "1.0.1-beta.2"}
+	m.tasks = nil // finished tasks hold their work until they leave the list
 	runToolRow(m, "cli")
 	if !strings.Contains(screenText(m), "Switch to the release feed") {
 		t.Fatalf("screen:\n%s", screenText(m))
 	}
-	_, cmd = m.Update(keyMsg("enter")) // Update
+	_, cmd := m.Update(keyMsg("enter")) // Update
 	drain(m, cmd)
-	if f.count("SelfUpdate", "beta") != 2 {
+	if !f.called("SelfUpdate", unitycli.UpdateOptions{Channel: "beta", Target: "1.0.1-beta.2"}) {
 		t.Errorf("Update stays on the beta feed: %v", f.Calls())
+	}
+
+	// going back to releases needs no question
+	m.cli, m.popups, m.tasks = f, nil, nil // the update probed the test machine, which has no CLI
+	m.cliStatus = unitycli.Status{State: unitycli.Ready, Version: unitycli.MinVersion}
+	runToolRow(m, "cli")
+	press(m, "j")
+	_, cmd = m.Update(keyMsg("enter"))
+	drain(m, cmd)
+	if !f.called("SelfUpdate", unitycli.UpdateOptions{Channel: "stable"}) {
+		t.Errorf("calls: %v", f.Calls())
 	}
 }
 

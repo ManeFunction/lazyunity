@@ -35,6 +35,7 @@ func run() error {
 		showVersion = flag.Bool("version", false, "print the version and exit")
 		configDir   = flag.String("config-dir", "", "folder holding config.yml and state.yml")
 		debugLog    = flag.String("debug-log", "", "write debug messages to this file")
+		safe        = flag.Bool("safe", false, "start in safe mode, with only the Unity CLI tools, for a Unity CLI that breaks lazyunity")
 		// undocumented: shows the made-up machine of a YAML file, for screenshots
 		fakeFile = flag.String("fake", "", "")
 	)
@@ -82,7 +83,7 @@ func run() error {
 
 	// Editing the config from the Tools tab quits to start again with it applied.
 	for {
-		restart, err := session(dir, fake)
+		restart, err := session(dir, fake, *safe)
 		if err != nil || !restart {
 			return err
 		}
@@ -91,13 +92,13 @@ func run() error {
 
 // session loads the config and runs the interface once; restart reports that
 // it quit to be started again.
-func session(dir string, fake *tui.Fake) (restart bool, err error) {
+func session(dir string, fake *tui.Fake, safe bool) (restart bool, err error) {
 	cfg, err := config.Load(dir)
 	if err != nil {
 		return false, err
 	}
 	if fake != nil {
-		return fakeSession(dir, cfg, fake)
+		return fakeSession(dir, cfg, fake, safe)
 	}
 	st := state.Load(dir)
 
@@ -111,9 +112,12 @@ func session(dir string, fake *tui.Fake) (restart bool, err error) {
 		Config: cfg, State: st, ConfigDir: dir, Version: version,
 		CLI: status, Env: env, GOOS: env.GOOS,
 		Warnings: append(append([]string(nil), cfg.Warnings...), st.Warnings...),
+		Safe:     safe,
 	}
 	if status.State == unitycli.Ready {
 		opts.Client = unitycli.New(status.Path)
+	}
+	if opts.Client != nil && !safe { // safe mode does not trust the CLI with anything
 		// a budget of its own: a slow probe must not starve it. When it does
 		// not make it, the interface loads the projects after the first frame.
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -139,7 +143,7 @@ func session(dir string, fake *tui.Fake) (restart bool, err error) {
 // fakeSession runs the interface on the made-up machine of a --fake file. It
 // uses the real config, for its theme and keys, but a throwaway state, so the
 // real one is neither shown nor changed.
-func fakeSession(dir string, cfg config.Config, fake *tui.Fake) (restart bool, err error) {
+func fakeSession(dir string, cfg config.Config, fake *tui.Fake, safe bool) (restart bool, err error) {
 	tmp, err := os.MkdirTemp("", "lazyunity-fake-*")
 	if err != nil {
 		return false, err
@@ -149,7 +153,7 @@ func fakeSession(dir string, cfg config.Config, fake *tui.Fake) (restart bool, e
 	opts := tui.Options{
 		Config: cfg, State: state.Load(tmp), ConfigDir: dir, Version: version,
 		CLI: fake.Status(), Env: env, GOOS: env.GOOS, InstallRoot: fake.InstallRoot(env.GOOS),
-		Warnings: cfg.Warnings, Fake: fake,
+		Warnings: cfg.Warnings, Fake: fake, Safe: safe,
 	}
 	// A file without releases shows the real ones, when there is a Unity CLI
 	// to list them. Listing them changes nothing on the machine.

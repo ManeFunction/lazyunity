@@ -14,9 +14,69 @@ type Version struct {
 	PreNum              int
 }
 
-// MinVersion is the oldest CLI lazyunity supports. Every command it uses was
-// tested against this release.
-var MinVersion = Version{Major: 1}
+// The verified range: the Unity CLI releases this lazyunity was checked
+// against, from MinVersion up to the last patch of MaxLine. A patch release is
+// trusted not to change the commands lazyunity uses, so every patch of a
+// verified line is verified. A newer minor or major release may change them: it
+// still runs, but is shown as not verified, and only offered on request.
+//
+// docs/UnityCLI.md lists what was checked. Move MaxLine up only once a new
+// line has been checked against that list.
+var (
+	// MinVersion is the oldest CLI lazyunity works with; older ones must be
+	// updated.
+	MinVersion = Version{Major: 1}
+	// MaxLine is the newest verified release line.
+	MaxLine = Line{Major: 1, Minor: 0}
+)
+
+// Line is a release line: every patch of Major.Minor.
+type Line struct{ Major, Minor int }
+
+// Line is the release line v belongs to.
+func (v Version) Line() Line { return Line{v.Major, v.Minor} }
+
+// Compare returns -1, 0 or 1.
+func (l Line) Compare(o Line) int {
+	switch {
+	case l.Major != o.Major:
+		return cmpInt(l.Major, o.Major)
+	default:
+		return cmpInt(l.Minor, o.Minor)
+	}
+}
+
+func (l Line) String() string { return fmt.Sprintf("%d.%d.*", l.Major, l.Minor) }
+
+func cmpInt(a, b int) int {
+	switch {
+	case a < b:
+		return -1
+	case a > b:
+		return 1
+	}
+	return 0
+}
+
+// Verified reports whether v is in the verified range.
+func (v Version) Verified() bool {
+	return v.Compare(MinVersion) >= 0 && v.Line().Compare(MaxLine) <= 0
+}
+
+// BeyondVerified reports whether v is newer than the verified range.
+func (v Version) BeyondVerified() bool { return v.Line().Compare(MaxLine) > 0 }
+
+// VerifiedRange names the verified range, such as "1.0.*" or "1.0.2 – 1.1.*".
+func VerifiedRange() string {
+	from := MinVersion.String()
+	if MinVersion.Patch == 0 && MinVersion.Pre == "" {
+		if MinVersion.Line() == MaxLine {
+			return MaxLine.String()
+		}
+		from = MinVersion.Line().String()
+	}
+	return from + " – " + MaxLine.String()
+}
 
 var versionRe = regexp.MustCompile(`^(\d+)\.(\d+)\.(\d+)(?:-([A-Za-z]+)\.(\d+))?$`)
 

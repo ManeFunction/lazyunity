@@ -30,6 +30,9 @@ type host interface {
 	// LatestOpenUPM asks where src is now: the newest version in the npm
 	// registry, or the commit the repository's branch points to.
 	LatestOpenUPM(ctx context.Context, src config.OpenUPM) (string, error)
+	// LatestVerifiedCLI asks Unity's CDN for the newest Unity CLI release in
+	// the verified range; ok is false when it could not tell.
+	LatestVerifiedCLI(ctx context.Context) (v unitycli.Version, ok bool)
 	// AddPackages adds packages to the project in dir with the OpenUPM CLI.
 	AddPackages(ctx context.Context, exe, dir string, packages []string) error
 }
@@ -55,6 +58,10 @@ func (h machine) FindOpenUPM(ctx context.Context) (string, string) {
 		return "", ""
 	}
 	return path, openupm.Version(ctx, path)
+}
+
+func (h machine) LatestVerifiedCLI(ctx context.Context) (unitycli.Version, bool) {
+	return unitycli.LatestVerified(ctx, nil)
 }
 
 func (h machine) LatestOpenUPM(ctx context.Context, src config.OpenUPM) (string, error) {

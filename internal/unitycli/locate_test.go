@@ -105,6 +105,7 @@ func versions(m map[string]string) VersionFunc {
 }
 
 func TestProbe(t *testing.T) {
+	pinVerified(t, Version{Major: 1}, Line{Major: 1, Minor: 0}) // the versions below are around 1.0.*
 	const def = "/home/u/.local/bin/unity"
 	ctx := context.Background()
 
@@ -178,11 +179,21 @@ func TestProbe(t *testing.T) {
 }
 
 func TestInstallCommand(t *testing.T) {
-	unix := InstallCommand("linux")
+	unix := InstallCommand("linux", "")
 	if len(unix.Args) != 5 || unix.Args[0] != "/bin/sh" || unix.Args[1] != "-c" || unix.Args[4] != ManifestURL {
 		t.Errorf("unix command = %v", unix.Args)
 	}
-	win := InstallCommand("windows")
+	if unix.Env != nil {
+		t.Errorf("an unpinned install keeps the environment as it is: %v", unix.Env)
+	}
+	pinned := InstallCommand("darwin", "1.0.1")
+	if n := len(pinned.Env); n == 0 || pinned.Env[n-1] != "UNITY_CLI_VERSION=1.0.1" {
+		t.Errorf("a pinned install tells the installer the version: %v", pinned.Env)
+	}
+	if !PinnedInstall("linux") || PinnedInstall("windows") {
+		t.Error("only install.sh can be pinned")
+	}
+	win := InstallCommand("windows", "1.0.1")
 	if win.Args[0] != "powershell.exe" || win.Args[len(win.Args)-1] != installScriptWindows {
 		t.Errorf("windows command = %v", win.Args)
 	}

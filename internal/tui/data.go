@@ -142,12 +142,13 @@ const (
 	srcCLIUpdate                      // whether a newer Unity CLI is out
 	srcOpenUPM                        // the OpenUPM CLI
 	srcReleases                       // the Releases tab, once it was opened
+	srcVerifiedCLI                    // the newest verified Unity CLI, from Unity's CDN
 
 	// srcCLI is what comes from the Unity CLI; it is all loaded again once the
 	// CLI becomes usable.
 	srcCLI = srcProjects | srcEditors | srcAuth | srcInstallPath | srcCLIUpdate
 	// srcAll is everything.
-	srcAll = srcCLI | srcDisk | srcOpenUPM | srcReleases
+	srcAll = srcCLI | srcDisk | srcOpenUPM | srcReleases | srcVerifiedCLI
 )
 
 // reload loads the sources in s again.
@@ -164,6 +165,7 @@ func (m *Model) reload(s source) tea.Cmd {
 		{srcCLIUpdate, m.checkCLIUpdateCmd},
 		{srcOpenUPM, m.probeOpenUPMCmd},
 		{srcReleases, func() tea.Cmd { return m.releasesTab.refresh(m) }},
+		{srcVerifiedCLI, m.latestVerifiedCmd},
 	}
 	var cmds []tea.Cmd
 	for _, l := range loads {
@@ -180,6 +182,9 @@ func (m *Model) reload(s source) tea.Cmd {
 func (m *Model) handleData(msg tea.Msg) tea.Cmd {
 	switch msg := msg.(type) {
 	case projectsMsg:
+		if m.checkBreakage("list the projects", msg.err) {
+			return nil
+		}
 		if msg.err != nil {
 			m.toastf(toastError, "Could not list projects: %v", msg.err)
 			return nil
@@ -191,6 +196,9 @@ func (m *Model) handleData(msg tea.Msg) tea.Cmd {
 			m.selectAfterLoad = ""
 		}
 	case editorsMsg:
+		if m.checkBreakage("list the Editors", msg.err) {
+			return nil
+		}
 		if msg.err != nil {
 			m.toastf(toastError, "Could not list editors: %v", msg.err)
 			return nil
@@ -203,6 +211,9 @@ func (m *Model) handleData(msg tea.Msg) tea.Cmd {
 		m.refreshEditors()
 		return m.registerStrays()
 	case authMsg:
+		if m.checkBreakage("check the sign-in", msg.err) {
+			return nil
+		}
 		if msg.err != nil {
 			m.toastf(toastError, "Could not check the sign-in: %v", msg.err)
 			return nil
@@ -215,7 +226,15 @@ func (m *Model) handleData(msg tea.Msg) tea.Cmd {
 			m.cliUpdate = msg.info
 			m.refreshTools()
 		}
+	case verifiedCLIMsg:
+		if msg.ok {
+			m.cliVerified = msg.v
+			m.refreshTools()
+		}
 	case installPathMsg:
+		if m.checkBreakage("read the Editors folder", msg.err) {
+			return nil
+		}
 		if msg.err == nil && msg.path != "" {
 			m.inv.setInstallRoot(msg.path)
 			return m.scanEditorsCmd()

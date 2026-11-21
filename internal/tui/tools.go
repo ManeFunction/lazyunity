@@ -14,22 +14,16 @@ import (
 func (m *Model) refreshTools() {
 	var rows []toolRow
 
-	cli := toolRow{id: "cli", label: "Unity CLI", run: (*Model).cliTool}
-	switch m.cliStatus.State {
-	case unitycli.Ready:
-		cli.status, cli.tone = "ready · "+m.cliStatus.Version.String(), toneGood
-		if m.cliChannel() == unitycli.ChannelBeta {
-			cli.status += " · beta feed"
-		}
-		if m.cliUpdate.Available() {
-			cli.status, cli.tone = "update available: "+m.cliUpdate.Latest+" · enter to update", toneWarn
-		}
-	case unitycli.Outdated:
-		cli.status, cli.tone = "outdated · press enter to update", toneWarn
-	default:
-		cli.status, cli.tone = "not installed · press enter to install", toneWarn
+	rows = append(rows, m.cliRow())
+	if m.safe != nil { // only what helps to get a working CLI back
+		rows = append(rows, spacerRow("spacer.license"), m.configRow(), spacerRow("spacer.config"),
+			toolRow{id: "issues", label: "Report an issue", status: "GitHub issues of lazyunity · enter to open",
+				run: func(m *Model) tea.Cmd { return m.openURL(issuesURL) }},
+			toolRow{id: "about", label: "About", status: "lazyunity " + m.version + " · by Mane Function",
+				run: func(m *Model) tea.Cmd { m.aboutPopup(); return nil }})
+		m.toolsTab.SetItems(rows)
+		return
 	}
-	rows = append(rows, cli)
 
 	acct := toolRow{id: "account", label: "Account", run: (*Model).accountTool}
 	switch {

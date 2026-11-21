@@ -472,14 +472,32 @@ const (
 	ChannelBeta   = "beta"
 )
 
-// SelfUpdate updates the CLI itself from channel, switching to it when the CLI
-// is on another one. channel may be empty: the CLI's own.
-func (c *Client) SelfUpdate(ctx context.Context, channel string) error {
+// UpdateOptions says what SelfUpdate installs.
+type UpdateOptions struct {
+	// Channel is the feed to update from, switching to it when the CLI is on
+	// another one. Empty: the CLI's own.
+	Channel string
+	// Target is the exact version to install, older or newer. Empty: the
+	// newest on the channel.
+	Target string
+}
+
+// SelfUpdate updates the CLI itself, or moves it to another version.
+func (c *Client) SelfUpdate(ctx context.Context, o UpdateOptions) error {
 	args := []string{"self-update", "--yes"}
-	if channel != "" {
-		args = append(args, "--channel", channel)
+	if o.Channel != "" {
+		args = append(args, "--channel", o.Channel)
+	}
+	if o.Target != "" {
+		args = append(args, "--target", o.Target)
 	}
 	_, err := c.Run(ctx, args...)
+	return err
+}
+
+// Rollback puts back the CLI binary that the last update replaced.
+func (c *Client) Rollback(ctx context.Context) error {
+	_, err := c.Run(ctx, "self-update", "--rollback", "--yes")
 	return err
 }
 

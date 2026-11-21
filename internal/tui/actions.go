@@ -139,6 +139,9 @@ func (m *Model) afterNav() tea.Cmd { return m.focusedTab().moved(m) }
 // cycleMode moves to the next or previous screen mode, keeping the focus on a
 // panel that is still on screen.
 func (m *Model) cycleMode(delta int) {
+	if m.safe != nil { // safe mode shows the Tools only
+		return
+	}
 	m.mode = (m.mode + screenMode(delta) + numModes) % numModes
 	if !m.mode.shows(m.focus) {
 		m.filter.active = false

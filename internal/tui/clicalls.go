@@ -21,6 +21,10 @@ type cliDoneMsg struct {
 // needCLI reports whether the Unity CLI is there to use. When it is not, it
 // tells the user that what they asked for needs it.
 func (m *Model) needCLI() bool {
+	if m.safe != nil {
+		m.toastf(toastWarn, "Safe mode: bring back a Unity CLI lazyunity is verified with first")
+		return false
+	}
 	if m.cli == nil {
 		m.showCLIMissing()
 		return false
@@ -42,7 +46,7 @@ func (m *Model) withCLI(f func(c unityCLI) tea.Cmd) tea.Cmd {
 // reload. Without a CLI it quietly does nothing.
 func (m *Model) cliCmd(f func(ctx context.Context, c unityCLI) tea.Msg) tea.Cmd {
 	c := m.cli
-	if c == nil {
+	if c == nil || m.safe != nil {
 		return nil
 	}
 	return func() tea.Msg { return f(context.Background(), c) }

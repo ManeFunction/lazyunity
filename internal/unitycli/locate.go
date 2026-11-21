@@ -149,6 +149,9 @@ type Status struct {
 	Version Version // zero when unknown
 }
 
+// Unverified reports a usable CLI that is newer than the verified range.
+func (s Status) Unverified() bool { return s.State == Ready && s.Version.BeyondVerified() }
+
 // VersionFunc returns the output of `<path> --version`.
 type VersionFunc func(ctx context.Context, path string) (string, error)
 

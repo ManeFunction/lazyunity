@@ -7,6 +7,7 @@ import (
 const (
 	authorName = "Ilia Petrov-Komotskii (Mane Function)"
 	repoURL    = "https://github.com/ManeFunction/lazyunity"
+	issuesURL  = repoURL + "/issues"
 	sponsorURL = "https://github.com/sponsors/ManeFunction"
 )
 

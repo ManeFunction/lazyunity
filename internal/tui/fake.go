@@ -31,6 +31,13 @@ type Fake struct {
 		Version string `yaml:"version"` // "" or "missing": not installed
 		Latest  string `yaml:"latest"`  // newer than version: an update is offered
 		Channel string `yaml:"channel"` // stable or beta
+		// Verified is the newest release in the verified range, as Unity's
+		// CDN would report it. Empty: none found.
+		Verified string `yaml:"verified"`
+		// Broken makes listing the projects fail as if the CLI had changed:
+		// with a version beyond the verified range, lazyunity starts in safe
+		// mode. Moving the CLI to a verified version mends it.
+		Broken bool `yaml:"broken"`
 	} `yaml:"cli"`
 	Account struct {
 		SignedIn bool   `yaml:"signedIn"`
@@ -258,12 +265,14 @@ func (m *Model) useFake(f *Fake) {
 	if len(f.Releases) == 0 && m.cli != nil {
 		d.real = m.cli // a real Unity CLI, asked for the releases only
 	}
-	m.cli, m.cliStatus = d, f.Status()
+	d.cur, d.broken = f.Status(), f.CLI.Broken
+	m.cli, m.cliStatus = d, d.cur
+	m.cliVerified, _ = unitycli.ParseVersion(f.CLI.Verified)
 	switch f.CLI.Channel {
 	case unitycli.ChannelStable, unitycli.ChannelBeta:
 		m.st.CLIChannel = f.CLI.Channel
 	}
-	m.host = demoHost{host: m.host, openupm: f.OpenUPM}
+	m.host = demoHost{host: m.host, openupm: f.OpenUPM, verified: m.cliVerified}
 	if src := m.cfg.OpenUPM; !src.FromRegistry() && f.OpenUPM.Version != "" {
 		// what an install from the configured repository would have recorded
 		m.st.OpenUPMBuild = &state.OpenUPMBuild{Repo: src.Repo, Ref: src.Ref,
@@ -314,7 +323,12 @@ func fakeModules(have []unity.Platform) []unitycli.Module {
 // says, and nothing it starts reaches the disk.
 type demoHost struct {
 	host
-	openupm FakeOpenUPM
+	openupm  FakeOpenUPM
+	verified unitycli.Version // what Unity's CDN would say
+}
+
+func (h demoHost) LatestVerifiedCLI(context.Context) (unitycli.Version, bool) {
+	return h.verified, h.verified.Verified()
 }
 
 func (o FakeOpenUPM) commit() string {
@@ -361,6 +375,10 @@ type demoCLI struct {
 	auth        unitycli.AuthInfo
 	update      unitycli.UpdateInfo
 	installPath string
+	// cur is the made-up CLI's own status; SelfUpdate and Rollback move it, and
+	// prev is where Rollback goes.
+	cur, prev unitycli.Status
+	broken    bool
 	// real is the machine's own Unity CLI, when the file lists no releases: it
 	// lists them instead, and is asked nothing else.
 	real unityCLI
@@ -371,6 +389,10 @@ var _ unityCLI = (*demoCLI)(nil)
 func (d *demoCLI) Projects(context.Context) ([]unitycli.Project, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
+	if d.broken {
+		return nil, &unitycli.Error{Args: []string{"projects", "--all"}, ExitCode: unitycli.ExitBadArgs,
+			Code: "INVALID_COMMAND_ARGS", Message: "error: unknown option '--all'"}
+	}
 	return append([]unitycli.Project(nil), d.projects...), nil
 }
 
@@ -576,7 +598,48 @@ func (d *demoCLI) LicenseStatus(context.Context) (json.RawMessage, error) {
 
 func (d *demoCLI) ActivatePersonalLicense(context.Context) error { return nil }
 func (d *demoCLI) ReturnLicense(context.Context) error           { return nil }
-func (d *demoCLI) SelfUpdate(context.Context, string) error      { return nil }
+
+// SelfUpdate moves the made-up CLI to the target version. A verified version
+// mends a broken CLI.
+func (d *demoCLI) SelfUpdate(_ context.Context, o unitycli.UpdateOptions) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	v, ok := unitycli.ParseVersion(o.Target)
+	if !ok {
+		v, ok = unitycli.ParseVersion(d.update.Latest)
+	}
+	if ok {
+		d.move(v)
+	}
+	return nil
+}
+
+// Rollback puts the made-up CLI back where it was before the last move.
+func (d *demoCLI) Rollback(context.Context) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.prev.State == unitycli.Missing {
+		return &unitycli.Error{ExitCode: unitycli.ExitCommandFailed, Message: "There is no previous version to roll back to."}
+	}
+	d.move(d.prev.Version)
+	return nil
+}
+
+func (d *demoCLI) move(v unitycli.Version) {
+	d.prev = d.cur
+	d.cur.Version = v
+	d.update.Current = v.String()
+	if v.Verified() {
+		d.broken = false
+	}
+}
+
+// status is the made-up CLI as a probe would find it now.
+func (d *demoCLI) status() unitycli.Status {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.cur
+}
 
 func (d *demoCLI) CheckUpdate(context.Context, string) (unitycli.UpdateInfo, error) {
 	return d.update, nil

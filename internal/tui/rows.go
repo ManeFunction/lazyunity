@@ -319,6 +319,7 @@ const (
 	tonePlain tone = iota
 	toneGood       // green: ready, signed in
 	toneWarn       // yellow: something to do
+	toneBad        // red: must be fixed
 )
 
 // toolRow is a line of the Tools tab.
@@ -355,6 +356,8 @@ func (m *Model) drawTool(r toolRow, w int, base lipgloss.Style) string {
 		st = th.Success
 	case toneWarn:
 		st = th.Warning
+	case toneBad:
+		st = th.Missing
 	}
 	row.add(r.status, st, max(w-labelW-1, 1))
 	return row.done(w)

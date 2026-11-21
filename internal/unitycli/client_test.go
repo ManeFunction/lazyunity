@@ -304,6 +304,8 @@ func TestArguments(t *testing.T) {
 		"license activate --personal --accept-eula": ok,
 		"license return --yes":                      ok,
 		"self-update --yes --channel beta":          ok,
+		"self-update --yes --target 1.0.0":          ok,
+		"self-update --rollback --yes":              ok,
 		"open /p":                                   {Stdout: `{"success":true,"command":"open","data":{"alreadyOpen":true}}`},
 		"open /p --editor-version 6000.6.8f1 --build-target StandaloneLinux64":                                                             ok,
 		"projects create My Game --path /par --editor-version 6000.6.8f1 --template com.unity.template.urp-blank --no-cloud --bare --open": ok,
@@ -336,7 +338,9 @@ func TestArguments(t *testing.T) {
 	check("Logout", c.Logout(ctx))
 	check("ActivatePersonalLicense", c.ActivatePersonalLicense(ctx))
 	check("ReturnLicense", c.ReturnLicense(ctx))
-	check("SelfUpdate", c.SelfUpdate(ctx, "beta"))
+	check("SelfUpdate", c.SelfUpdate(ctx, UpdateOptions{Channel: "beta"}))
+	check("SelfUpdate to a version", c.SelfUpdate(ctx, UpdateOptions{Target: "1.0.0"}))
+	check("Rollback", c.Rollback(ctx))
 
 	res, err := c.Open(ctx, OpenOptions{Project: "/p"})
 	check("Open", err)
