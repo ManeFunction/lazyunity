@@ -424,7 +424,14 @@ func (m *Model) shellPrompt() {
 		},
 		onSubmit: func(m *Model, text string) tea.Cmd {
 			cmd := launch.ShellCommand(m.goos, m.cfg.OS.Shell, text, dir, m.getenv)
-			return tea.ExecProcess(cmd, func(err error) tea.Msg { return nil })
+			// The exit status is that of the wait for Enter, so an error here
+			// means the shell did not start, such as in a missing folder.
+			return tea.ExecProcess(cmd, func(err error) tea.Msg {
+				if err != nil {
+					return errorMsg{what: "Shell command", err: err}
+				}
+				return nil
+			})
 		},
 	})
 }
