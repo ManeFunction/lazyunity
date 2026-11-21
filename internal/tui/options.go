@@ -102,10 +102,16 @@ func (m *Model) cliChannel() string {
 	return unitycli.ChannelStable
 }
 
+// selfProber is a stand-in CLI that reports its own status, as a probe of the
+// real one would find it, instead of being looked for on the machine.
+type selfProber interface {
+	status() unitycli.Status
+}
+
 // reprobeCLI looks for the CLI again, after it was installed or updated.
 func (m *Model) reprobeCLI(updated bool) tea.Cmd {
-	if d, ok := m.cli.(*demoCLI); ok && m.fake != nil { // the made-up CLI, at the version it was moved to
-		st := d.status()
+	if p, ok := m.cli.(selfProber); ok {
+		st := p.status()
 		return func() tea.Msg { return cliStatusMsg{st: st, updated: updated} }
 	}
 	env, configured := m.env, m.cfg.Unity.CLIPath
