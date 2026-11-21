@@ -5,26 +5,9 @@ It replaces the Unity Hub completely: you do not need to install the Hub at all.
 
 lazyunity is a thin, fast front end for the official [Unity CLI](https://docs.unity.com/en-us/unity-cli). Every change goes through the CLI, so it shares the Hub's project list and install location, and Editors you open from it start **signed in**, without the Hub running.
 
-```
-╭─[1]─Projects────────────────────────────────╮╭─[2]─Installed Editors - Releases──────────────────────╮
-│★ Space Shooter 2h ago    6000.6.8f1  Linux  ││  6000.6.8f1      x86_64 Linux                         │
-│  Old Platform… 3d ago    2022.3.62f1 Android││  2022.3.62f1 LTS x86_64 Linux, Android                │
-│  Ancient Thing ✗ missing 2019.4.40f1 Linux  ││                                                       │
-│                                             ││                                                       │
-│                                             ││                                                       │
-│                                             ││                                                       │
-│                                             │╰────────────────────────────────────────────────1 of 2─╯
-│                                             │╭─[3]─Tools─────────────────────────────────────────────╮
-│                                             ││Unity CLI                ready · 1.0.0                 │
-│                                             ││Account                  signed in                     │
-│                                             ││License                  press enter to check          │
-│                                             ││ · · · · · · · · · · · · · · · · · · · · · · · · · · · │
-╰──────────────────────────────────────1 of 3─╯╰────────────────────────────────────────────────1 of 9─╯
-╭─Tasks────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ ⠋ Installing 6000.7.0b8 + Web Build Support [■■■■■■■·········]  42% download · Downloading Web Buil… │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────────╯
-Open: <enter> | Version: v | Platform: p | Pin: f | New: n | Add: a | Remove: d      ● signed in · 0.1.0
-```
+![](https://raw.githubusercontent.com/wiki/ManeFunction/lazyunity/main-ui.png)
+
+If anything breaks after Unity CLI update, you can launch an app in `lazyunity --safe` mode to rollback Unity CLI to the supported version.
 
 ## Requirements
 
@@ -129,11 +112,12 @@ Everything follows lazygit where lazygit has an equivalent. `?` shows the keys t
 | `C` | clean caches (Library, Temp ...) |
 
 **Editors, Installed Editors**: `enter` modules · `a` add modules · `n` install a new Editor · `d` uninstall · `space` set default · `u` upgrade to the newest patch · `o` folder · `y` copy.
-**Modules of an Editor**: `space`, `a` or `enter` install · `d` remove.
-**Releases**: `enter` or `space` install · `/` filter by version, in the filter row at the bottom of the tab (every page of releases is searched, not only the ones loaded) · `ctrl+s` release stream: Supported (the default), LTS, Beta, Alpha or All · `o` release notes.
-**Anywhere in the Editors panel**: `C` cleans the download cache, where installers and the partial downloads of interrupted installs are kept (asks first, with its size; not while a task runs).
 
-**Tools**: `enter` runs the selected tool, and `e` edits `config.yml` from any row. On the **Unity CLI** row, `enter` installs the CLI, or, once it is ready, opens a menu to update it, switch it between the release and beta feeds (the row says `beta feed` while you follow betas), or reinstall it with the official installer. Each lazyunity release is verified with a range of CLI versions (every patch of a release line). The row is green inside that range, red when the CLI is too old, and yellow when it is newer than the range or a verified update is out. A newer, not verified CLI is offered only in the menu, after a warning. If one breaks lazyunity, it starts in **safe mode**, with only the tools that bring back a verified CLI. If the CLI breaks lazyunity without it noticing, start it with `lazyunity --safe` to get the same tools. See [docs/UnityCLI.md](docs/UnityCLI.md). The **Editors folder** row is where new Editors install and installed Editors are looked for; `enter` on it changes it through the CLI. When the editor quits with the config changed, lazyunity restarts to apply it; if a task is running, the Config file row says a restart is required instead, and `enter` on it restarts (asking first while a task would be cancelled). **OpenUPM CLI** installs [openupm-cli](https://github.com/openupm/openupm-cli) with npm (Node.js is needed): the official release from the npm registry, unless `openupm.repo` is set in `config.yml`: then that repository (the official one or a fork) is cloned and built, and git is needed too. Like the Unity CLI row, it says `ready · <version>` for the npm release and `update available: <version>` once a newer one is out. A build from a repository reads `<version> · from <repo>@<branch> #<commit>`, and the row offers an update whenever the branch has newer commits, even when the version did not change. **Donate** opens the GitHub Sponsors page. The bottom line ends with the lazyunity version.
+**Modules of an Editor**: `space`, `a` or `enter` install · `d` remove.
+
+**Releases**: `enter` or `space` install · `/` filter by version, in the filter row at the bottom of the tab (every page of releases is searched, not only the ones loaded) · `ctrl+s` release stream: Supported (the default), LTS, Beta, Alpha or All · `o` release notes.
+
+**Anywhere in the Editors panel**: `C` cleans the download cache, where installers and the partial downloads of interrupted installs are kept (asks first, with its size; not while a task runs).
 
 ## Configuration
 
@@ -167,15 +151,29 @@ unity:
   cliPath: ''                # default: found automatically
 projects:
   defaultLocation: ~/Projects
-# openupm:                   # commented out: the Tools tab installs the official npm release
-#   repo: https://github.com/ManeFunction/openupm-cli   # set: clone, build and install from this git repo
-#   ref: no-more-legacy      # a branch or tag to build; empty: the default branch
 quitAfterOpen: false
 ```
 
 **Command lines** (`os.edit`, `os.openFolder`, `$VISUAL` / `$EDITOR`) are cut into words as a shell would, with quotes grouping words, but nothing in them is expanded. On Windows a backslash is part of the path, so `C:\Tools\nvim.exe {{dir}}` works as written; on Unix it escapes the next character.
 
-**OpenUPM CLI fork.** Until [openupm/openupm-cli#430](https://github.com/openupm/openupm-cli/pull/430) is merged (it is not accepted yet), the fork in the `openupm` block above is the recommended build. It drops deprecated dependencies, so npm no longer floods the install with deprecation warnings. It also cuts the `npm audit` findings from 19 vulnerable production packages (one critical) to 5, and fixes `openupm login` with a username and password, which sent the email as the password and logged in to registry.npmjs.org instead of the registry you asked for. It needs Node.js 20.17+ or 22.9+. Uncomment the block to use it; leave it commented out for the official npm release.
+## OpenUPM
+
+lazyunity can add [OpenUPM](https://openupm.com) packages to your projects through [openupm-cli](https://github.com/openupm/openupm-cli).
+
+- **Installing the CLI.** The **OpenUPM CLI** row of the Tools tab installs it with npm (Node.js is needed). By default that is the official release from the npm registry. With `openupm.repo` set in `config.yml`, that repository (the official one or a fork) is cloned and built instead, and git is needed too.
+- **Updates.** Like the Unity CLI row, the row says `ready · <version>` for the npm release and `update available: <version>` once a newer one is out. A build from a repository reads `<version> · from <repo>@<branch> #<commit>`, and the row offers an update whenever the branch has newer commits, even when the version did not change.
+- **Adding a package.** `ctrl+a` in Projects asks for a package name, such as `com.example.package` or `com.example.package@1.2.0`, and adds it to the selected project.
+- **New projects.** With the CLI installed, the last step of `n` (new project) can add [ManeTools](https://github.com/ManeFunction/ManeTools-Unity) from OpenUPM, in full or without the UI module, before the Editor opens.
+
+**Where the CLI comes from** is set by the `openupm` block of `config.yml`:
+
+```yaml
+# openupm:                   # commented out: the Tools tab installs the official npm release
+#   repo: https://github.com/ManeFunction/openupm-cli   # set: clone, build and install from this git repo
+#   ref: no-more-legacy      # a branch or tag to build; empty: the default branch
+```
+
+**OpenUPM CLI fork.** Until [openupm/openupm-cli#430](https://github.com/openupm/openupm-cli/pull/430) is merged (it is not accepted yet), the fork in the block above is the recommended build. It drops deprecated dependencies, so npm no longer floods the install with deprecation warnings. It also cuts the `npm audit` findings from 19 vulnerable production packages (one critical) to 5, and fixes `openupm login` with a username and password, which sent the email as the password and logged in to registry.npmjs.org instead of the registry you asked for. It needs Node.js 20.17+ or 22.9+. Uncomment the block to use it; leave it commented out for the official npm release.
 
 ## Safety
 
