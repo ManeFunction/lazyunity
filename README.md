@@ -7,11 +7,41 @@ lazyunity is a thin, fast front end for the official [Unity CLI](https://docs.un
 
 ![](https://raw.githubusercontent.com/wiki/ManeFunction/lazyunity/main-ui.png)
 
+<details>
+<summanry>Text version of UI</summanry>
+```
+╭─[1]─Projects────────────────────────────────────────────────╮╭─[2]─Installed Editors - Releases────────────────────────────────────────────╮
+│★ Space Shooter  2h ago    6000.6.8f1             Linux      ││★ 6000.6.8f1      x86_64 Linux, Android, WebGL                               │
+│★ Neon Drift     5h ago    6000.6.8f1             Android    ││  6000.3.28f1 LTS x86_64 Linux, Android, WebGL                               │
+│  Tiny Kingdoms  1d ago    6000.3.28f1            WebGL      ││  2022.3.62f1 LTS x86_64 Linux, Windows, Android, iOS                        │
+│  Lighthouse VR  3d ago    6000.3.28f1→6000.6.8f1 Android    │╰──────────────────────────────────────────────────────────────────────1 of 3─╯
+│  Puzzle Garden  6d ago    2022.3.62f1            iOS→Android│╭─[3]─Tools───────────────────────────────────────────────────────────────────╮
+│  Old Platformer 3w ago    2022.3.62f1            Windows    ││Unity CLI                ready · 1.0.0                                       │
+│  Ancient Thing  ✗ missing 2019.4.40f1            Linux      ││Account                  signed in as alex@example.com · enter to sign out   │
+│                                                             ││License                  press enter to check                                │
+│                                                             ││ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ │
+│                                                             ││Default project folder   ~/Projects · enter to change                        │
+│                                                             ││Editors folder           ~/Unity/Hub/Editor · enter to change                │
+│                                                             ││Config file              ~/.config/lazyunity/config.yml · enter to edit      │
+│                                                             ││ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ │
+│                                                             ││OpenUPM CLI              4.5.3 · from ManeFunction/openupm-cli@no-more-legacy│
+│                                                             ││ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ ╌ │
+│                                                             ││About                    lazyunity 0.1.0 · by Mane Function                  │
+│                                                             ││Donate                   support lazyunity on GitHub Sponsors · enter to open│
+╰──────────────────────────────────────────────────────1 of 7─╯╰──────────────────────────────────────────────────────────────────────1 of 9─╯
+╭─Tasks──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ ⠙ Installing 6000.7.0b8 + Web Build Support   [■■■■■■■■■■■■················]  42% download · Downloading Web Build Support                 │
+│ ○ Installing iOS Build Support for 6000.6.8f1 queued                                                                                       │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+Open: <enter> | Version: v | Platform: p | Pin: f | New: n | Add: a | Remove: d | Keybindings: ? | Cancel task: X          ● signed in · 0.1.0
+```
+</details>
+
 If anything breaks after a Unity CLI update, start lazyunity in safe mode (`lazyunity --safe`) to roll the Unity CLI back to a supported version.
 
 ## Requirements
 
-- The Unity CLI, version 1.0.0 or newer. If it is missing, lazyunity offers to install it with Unity's official installer (Tools tab, `3`). [docs/UnityCLI.md](docs/UnityCLI.md) lists every CLI command, flag and output field lazyunity relies on, and the CLI version they were checked against.
+- The Unity CLI, version 1.0.0 or newer. If it is missing, lazyunity offers to install it with Unity's official installer (Tools tab, `[3]`). [docs/UnityCLI.md](docs/UnityCLI.md) lists every CLI command, flag and output field lazyunity relies on, and the CLI version they were checked against.
 - Linux, macOS or Windows. A terminal with colours and, ideally, mouse support.
 
 ## Installation
