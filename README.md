@@ -9,6 +9,7 @@ lazyunity is a thin, fast front end for the official [Unity CLI](https://docs.un
 
 <details>
 <summary>Text version of UI</summary>
+
 ```
 ╭─[1]─Projects────────────────────────────────────────────────╮╭─[2]─Installed Editors - Releases────────────────────────────────────────────╮
 │★ Space Shooter  2h ago    6000.6.8f1             Linux      ││★ 6000.6.8f1      x86_64 Linux, Android, WebGL                               │
@@ -35,6 +36,7 @@ lazyunity is a thin, fast front end for the official [Unity CLI](https://docs.un
 ╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 Open: <enter> | Version: v | Platform: p | Pin: f | New: n | Add: a | Remove: d | Keybindings: ? | Cancel task: X          ● signed in · 0.1.0
 ```
+
 </details>
 
 If anything breaks after a Unity CLI update, start lazyunity in safe mode (`lazyunity --safe`) to roll the Unity CLI back to a supported version.
