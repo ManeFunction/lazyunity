@@ -138,6 +138,57 @@ func TestOpenUPMToolRow(t *testing.T) {
 	}
 }
 
+// TestOpenUPMStatus pins every kind of the OpenUPM status to the probe, the
+// remembered build, the update check and the configured source.
+func TestOpenUPMStatus(t *testing.T) {
+	registry := config.OpenUPM{}
+	fork := config.OpenUPM{Repo: "https://github.com/ManeFunction/openupm-cli.git", Ref: "fixes"}
+	other := config.OpenUPM{Repo: "https://github.com/ManeFunction/openupm-cli.git", Ref: "main"}
+	installed := openupmState{checked: true, path: "/usr/bin/openupm", version: "4.5.3"}
+	build := &state.OpenUPMBuild{Repo: "https://github.com/ManeFunction/openupm-cli", Ref: "fixes", Commit: "0123456789abcdef", Version: "4.5.3"}
+	stale := &state.OpenUPMBuild{Repo: build.Repo, Ref: build.Ref, Commit: build.Commit, Version: "4.4.0"}
+
+	for _, c := range []struct {
+		name    string
+		src     config.OpenUPM
+		probe   openupmState
+		build   *state.OpenUPMBuild
+		latest  openupmLatest
+		kind    openupmKind
+		version string
+		update  string
+		built   bool // the status names the build
+	}{
+		{name: "before the probe", src: registry, kind: openupmChecking},
+		{name: "not installed", src: registry, probe: openupmState{checked: true}, kind: openupmMissing},
+		{name: "no version reported", src: registry, probe: openupmState{checked: true, path: "/usr/bin/openupm"}, kind: openupmReady, version: "installed"},
+
+		{name: "npm, not checked yet", src: registry, probe: installed, kind: openupmReady, version: "4.5.3"},
+		{name: "npm, current", src: registry, probe: installed, latest: openupmLatest{src: registry, latest: "4.5.3"}, kind: openupmReady, version: "4.5.3"},
+		{name: "npm, newer out", src: registry, probe: installed, latest: openupmLatest{src: registry, latest: "4.6.0"}, kind: openupmUpdate, version: "4.5.3", update: "4.6.0"},
+		{name: "npm, check for another source", src: registry, probe: installed, latest: openupmLatest{src: fork, latest: "fedcba9876543210"}, kind: openupmReady, version: "4.5.3"},
+		{name: "npm wanted, repository build installed", src: registry, probe: installed, build: build, kind: openupmOther, version: "4.5.3", built: true},
+
+		{name: "repository wanted, npm installed", src: fork, probe: installed, kind: openupmOther, version: "4.5.3"},
+		{name: "repository, another branch installed", src: other, probe: installed, build: build, kind: openupmOther, version: "4.5.3", built: true},
+		{name: "repository, build replaced since", src: fork, probe: installed, build: stale, kind: openupmOther, version: "4.5.3"},
+		{name: "repository, not checked yet", src: fork, probe: installed, build: build, kind: openupmReady, version: "4.5.3", built: true},
+		{name: "repository, current", src: fork, probe: installed, build: build, latest: openupmLatest{src: fork, latest: build.Commit}, kind: openupmReady, version: "4.5.3", built: true},
+		{name: "repository, newer commit", src: fork, probe: installed, build: build, latest: openupmLatest{src: fork, latest: "fedcba9876543210"}, kind: openupmUpdate, version: "4.5.3", update: "#fedcba9", built: true},
+		{name: "repository, check for another branch", src: fork, probe: installed, build: build, latest: openupmLatest{src: other, latest: "fedcba9876543210"}, kind: openupmReady, version: "4.5.3", built: true},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			m := newTestModel(t)
+			m.cfg.OpenUPM, m.openupm, m.st.OpenUPMBuild, m.openupmNew = c.src, c.probe, c.build, c.latest
+			st := m.openupmStatus()
+			if st.kind != c.kind || st.version != c.version || st.update != c.update || (st.build != nil) != c.built {
+				t.Errorf("got kind %d, version %q, update %q, build %v; want kind %d, version %q, update %q, build %v",
+					st.kind, st.version, st.update, st.build != nil, c.kind, c.version, c.update, c.built)
+			}
+		})
+	}
+}
+
 func TestOpenUPMInstallRecordsTheCommit(t *testing.T) {
 	m := newTestModel(t)
 	fork := config.OpenUPM{Repo: " https://github.com/me/openupm-cli ", Ref: "fixes"}
