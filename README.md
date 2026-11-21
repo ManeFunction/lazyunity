@@ -8,7 +8,7 @@ lazyunity is a thin, fast front end for the official [Unity CLI](https://docs.un
 ![](https://raw.githubusercontent.com/wiki/ManeFunction/lazyunity/main-ui.png)
 
 <details>
-<summanry>Text version of UI</summanry>
+<summary>Text version of UI</summary>
 ```
 ╭─[1]─Projects────────────────────────────────────────────────╮╭─[2]─Installed Editors - Releases────────────────────────────────────────────╮
 │★ Space Shooter  2h ago    6000.6.8f1             Linux      ││★ 6000.6.8f1      x86_64 Linux, Android, WebGL                               │
