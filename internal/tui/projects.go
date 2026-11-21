@@ -461,6 +461,9 @@ func (m *Model) deleteProjectFlow(r projectRow) {
 						title: "Deleting " + r.name(),
 						label: "delete " + r.name(),
 						works: []string{workProject(r.Path)},
+						// os.RemoveAll cannot be stopped halfway: a cancel or
+						// quit would leave a partly deleted project behind.
+						keep: true,
 						do: func(ctx context.Context) error {
 							if err := os.RemoveAll(r.Path); err != nil {
 								return err
