@@ -7,7 +7,7 @@ lazyunity is a thin, fast front end for the official [Unity CLI](https://docs.un
 
 ![](https://raw.githubusercontent.com/wiki/ManeFunction/lazyunity/main-ui.png)
 
-If anything breaks after Unity CLI update, you can launch an app in `lazyunity --safe` mode to rollback Unity CLI to the supported version.
+If anything breaks after a Unity CLI update, start lazyunity in safe mode (`lazyunity --safe`) to roll the Unity CLI back to a supported version.
 
 ## Requirements
 
