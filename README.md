@@ -28,7 +28,7 @@ Open: <enter> | Version: v | Platform: p | Pin: f | New: n | Add: a | Remove: d 
 
 ## Requirements
 
-- The Unity CLI, version 1.0.0 or newer. If it is missing, lazyunity offers to install it with Unity's official installer (Tools tab, `3`).
+- The Unity CLI, version 1.0.0 or newer. If it is missing, lazyunity offers to install it with Unity's official installer (Tools tab, `3`). [docs/UnityCLI.md](docs/UnityCLI.md) lists every CLI command, flag and output field lazyunity relies on, and the CLI version they were checked against.
 - Linux, macOS or Windows. A terminal with colours and, ideally, mouse support.
 
 ## Installation
