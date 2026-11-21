@@ -203,7 +203,7 @@ func TestReadmeSampleConfigIsClean(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	text := string(readme)
+	text := strings.ReplaceAll(string(readme), "\r\n", "\n") // a Windows checkout has CRLF
 	start := strings.Index(text, "```yaml\ngui:")
 	if start < 0 {
 		t.Fatal("the README has no sample config")

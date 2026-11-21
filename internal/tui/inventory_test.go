@@ -38,10 +38,10 @@ func TestInventoryScanAndMerge(t *testing.T) {
 	}
 	inv.setListed(listEditors("linux", []unitycli.Editor{
 		{Version: "6000.6.8f1", Location: exe, Default: true},
-		{Version: "2022.3.62f1", Location: "/elsewhere/2022.3.62f1/Editor/Unity"},
+		{Version: "2022.3.62f1", Location: filepath.FromSlash("/elsewhere/2022.3.62f1/Editor/Unity")},
 	}))
 	eds := inv.editors()
-	if len(eds) != 2 || eds[0].Version != "6000.6.8f1" || !eds[0].Default || eds[1].Dir != "/elsewhere/2022.3.62f1" {
+	if len(eds) != 2 || eds[0].Version != "6000.6.8f1" || !eds[0].Default || eds[1].Dir != filepath.FromSlash("/elsewhere/2022.3.62f1") {
 		t.Errorf("the CLI marks the default and adds the Editors it knows elsewhere: %+v", eds)
 	}
 }

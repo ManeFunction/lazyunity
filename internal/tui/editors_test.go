@@ -548,8 +548,9 @@ func TestCompleteDirKeepsTilde(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := completeDir("~/Pro")
-	if len(got) != 1 || got[0] != "~/Projects/" {
-		t.Errorf("completeDir = %q, want ~/Projects/", got)
+	want := filepath.FromSlash("~/Projects/")
+	if len(got) != 1 || got[0] != want {
+		t.Errorf("completeDir = %q, want %q", got, want)
 	}
 }
 
