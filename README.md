@@ -143,11 +143,34 @@ Everything follows lazygit where lazygit has an equivalent. `?` shows the keys t
 | `y` | copy the path, name or version |
 | `C` | clean caches (Library, Temp ...) |
 
-**Editors, Installed Editors**: `enter` modules · `a` add modules · `n` install a new Editor · `d` uninstall · `space` set default · `u` upgrade to the newest patch · `o` folder · `y` copy.
+**Editors, Installed Editors**
 
-**Modules of an Editor**: `space`, `a` or `enter` install · `d` remove.
+| Key | |
+|---|---|
+| `enter` | modules |
+| `a` | add modules |
+| `n` | install a new Editor |
+| `d` | uninstall |
+| `space` | set default |
+| `u` | upgrade to the newest patch |
+| `o` | folder |
+| `y` | copy |
 
-**Releases**: `enter` or `space` install · `/` filter by version, in the filter row at the bottom of the tab (every page of releases is searched, not only the ones loaded) · `ctrl+s` release stream: Supported (the default), LTS, Beta, Alpha or All · `o` release notes.
+**Modules of an Editor**
+
+| Key | |
+|---|---|
+| `space`, `a`, `enter` | install |
+| `d` | remove |
+
+**Releases**
+
+| Key | |
+|---|---|
+| `enter`, `space` | install |
+| `/` | filter by version, in the filter row at the bottom of the tab (every page of releases is searched, not only the ones loaded) |
+| `ctrl+s` | release stream: Supported (the default), LTS, Beta, Alpha or All |
+| `o` | release notes |
 
 **Anywhere in the Editors panel**: `C` cleans the download cache, where installers and the partial downloads of interrupted installs are kept (asks first, with its size; not while a task runs).
 
