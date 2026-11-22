@@ -1,6 +1,6 @@
 # A made-up machine for promotional screenshots:
 #
-#   lazyunity --fake testdata/fake/screenshot.yml
+#   lazyunity --fake testdata/promo.yml
 #
 # Nothing here is read from the Unity CLI or the disk, and nothing done in the
 # interface reaches them. Your config.yml still applies (theme, keys), but

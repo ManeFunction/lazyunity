@@ -17,7 +17,7 @@ import (
 // TestFakeSample shows the sample file of the fake mode, which must keep
 // loading as the format changes.
 func TestFakeSample(t *testing.T) {
-	f, err := LoadFake(filepath.Join("..", "..", "testdata", "fake", "screenshot.yml"))
+	f, err := LoadFake(filepath.Join("..", "..", "testdata", "promo.yml"))
 	if err != nil {
 		t.Fatal(err)
 	}
