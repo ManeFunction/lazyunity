@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -143,6 +144,12 @@ func TestDir(t *testing.T) {
 	t.Setenv("HOME", "/home/x")
 	if got, err := Dir(""); err != nil || filepath.Base(got) != "lazyunity" {
 		t.Errorf("default: %q, %v", got, err)
+	}
+	if runtime.GOOS != "windows" && runtime.GOOS != "darwin" {
+		t.Setenv("XDG_CONFIG_HOME", "relative/cfg")
+		if got, err := Dir(""); err != nil || got != "/home/x/.config/lazyunity" {
+			t.Errorf("a relative $XDG_CONFIG_HOME is ignored: %q, %v", got, err)
+		}
 	}
 }
 

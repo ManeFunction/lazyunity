@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 
@@ -216,7 +217,8 @@ func Default() Config {
 // Dir is the folder holding config.yml and state.yml. override, if not empty,
 // wins; then $LAZYUNITY_CONFIG_DIR; then lazyunity in $XDG_CONFIG_HOME, when
 // that is an absolute path, on every system, as lazygit does; then the user's
-// config folder (~/.config, ~/Library/Application Support, %AppData%).
+// config folder (~/.config, ~/Library/Application Support, %AppData%). A
+// relative $XDG_CONFIG_HOME counts as unset, as the XDG spec says.
 func Dir(override string) (string, error) {
 	if override != "" {
 		return override, nil
@@ -226,6 +228,15 @@ func Dir(override string) (string, error) {
 	}
 	if x := os.Getenv("XDG_CONFIG_HOME"); filepath.IsAbs(x) {
 		return filepath.Join(x, "lazyunity"), nil
+	}
+	if runtime.GOOS != "windows" && runtime.GOOS != "darwin" {
+		// os.UserConfigDir fails on a relative $XDG_CONFIG_HOME instead of
+		// ignoring it.
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", err
+		}
+		return filepath.Join(home, ".config", "lazyunity"), nil
 	}
 	base, err := os.UserConfigDir()
 	if err != nil {

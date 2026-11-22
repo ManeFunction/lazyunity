@@ -58,8 +58,9 @@ func (e Env) HubDataDir() string {
 	case "darwin":
 		return e.join(e.Home, "Library", "Application Support", "UnityHub")
 	default:
+		// A relative $XDG_CONFIG_HOME counts as unset, as the XDG spec says.
 		base := e.Getenv("XDG_CONFIG_HOME")
-		if base == "" {
+		if !strings.HasPrefix(base, "/") {
 			base = e.join(e.Home, ".config")
 		}
 		return e.join(base, "unityhub")

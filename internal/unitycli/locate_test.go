@@ -44,6 +44,10 @@ func TestPaths(t *testing.T) {
 			"/cfg/unityhub", "/home/u/.local/bin/unity",
 		},
 		{
+			"linux with a relative XDG_CONFIG_HOME", testEnv("linux", "/home/u", map[string]string{"XDG_CONFIG_HOME": "cfg"}, nil, ""),
+			"/home/u/.config/unityhub", "/home/u/.local/bin/unity",
+		},
+		{
 			"macos", testEnv("darwin", "/Users/u", nil, nil, ""),
 			"/Users/u/Library/Application Support/UnityHub", "/Users/u/.unity/bin/unity",
 		},
