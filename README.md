@@ -176,7 +176,7 @@ Everything follows lazygit where lazygit has an equivalent. `?` shows the keys t
 
 ## Configuration
 
-`config.yml` lives in `~/.config/lazyunity/` (`~/Library/Application Support/lazyunity/` on macOS, `%AppData%\lazyunity\` on Windows), or wherever `--config-dir` or `$LAZYUNITY_CONFIG_DIR` points. As with lazygit, a set `$XDG_CONFIG_HOME` puts it in `$XDG_CONFIG_HOME/lazyunity/` on every system. lazyunity only reads it. What the interface remembers (pending choices, sort order) goes in `state.yml` next to it. The first time you edit it from the Tools tab, lazyunity writes every setting into it, commented out and set to its default, keybindings included.
+`config.yml` lives in `~/.config/lazyunity/` (`~/Library/Application Support/lazyunity/` on macOS, `%LOCALAPPDATA%\lazyunity\` on Windows, as with lazygit), or wherever `--config-dir` or `$LAZYUNITY_CONFIG_DIR` points. A set `$XDG_CONFIG_HOME` puts it in `$XDG_CONFIG_HOME/lazyunity/` on every system. lazyunity only reads it. What the interface remembers (pending choices, sort order) goes in `state.yml` next to it. The first time you edit it from the Tools tab, lazyunity writes every setting into it, commented out and set to its default, keybindings included.
 
 ```yaml
 gui:

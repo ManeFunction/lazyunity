@@ -151,6 +151,12 @@ func TestDir(t *testing.T) {
 			t.Errorf("a relative $XDG_CONFIG_HOME is ignored: %q, %v", got, err)
 		}
 	}
+	if runtime.GOOS == "windows" {
+		t.Setenv("LOCALAPPDATA", `C:\Users\x\AppData\Local`)
+		if got, err := Dir(""); err != nil || got != `C:\Users\x\AppData\Local\lazyunity` {
+			t.Errorf("windows default is %%LOCALAPPDATA%%: %q, %v", got, err)
+		}
+	}
 }
 
 func TestNormalizeKey(t *testing.T) {
