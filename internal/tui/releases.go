@@ -180,7 +180,7 @@ func releaseActions() []*action {
 			}),
 		{id: "releases.stream", ctx: ctxReleases, keys: []string{"ctrl+s"}, desc: "Filter by release stream (Supported, LTS, Beta, Alpha)", hint: "Stream",
 			run: func(m *Model) tea.Cmd { m.streamMenu(); return nil }},
-		on(&action{id: "releases.notes", ctx: ctxReleases, keys: []string{"o"}, desc: "Open the release notes in the browser"},
+		on(&action{id: "releases.notes", ctx: ctxReleases, keys: []string{"o"}, desc: "Open the release notes in the browser", hint: "Release notes"},
 			func(m *Model, r unitycli.Release) tea.Cmd { return m.openURL(releaseNotesURL(r.Version)) }),
 	}
 }
