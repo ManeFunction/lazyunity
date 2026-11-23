@@ -562,8 +562,23 @@ func (d *demoCLI) InstallModules(ctx context.Context, _, _ string, _ []string) (
 func (d *demoCLI) RemoveModules(context.Context, string, string, []string) error { return nil }
 func (d *demoCLI) Uninstall(context.Context, string, string) error               { return nil }
 
-func (d *demoCLI) UpgradeEditor(ctx context.Context, _ string) (*unitycli.Stream, error) {
-	return held(ctx)
+// EditorUpdates finds, for each made-up Editor, the newest release of its
+// line in the made-up releases.
+func (d *demoCLI) EditorUpdates(context.Context) ([]unitycli.EditorUpdate, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	var out []unitycli.EditorUpdate
+	for _, e := range d.editors {
+		up := unitycli.EditorUpdate{Current: e.Version, Architecture: e.Architecture}
+		for _, r := range d.releases {
+			if unityLine(r.Version) == unityLine(e.Version) && unity.CompareStrings(r.Version, e.Version) > 0 &&
+				(up.Target == "" || unity.CompareStrings(r.Version, up.Target) > 0) {
+				up.Target, up.Available = r.Version, true
+			}
+		}
+		out = append(out, up)
+	}
+	return out, nil
 }
 
 func (d *demoCLI) DownloadCache(context.Context) (unitycli.CacheInfo, error) {

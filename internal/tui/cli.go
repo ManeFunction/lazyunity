@@ -38,7 +38,7 @@ type unityCLI interface {
 	InstallModules(ctx context.Context, version, arch string, modules []string) (*unitycli.Stream, error)
 	RemoveModules(ctx context.Context, version, arch string, modules []string) error
 	Uninstall(ctx context.Context, version, arch string) error
-	UpgradeEditor(ctx context.Context, version string) (*unitycli.Stream, error)
+	EditorUpdates(ctx context.Context) ([]unitycli.EditorUpdate, error)
 	DownloadCache(ctx context.Context) (unitycli.CacheInfo, error)
 	CleanDownloadCache(ctx context.Context) error
 

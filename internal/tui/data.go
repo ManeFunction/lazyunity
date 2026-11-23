@@ -39,6 +39,12 @@ type cliUpdateMsg struct {
 	err  error
 }
 
+// editorUpdatesMsg says which installed Editors have a newer patch out.
+type editorUpdatesMsg struct {
+	updates []unitycli.EditorUpdate
+	err     error
+}
+
 type installPathMsg struct {
 	path string
 	err  error
@@ -122,6 +128,14 @@ func (m *Model) checkCLIUpdateCmd() tea.Cmd {
 	})
 }
 
+// checkEditorUpdatesCmd asks which installed Editors have a newer patch out.
+func (m *Model) checkEditorUpdatesCmd() tea.Cmd {
+	return m.cliCmd(func(ctx context.Context, c unityCLI) tea.Msg {
+		ups, err := c.EditorUpdates(ctx)
+		return editorUpdatesMsg{updates: ups, err: err}
+	})
+}
+
 func (m *Model) loadInstallPathCmd() tea.Cmd {
 	return m.cliCmd(func(ctx context.Context, c unityCLI) tea.Msg {
 		p, err := c.InstallPath(ctx)
@@ -134,19 +148,20 @@ func (m *Model) loadInstallPathCmd() tea.Cmd {
 type source uint
 
 const (
-	srcProjects    source = 1 << iota // the CLI's project list
-	srcEditors                        // the CLI's Editor list
-	srcDisk                           // the scan of the Editors folder
-	srcAuth                           // who is signed in
-	srcInstallPath                    // where new Editors go
-	srcCLIUpdate                      // whether a newer Unity CLI is out
-	srcOpenUPM                        // the OpenUPM CLI
-	srcReleases                       // the Releases tab, once it was opened
-	srcVerifiedCLI                    // the newest verified Unity CLI, from Unity's CDN
+	srcProjects      source = 1 << iota // the CLI's project list
+	srcEditors                          // the CLI's Editor list
+	srcDisk                             // the scan of the Editors folder
+	srcAuth                             // who is signed in
+	srcInstallPath                      // where new Editors go
+	srcCLIUpdate                        // whether a newer Unity CLI is out
+	srcOpenUPM                          // the OpenUPM CLI
+	srcReleases                         // the Releases tab, once it was opened
+	srcVerifiedCLI                      // the newest verified Unity CLI, from Unity's CDN
+	srcEditorUpdates                    // the newer patches of the installed Editors
 
 	// srcCLI is what comes from the Unity CLI; it is all loaded again once the
 	// CLI becomes usable.
-	srcCLI = srcProjects | srcEditors | srcAuth | srcInstallPath | srcCLIUpdate
+	srcCLI = srcProjects | srcEditors | srcAuth | srcInstallPath | srcCLIUpdate | srcEditorUpdates
 	// srcAll is everything.
 	srcAll = srcCLI | srcDisk | srcOpenUPM | srcReleases | srcVerifiedCLI
 )
@@ -166,6 +181,7 @@ func (m *Model) reload(s source) tea.Cmd {
 		{srcOpenUPM, m.probeOpenUPMCmd},
 		{srcReleases, func() tea.Cmd { return m.releasesTab.refresh(m) }},
 		{srcVerifiedCLI, m.latestVerifiedCmd},
+		{srcEditorUpdates, m.checkEditorUpdatesCmd},
 	}
 	var cmds []tea.Cmd
 	for _, l := range loads {
@@ -226,6 +242,12 @@ func (m *Model) handleData(msg tea.Msg) tea.Cmd {
 			m.cliUpdate = msg.info
 			m.refreshTools()
 		}
+	case editorUpdatesMsg:
+		// like the CLI's own, a failed check (offline, say) is not worth a word
+		if msg.err == nil {
+			m.editorUpdates = msg.updates
+			m.refreshEditors()
+		}
 	case verifiedCLIMsg:
 		if msg.ok {
 			m.cliVerified = msg.v
@@ -251,6 +273,8 @@ func (m *Model) handleData(msg tea.Msg) tea.Cmd {
 		m.onAddModules(msg)
 	case releaseModulesMsg:
 		return m.onReleaseModules(msg)
+	case updateModulesMsg:
+		return m.onUpdateModules(msg)
 	case planMsg:
 		m.onPlan(msg)
 	case cacheInfoMsg:
@@ -298,7 +322,25 @@ func (m *Model) refreshProjects() {
 	m.projectsTab.SetItems(rows)
 }
 
-// refreshEditors shows the inventory's Editors.
+// refreshEditors shows the inventory's Editors, each with the newer patch
+// that is out for it, unless that one is installed too.
 func (m *Model) refreshEditors() {
-	m.editorsTab.SetItems(m.inv.editors())
+	rows := append([]editorRow(nil), m.inv.editors()...)
+	for i := range rows {
+		if to := m.updateFor(rows[i]); to != "" && !m.inv.has(to) {
+			rows[i].Update = to
+		}
+	}
+	m.editorsTab.SetItems(rows)
+}
+
+// updateFor is the newest patch out for an Editor, or "" when there is none.
+// An Editor whose architecture is not known matches on its version alone.
+func (m *Model) updateFor(e editorRow) string {
+	for _, u := range m.editorUpdates {
+		if u.Available && u.Current == e.Version && (e.Arch == "" || u.Architecture == "" || u.Architecture == e.Arch) {
+			return u.Target
+		}
+	}
+	return ""
 }

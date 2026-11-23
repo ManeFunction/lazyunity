@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	tea "charm.land/bubbletea/v2"
+
 	"github.com/ManeFunction/lazyunity/internal/unitycli"
 )
 
@@ -279,7 +281,7 @@ func TestInstallConfirmationShowsTheCachedDownload(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.plan.TotalDownloadSize = 4100
-	drain(m, m.planInstall(unitycli.InstallOptions{Version: "6000.5.1f1"}))
+	drain(m, m.planInstall(unitycli.InstallOptions{Version: "6000.5.1f1"}, nil))
 	if out := screenText(m); !strings.Contains(out, "Downloaded: 2.3 of 4.1 kB (56%)") {
 		t.Errorf("the confirmation should show the cached part:\n%s", out)
 	}
@@ -375,20 +377,169 @@ func TestSetDefaultEditor(t *testing.T) {
 	}
 }
 
-func TestUpgradeEditor(t *testing.T) {
-	m := newTestModel(t)
-	press(m, "2")
-	selectEditor(t, m, "2022.3.62f1")
+// withUpdate tells the model that a newer patch of 2022.3.62f1 is out, and
+// selects that Editor.
+func withUpdate(t *testing.T, m *Model) *fakeCLI {
+	t.Helper()
 	f := useFakeCLI(t, m)
 	f.editors = cliEditors(m)
+	f.projects = m.rawProjects
+	m.Update(editorUpdatesMsg{updates: []unitycli.EditorUpdate{
+		{Current: "6000.6.8f1", Architecture: "x86_64"},
+		{Current: "2022.3.62f1", Architecture: "x86_64", Target: "2022.3.70f1", Available: true},
+	}})
+	press(m, "2")
+	selectEditor(t, m, "2022.3.62f1")
+	return f
+}
+
+func TestEditorUpdateIsShownAndOnlyThenOnTheBottomLine(t *testing.T) {
+	m := newTestModel(t)
+	withUpdate(t, m)
+	out := screenText(m)
+	if !strings.Contains(out, "· update 2022.3.70f1 available ·") {
+		t.Fatalf("the Editor's row names the newer patch:\n%s", out)
+	}
+	if !strings.Contains(out, "Update: u") {
+		t.Errorf("the bottom line offers the update:\n%s", out)
+	}
+	selectEditor(t, m, "6000.6.8f1")
+	if out := screenText(m); strings.Contains(out, "Update: u") {
+		t.Errorf("an Editor with no newer patch offers no update:\n%s", out)
+	}
 	press(m, "u")
-	if len(m.popups) != 1 || !strings.Contains(screenText(m), "newest patch of Unity 2022.3") {
-		t.Fatalf("screen:\n%s", screenText(m))
+	if len(m.popups) != 0 {
+		t.Error("u does nothing on an Editor with no newer patch")
+	}
+}
+
+func TestEditorUpdateHiddenWhenTheNewPatchIsInstalled(t *testing.T) {
+	m := newTestModel(t)
+	useFakeCLI(t, m)
+	m.Update(editorUpdatesMsg{updates: []unitycli.EditorUpdate{
+		{Current: "2022.3.62f1", Architecture: "x86_64", Target: "6000.6.8f1", Available: true},
+	}})
+	if strings.Contains(screenText(m), "available") {
+		t.Errorf("a patch that is installed is not offered:\n%s", screenText(m))
+	}
+}
+
+// updateUpToConfirm goes through the update of 2022.3.62f1 to the install
+// confirmation, and returns the command the Install answer gives.
+func updateUpToConfirm(t *testing.T, m *Model, f *fakeCLI) tea.Cmd {
+	t.Helper()
+	f.modules = []unitycli.Module{
+		{ID: "android", Name: "Android Build Support", Category: "Platforms", IsInstalled: true},
+		{ID: "webgl", Name: "Web Build Support", Category: "Platforms"},
+	}
+	f.releaseModules = []unitycli.Module{
+		{ID: "android", Name: "Android Build Support", Category: "Platforms", DownloadBytes: 1 << 30},
+		{ID: "webgl", Name: "Web Build Support", Category: "Platforms", DownloadBytes: 1 << 29},
+	}
+	press(m, "u")
+	if out := screenText(m); len(m.popups) != 1 || !strings.Contains(out, "Install Unity 2022.3.70f1, the newest patch") {
+		t.Fatalf("u offers the newest patch:\n%s", out)
 	}
 	_, cmd := m.Update(keyMsg("enter"))
 	drain(m, cmd)
-	if !f.called("UpgradeEditor", "2022.3.62f1") {
+	if !f.called("ReleaseModules", "2022.3.70f1") || !f.called("Modules", "2022.3.62f1", "x86_64") {
+		t.Fatalf("the modules of both versions are listed: %v", f.Calls())
+	}
+	menu, ok := m.popups[len(m.popups)-1].(*menuPopup)
+	if !ok || !menu.multi {
+		t.Fatalf("a module picker:\n%s", screenText(m))
+	}
+	var ticked []string
+	for _, it := range menu.picked() {
+		ticked = append(ticked, it.id)
+	}
+	if strings.Join(ticked, ",") != "android" {
+		t.Errorf("the old Editor's modules are ticked from the start, got %v", ticked)
+	}
+	_, cmd = m.Update(keyMsg("enter"))
+	drain(m, cmd)
+	want := unitycli.InstallOptions{Version: "2022.3.70f1", Architecture: "x86_64", Modules: []string{"android"}}
+	if !f.called("PlanInstall", want) {
+		t.Fatalf("the plan: %v", f.Calls())
+	}
+	if !strings.Contains(screenText(m), "Update Unity 2022.3.62f1 to 2022.3.70f1") {
+		t.Errorf("the confirmation names the update:\n%s", screenText(m))
+	}
+	_, cmd = m.Update(keyMsg("enter")) // Install
+	if len(m.tasks) != 1 {
+		t.Fatalf("the install is queued: %v", m.tasks)
+	}
+	return cmd
+}
+
+func TestEditorUpdateEndToEnd(t *testing.T) {
+	m := newTestModel(t)
+	f := withUpdate(t, m)
+	install := updateUpToConfirm(t, m, f)
+	if !strings.Contains(screenText(m), "Delete the Unity 2022.3.62f1 version") {
+		t.Fatalf("asks about the old Editor:\n%s", screenText(m))
+	}
+	_, del := m.Update(keyMsg("enter"))
+	if out := screenText(m); !strings.Contains(out, "Move projects to Unity 2022.3.70f1") || !strings.Contains(out, "Old Platformer") {
+		t.Fatalf("then about its projects:\n%s", out)
+	}
+	_, move := m.Update(keyMsg("enter"))
+	if len(m.tasks) != 3 || m.tasks[1].waitFor != m.tasks[0] || m.tasks[2].waitFor != m.tasks[0] {
+		t.Fatalf("the uninstall and the move wait for the install: %v", m.tasks)
+	}
+	if !strings.Contains(screenText(m), "queued, after") {
+		t.Errorf("the queue says what they wait for:\n%s", screenText(m))
+	}
+	if r, _ := m.projectByPath(m.rawProjects[1].Path); r.Pending.Version != "" {
+		t.Error("the projects move only once the install has succeeded")
+	}
+	drain(m, tea.Batch(install, del, move))
+	if !f.called("Install", unitycli.InstallOptions{Version: "2022.3.70f1", Architecture: "x86_64", Modules: []string{"android"}}) ||
+		!f.called("Uninstall", "2022.3.62f1", "x86_64") {
 		t.Errorf("calls: %v", f.Calls())
+	}
+	calls := strings.Join(f.Calls(), "\n")
+	if strings.Index(calls, "Uninstall") < strings.Index(calls, "Install {") {
+		t.Errorf("the old Editor is uninstalled after the install: %v", f.Calls())
+	}
+	if r, _ := m.projectByPath(m.rawProjects[1].Path); r.Pending.Version != "2022.3.70f1" {
+		t.Errorf("Old Platformer opens with the new patch: %+v", r.Pending)
+	}
+	if m.st.PendingFor(m.rawProjects[0].Path).Version != "" {
+		t.Error("a project on another version is left alone")
+	}
+}
+
+func TestEditorUpdateFollowUpsDroppedWhenTheInstallFails(t *testing.T) {
+	m := newTestModel(t)
+	f := withUpdate(t, m)
+	f.err["Install"] = cliError(unitycli.ExitNetwork, "no network")
+	install := updateUpToConfirm(t, m, f)
+	_, del := m.Update(keyMsg("enter"))
+	_, move := m.Update(keyMsg("enter"))
+	drain(m, tea.Batch(install, del, move))
+	if f.called("Uninstall", "2022.3.62f1", "x86_64") {
+		t.Error("the old Editor stays when the new one did not install")
+	}
+	if r, _ := m.projectByPath(m.rawProjects[1].Path); r.Pending.Version != "" {
+		t.Errorf("the projects stay too: %+v", r.Pending)
+	}
+	if len(m.tasks) != 0 {
+		t.Errorf("the follow-ups are gone from the queue: %v", m.tasks)
+	}
+}
+
+func TestEditorUpdateFollowUpsDeclined(t *testing.T) {
+	m := newTestModel(t)
+	f := withUpdate(t, m)
+	install := updateUpToConfirm(t, m, f)
+	press(m, "esc", "esc")
+	if len(m.popups) != 0 || len(m.tasks) != 1 {
+		t.Fatalf("only the install is queued: %v", m.tasks)
+	}
+	drain(m, install)
+	if f.called("Uninstall", "2022.3.62f1", "x86_64") || m.st.PendingFor(m.rawProjects[1].Path).Version != "" {
+		t.Errorf("declined follow-ups do not run: %v", f.Calls())
 	}
 }
 

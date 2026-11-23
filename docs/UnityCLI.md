@@ -89,7 +89,7 @@ Flags are used instead of the `UNITY_*` / `NO_COLOR` environment variables on pu
 | `editors add <path>...` | action | `AddEditors` | Register Editors installed some other way | none |
 | `editors default <ver>` | action | `SetDefaultEditor` | Set the default Editor | none |
 | `editors info <ver>` | query | `ReleaseModules` | List a release's modules **before** it is installed | `data.modules[]`: `id`, `name`, `downloadSize.value`, `installedSize.value`, `hidden`. There is no category field, so lazyunity works it out from `id` |
-| `editors upgrade <ver> --yes --accept-eula` | stream | `UpgradeEditor` | Move to the newest patch of a release line | ndjson frames |
+| `editors upgrade --all --dry-run` | query | `EditorUpdates` | Find the newest patch of each installed Editor's release line (the "X available" label and `u`). lazyunity runs the update itself, as an `install` | `data[]` (an array, not `data.items`): `current`, `architecture`, `target` (`null` when none), `upgradeAvailable` |
 | `editors module remove <ver> --module <id>... [--architecture <a>] --yes` | action | `RemoveModules` | Remove modules | none |
 | `releases --limit <n> --offset <n> [--stream lts\|tech\|beta\|alpha]` | query | `Releases` | List releases page by page (the Releases tab) | `data.items[]`: `version`, `architecture`, `stream` (`LTS`/`TECH`/`SUPPORTED`/`BETA`/`ALPHA`), `lts`, `installed`, `revisionHash`; `data.nextPage` |
 | `install-path --get` | query | `InstallPath` | Show the Editors folder | `data.path` |
@@ -190,6 +190,7 @@ These are things lazyunity works around. A CLI update may fix them, and then laz
 | `unity open` and installs start helper processes that keep stdout open | Output goes to temp files, or the pipe is read for 500 ms after exit |
 | `projects info` takes ~1 s, while `projects --all` takes ~20 ms | Info is loaded only on demand |
 | The CDN has no list of CLI versions (`index.json` and the like return 404) | Patch numbers are probed one by one (`LatestVerified`) |
+| `editors upgrade` installs without letting the user pick modules, and reports a `target` that may already be installed | Only its `--dry-run` is used, to learn the newest patch; a target that is installed is not offered |
 | The `--rollback` flag cannot be dry-run | Nothing to work around; it is only offered as a choice in the menu |
 
 ## How to check a new CLI version

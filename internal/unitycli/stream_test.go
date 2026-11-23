@@ -240,12 +240,11 @@ func TestStreamCannotStart(t *testing.T) {
 	}
 }
 
-func TestInstallModulesAndUpgradeArguments(t *testing.T) {
+func TestInstallModulesAndInstallArguments(t *testing.T) {
 	ok := []string{`{"type":"result","success":true}`}
 	c := fakeClient(t, map[string]fakeResp{
 		"install-modules --editor-version 6000.6.8f1 --module webgl --module ios --architecture arm64 --child-modules --accept-eula --yes": {Lines: ok},
-		"editors upgrade 2022.3.10f1 --yes --accept-eula":                                                           {Lines: ok},
-		"install 6000.5.1f1 --changeset abc --architecture arm64 --child-modules --accept-eula --yes --set-default": {Lines: ok},
+		"install 6000.5.1f1 --changeset abc --architecture arm64 --child-modules --accept-eula --yes --set-default":                        {Lines: ok},
 	})
 	ctx := ctx5(t)
 
@@ -255,13 +254,6 @@ func TestInstallModulesAndUpgradeArguments(t *testing.T) {
 	}
 	if err := s.Wait(); err != nil {
 		t.Errorf("InstallModules: %v", err)
-	}
-	s, err = c.UpgradeEditor(ctx, "2022.3.10f1")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := s.Wait(); err != nil {
-		t.Errorf("UpgradeEditor: %v", err)
 	}
 	s, err = c.Install(ctx, InstallOptions{Version: "6000.5.1f1", Changeset: "abc", Architecture: "arm64", SetDefault: true})
 	if err != nil {

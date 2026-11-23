@@ -30,6 +30,7 @@ type fakeCLI struct {
 	modules        []unitycli.Module               // of an installed Editor
 	releaseModules []unitycli.Module               // of a release, before it is installed
 	releases       map[string]unitycli.ReleasePage // by releasesKey; a page not here fails
+	updates        []unitycli.EditorUpdate         // newer patches of the installed Editors
 	plan           unitycli.InstallPlan
 	frames         []unitycli.Frame // what an install reports before it ends
 	cache          unitycli.CacheInfo
@@ -232,8 +233,8 @@ func (f *fakeCLI) Uninstall(_ context.Context, version, arch string) error {
 	return f.record("Uninstall", version, arch)
 }
 
-func (f *fakeCLI) UpgradeEditor(_ context.Context, version string) (*unitycli.Stream, error) {
-	return f.stream("UpgradeEditor", version)
+func (f *fakeCLI) EditorUpdates(context.Context) ([]unitycli.EditorUpdate, error) {
+	return f.updates, f.record("EditorUpdates")
 }
 
 func (f *fakeCLI) DownloadCache(context.Context) (unitycli.CacheInfo, error) {

@@ -1,0 +1,20 @@
+{
+  "success": true,
+  "command": "editors upgrade",
+  "data": [
+    {
+      "current": "6000.6.10f1",
+      "architecture": "x86_64",
+      "target": null,
+      "upgradeAvailable": false
+    },
+    {
+      "current": "6000.6.9f1",
+      "architecture": "x86_64",
+      "target": "6000.6.10f1",
+      "upgradeAvailable": true
+    }
+  ],
+  "errors": [],
+  "warnings": []
+}

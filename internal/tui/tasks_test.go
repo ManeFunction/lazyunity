@@ -498,7 +498,7 @@ func TestAQueueShowsShortLabels(t *testing.T) {
 // reached from a popup that was opened while there still was one.
 func TestFlowsWithoutTheCLIExplainItIsNeeded(t *testing.T) {
 	flows := map[string]func(m *Model) tea.Cmd{
-		"plan an install":   func(m *Model) tea.Cmd { return m.planInstall(unitycli.InstallOptions{Version: "6000.5.1f1"}) },
+		"plan an install":   func(m *Model) tea.Cmd { return m.planInstall(unitycli.InstallOptions{Version: "6000.5.1f1"}, nil) },
 		"list templates":    func(m *Model) tea.Cmd { return m.loadTemplatesCmd(newProject{name: "G", version: "6000.6.8f1"}) },
 		"install an Editor": func(m *Model) tea.Cmd { return m.installEditorFlow("6000.5.1f1", "") },
 		"open a project":    func(m *Model) tea.Cmd { r := m.projectsTab.Items()[0]; return m.runOpen(r, m.planOpen(r)) },

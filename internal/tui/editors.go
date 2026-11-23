@@ -26,8 +26,9 @@ func editorActions() []*action {
 			func(m *Model, e editorRow) tea.Cmd { m.uninstallConfirm(e); return nil }),
 		on(&action{id: "editors.default", ctx: ctxEditors, keys: []string{"space"}, desc: "Make this the default Editor", hint: "Default"},
 			func(m *Model, e editorRow) tea.Cmd { return m.setDefaultEditor(e) }),
-		on(&action{id: "editors.upgrade", ctx: ctxEditors, keys: []string{"u"}, desc: "Upgrade to the newest patch of this release line"},
-			func(m *Model, e editorRow) tea.Cmd { m.upgradeConfirm(e); return nil }),
+		on(&action{id: "editors.upgrade", ctx: ctxEditors, keys: []string{"u"}, desc: "Update to the newest patch of this release line", hint: "Update",
+			enabled: func(m *Model) bool { e, ok := m.editorsTab.Selected(); return ok && e.Update != "" }},
+			func(m *Model, e editorRow) tea.Cmd { m.updateConfirm(e); return nil }),
 		on(&action{id: "editors.openFolder", ctx: ctxEditors, keys: []string{"o"}, desc: "Open the Editor's folder"},
 			func(m *Model, e editorRow) tea.Cmd { return m.openFolder(editorDir(e)) }),
 		on(&action{id: "editors.copy", ctx: ctxEditors, keys: []string{"y"}, desc: "Copy the version or path"},
@@ -83,37 +84,21 @@ func (m *Model) uninstallConfirm(e editorRow) {
 	m.push(&confirmPopup{
 		title: "Uninstall Unity " + e.Version, yes: "Uninstall", danger: true, message: msg,
 		onYes: func(m *Model) tea.Cmd {
-			return m.withCLI(func(c unityCLI) tea.Cmd {
-				return m.enqueue(&task{
-					title: "Uninstalling Unity " + e.Version,
-					label: "uninstall " + e.Version,
-					works: []string{workEditor(e.Version)},
-					keep:  true,
-					do:    func(ctx context.Context) error { return c.Uninstall(ctx, e.Version, e.Arch) },
-					after: func(m *Model, err error) tea.Cmd { return m.refreshEditorsCmd() },
-				})
-			})
+			return m.withCLI(func(c unityCLI) tea.Cmd { return m.enqueue(uninstallTask(c, e)) })
 		},
 	})
 }
 
-func (m *Model) upgradeConfirm(e editorRow) {
-	m.push(&confirmPopup{
-		title: "Upgrade Unity " + e.Version, yes: "Upgrade",
-		message: fmt.Sprintf("Install the newest patch of Unity %s, carrying this Editor's modules over? "+
-			"The new version is installed next to this one; this one stays.", unityLine(e.Version)),
-		onYes: func(m *Model) tea.Cmd {
-			return m.withCLI(func(c unityCLI) tea.Cmd {
-				return m.enqueue(&task{
-					title: "Upgrading Unity " + e.Version,
-					label: "upgrade " + e.Version,
-					works: []string{workUpgradeEditor(e.Version)},
-					open:  func(ctx context.Context) (*unitycli.Stream, error) { return c.UpgradeEditor(ctx, e.Version) },
-					after: func(m *Model, err error) tea.Cmd { return m.refreshEditorsCmd() },
-				})
-			})
-		},
-	})
+// uninstallTask is the task that uninstalls an Editor.
+func uninstallTask(c unityCLI, e editorRow) *task {
+	return &task{
+		title: "Uninstalling Unity " + e.Version,
+		label: "uninstall " + e.Version,
+		works: []string{workEditor(e.Version)},
+		keep:  true,
+		do:    func(ctx context.Context) error { return c.Uninstall(ctx, e.Version, e.Arch) },
+		after: func(m *Model, err error) tea.Cmd { return m.refreshEditorsCmd() },
+	}
 }
 
 func unityLine(version string) string {
@@ -125,7 +110,7 @@ func unityLine(version string) string {
 
 // refreshEditorsCmd rescans the disk and asks the CLI again.
 func (m *Model) refreshEditorsCmd() tea.Cmd {
-	return m.reload(srcDisk | srcEditors | srcProjects)
+	return m.reload(srcDisk | srcEditors | srcProjects | srcEditorUpdates)
 }
 
 // ---- modules of one Editor ----------------------------------------------------------
@@ -342,7 +327,7 @@ func (m *Model) onAddModules(msg addModulesMsg) {
 		return
 	}
 	sortModules(avail)
-	m.push(m.modulePicker("Add modules to Unity "+msg.ed.Version, avail, func(m *Model, picked []unitycli.Module) tea.Cmd {
+	m.push(m.modulePicker("Add modules to Unity "+msg.ed.Version, avail, nil, func(m *Model, picked []unitycli.Module) tea.Cmd {
 		if len(picked) == 0 {
 			return nil
 		}
@@ -350,13 +335,14 @@ func (m *Model) onAddModules(msg addModulesMsg) {
 	}))
 }
 
-// modulePicker is a multi-select menu of modules.
-func (m *Model) modulePicker(title string, mods []unitycli.Module, submit func(m *Model, picked []unitycli.Module) tea.Cmd) *menuPopup {
+// modulePicker is a multi-select menu of modules, with the modules in ticked
+// ticked from the start.
+func (m *Model) modulePicker(title string, mods []unitycli.Module, ticked map[string]bool, submit func(m *Model, picked []unitycli.Module) tea.Cmd) *menuPopup {
 	byID := map[string]unitycli.Module{}
 	var items []menuItem
 	for _, x := range mods {
 		byID[x.ID] = x
-		items = append(items, menuItem{id: x.ID, label: x.Name, right: humanBytes(x.DownloadBytes)})
+		items = append(items, menuItem{id: x.ID, label: x.Name, right: humanBytes(x.DownloadBytes), checked: ticked[x.ID]})
 	}
 	menu := newMenu(title, items)
 	menu.multi = true
@@ -381,7 +367,10 @@ type releaseModulesMsg struct {
 }
 
 type planMsg struct {
-	opts   unitycli.InstallOptions
+	opts unitycli.InstallOptions
+	// from, when set, is the Editor this install updates: once it is queued,
+	// lazyunity asks what to do with that one and its projects.
+	from   *editorRow
 	plan   unitycli.InstallPlan
 	cached int64 // bytes an interrupted install left in the download cache
 	err    error
@@ -422,20 +411,20 @@ func (m *Model) onReleaseModules(msg releaseModulesMsg) tea.Cmd {
 		return m.planInstall(unitycli.InstallOptions{
 			Version: msg.version, Changeset: msg.changeset, Modules: ids,
 			SetDefault: len(m.inv.editors()) == 0,
-		})
+		}, nil)
 	}
 	if len(mods) == 0 {
 		return pick(m, nil) // nothing to choose from: go straight to the install
 	}
-	m.push(m.modulePicker("Install Unity "+msg.version+": choose modules", mods, pick))
+	m.push(m.modulePicker("Install Unity "+msg.version+": choose modules", mods, nil, pick))
 	return nil
 }
 
 // planInstall asks the CLI what the install would download, and how much of
 // it an interrupted install already left in the download cache. The two are
 // asked at once; the cache is only a nicety, so failing to read it is not an
-// error.
-func (m *Model) planInstall(o unitycli.InstallOptions) tea.Cmd {
+// error. from, when set, is the Editor the install updates.
+func (m *Model) planInstall(o unitycli.InstallOptions, from *editorRow) tea.Cmd {
 	return m.withCLI(func(c unityCLI) tea.Cmd {
 		return func() tea.Msg {
 			ctx := context.Background()
@@ -446,7 +435,7 @@ func (m *Model) planInstall(o unitycli.InstallOptions) tea.Cmd {
 			}()
 			plan, err := c.PlanInstall(ctx, o)
 			info := <-cache
-			return planMsg{opts: o, plan: plan, cached: unitycli.CachedBytes(info.Path, o.Version), err: err}
+			return planMsg{opts: o, from: from, plan: plan, cached: unitycli.CachedBytes(info.Path, o.Version), err: err}
 		}
 	})
 }
@@ -487,11 +476,23 @@ func (m *Model) onPlan(msg planMsg) {
 	}
 	text += ".\n\n" + downloadLine(msg.plan.TotalDownloadSize, msg.cached) +
 		"\n\nInstalling accepts Unity's license terms for the Editor and each selected component."
-	opts := msg.opts
+	opts, from := msg.opts, msg.from
+	title := "Install Unity " + opts.Version
+	if from != nil {
+		title = fmt.Sprintf("Update Unity %s to %s", from.Version, opts.Version)
+	}
 	m.push(&confirmPopup{
-		title: "Install Unity " + opts.Version, yes: "Install", message: text,
+		title: title, yes: "Install", message: text,
 		onYes: func(m *Model) tea.Cmd {
-			return m.withCLI(func(c unityCLI) tea.Cmd { return m.queueInstall(c, opts, names) })
+			return m.withCLI(func(c unityCLI) tea.Cmd {
+				cmd := m.queueInstall(c, opts, names)
+				if from != nil {
+					if t := m.taskOn(workEditor(opts.Version)); t != nil {
+						m.askAfterUpdate(*from, opts.Version, t)
+					}
+				}
+				return cmd
+			})
 		},
 	})
 }

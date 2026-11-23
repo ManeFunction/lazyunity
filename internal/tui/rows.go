@@ -189,9 +189,20 @@ type editorRow struct {
 	Default   bool
 	LTS       bool
 	Platforms []unity.Platform
+	// Update is the newest patch of the Editor's release line, when a newer
+	// one is out and not installed.
+	Update string
 }
 
 func (r editorRow) key() string { return r.Location }
+
+// updateLabel is how the list tells that a newer patch is out.
+func (r editorRow) updateLabel() string {
+	if r.Update == "" {
+		return ""
+	}
+	return "· update " + r.Update + " available ·"
+}
 
 func (r editorRow) platformLabels() string {
 	var out []string
@@ -201,15 +212,16 @@ func (r editorRow) platformLabels() string {
 	return strings.Join(out, ", ")
 }
 
-type editorCols struct{ version, arch int }
+type editorCols struct{ version, arch, update int }
 
 func measureEditors(rows []editorRow) editorCols {
-	var v, a []string
+	var v, a, u []string
 	for _, r := range rows {
 		v = append(v, r.Version)
 		a = append(a, r.Arch)
+		u = append(u, r.updateLabel())
 	}
-	return editorCols{version: maxWidth(v, 16), arch: maxWidth(a, 8)}
+	return editorCols{version: maxWidth(v, 16), arch: maxWidth(a, 8), update: maxWidth(u, 36)}
 }
 
 func (m *Model) drawEditor(r editorRow, w int, base lipgloss.Style, cols editorCols) string {
@@ -227,6 +239,9 @@ func (m *Model) drawEditor(r editorRow, w int, base lipgloss.Style, cols editorC
 		row.gap(3)
 	}
 	row.gap(1).add(r.Arch, th.Dim, cols.arch).gap(1)
+	if cols.update > 0 {
+		row.add(r.updateLabel(), th.Text, cols.update).gap(1)
+	}
 	rest := w - row.used
 	if rest > 0 {
 		row.add(r.platformLabels(), th.Dim, rest)

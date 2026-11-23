@@ -42,6 +42,12 @@ func TestRealCLI(t *testing.T) {
 		t.Logf("%s has %d modules", eds[0].Version, len(mods))
 	}
 
+	if ups, err := c.EditorUpdates(ctx); err != nil {
+		t.Errorf("EditorUpdates: %v", err)
+	} else {
+		t.Logf("%d editors checked for updates", len(ups))
+	}
+
 	if _, err := c.InstallPath(ctx); err != nil {
 		t.Errorf("InstallPath: %v", err)
 	}

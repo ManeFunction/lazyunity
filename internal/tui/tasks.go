@@ -52,6 +52,10 @@ type task struct {
 	do   func(ctx context.Context) error
 	// after runs when the task ends, whatever the outcome.
 	after func(m *Model, err error) tea.Cmd
+	// waitFor, when set, is a task this one follows up on, such as the
+	// install of the Editor a project moves to: this one starts only once
+	// that one has succeeded, and is dropped from the queue when it fails.
+	waitFor *task
 
 	cancel context.CancelFunc
 	// cancelled is set when the user stopped the task. How a stopped process
@@ -156,13 +160,47 @@ func (m *Model) taskOn(w string) *task {
 }
 
 // Keys for task.works.
-func workEditor(version string) string        { return "editor:" + version }
-func workModule(version, id string) string    { return "module:" + version + ":" + id }
-func workProject(path string) string          { return "project:" + path }
-func workUpgradeEditor(version string) string { return "upgrade:" + version }
+func workEditor(version string) string       { return "editor:" + version }
+func workModule(version, id string) string   { return "module:" + version + ":" + id }
+func workProject(path string) string         { return "project:" + path }
+func workMoveProjects(version string) string { return "move:" + version }
 
 // workCLI is the Unity CLI itself, while it updates or changes feed.
 const workCLI = "cli"
+
+// succeeded reports whether a task has ended well.
+func (t *task) succeeded() bool { return t.status == taskDone && t.err == nil }
+
+// failed reports whether a task has ended badly, or was stopped.
+func (t *task) failed() bool { return t.err != nil || t.cancelled }
+
+// enqueueAfter queues t as a follow-up of dep: it starts once dep has
+// succeeded. When dep has already succeeded, t is queued as any other task;
+// when dep has failed, t is not queued at all.
+func (m *Model) enqueueAfter(dep, t *task) tea.Cmd {
+	switch {
+	case dep == nil || dep.succeeded():
+	case dep.failed():
+		m.toastf(toastWarn, "Not queued: %s, since %q did not succeed", t.title, dep.title)
+		return nil
+	default:
+		t.waitFor = dep
+	}
+	return m.enqueue(t)
+}
+
+// dropFollowUps removes the queued tasks that follow up on a task that did not
+// succeed, and those that follow up on them.
+func (m *Model) dropFollowUps(dep *task) {
+	for _, t := range append([]*task(nil), m.tasks...) {
+		if t.waitFor == dep && t.status == taskQueued {
+			m.removeTask(t)
+			t.cancelled = true
+			m.toastf(toastWarn, "Skipped: %s, since %q did not succeed", t.title, dep.title)
+			m.dropFollowUps(t)
+		}
+	}
+}
 
 // enqueue adds a task and starts it if nothing else is running. A task that
 // would work on something another task is already busy with is refused.
@@ -208,7 +246,7 @@ func (m *Model) startNext() tea.Cmd {
 		return nil
 	}
 	for _, t := range m.tasks {
-		if t.status != taskQueued {
+		if t.status != taskQueued || (t.waitFor != nil && !t.waitFor.succeeded()) {
 			continue
 		}
 		t.status = taskRunning
@@ -305,9 +343,11 @@ func (m *Model) onTaskEnd(msg taskEndMsg) tea.Cmd {
 	case t.cancelled || isCancelled(msg.err):
 		m.removeTask(t)
 		m.toastf(toastInfo, "Cancelled: %s", t.title)
+		m.dropFollowUps(t)
 	default:
 		m.removeTask(t)
 		m.showError(t.title, msg.err)
+		m.dropFollowUps(t)
 	}
 	if t.after != nil {
 		cmds = append(cmds, t.after(m, msg.err))
@@ -475,7 +515,11 @@ func (m *Model) taskLine(t *task, w int, labelW int) string {
 		used += labelW + 1
 	}
 	if t.status == taskQueued {
-		return icon + " " + strings.Join(parts, " ") + th.Dim.Render(" queued")
+		queued := " queued"
+		if t.waitFor != nil {
+			queued = " queued, after " + t.waitFor.shortLabel()
+		}
+		return icon + " " + strings.Join(parts, " ") + th.Dim.Render(queued)
 	}
 	pct := ""
 	if !t.indeterminate() || t.status == taskDone {

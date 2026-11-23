@@ -118,6 +118,9 @@ type Model struct {
 	authKnown   bool
 	cliUpdate   unitycli.UpdateInfo // what the launch check found; empty until it answers
 	cliVerified unitycli.Version    // the newest verified Unity CLI release; zero until the CDN answers
+	// editorUpdates are the newer patches out for the installed Editors, as
+	// the last check found them.
+	editorUpdates []unitycli.EditorUpdate
 	// safe, when set, is why lazyunity runs in safe mode: a Unity CLI beyond
 	// the verified range broke a launch load, and only the CLI tools are shown.
 	safe       *safeMode

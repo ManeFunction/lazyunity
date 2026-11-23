@@ -45,6 +45,16 @@ type Editor struct {
 	Default      bool     `json:"default"`
 }
 
+// EditorUpdate says whether a newer patch of an installed Editor's release
+// line is out.
+type EditorUpdate struct {
+	Current      string `json:"current"`
+	Architecture string `json:"architecture"`
+	// Target is the newest patch, or "" when there is none.
+	Target    string `json:"target"`
+	Available bool   `json:"upgradeAvailable"`
+}
+
 // Module is an installable part of an Editor, such as a build platform.
 type Module struct {
 	ID             string `json:"id"`

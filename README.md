@@ -152,7 +152,7 @@ Everything follows lazygit where lazygit has an equivalent. `?` shows the keys t
 | `n` | install a new Editor |
 | `d` | uninstall |
 | `space` | set default |
-| `u` | upgrade to the newest patch |
+| `u` | update to the newest patch, when one is out (the row says "· update X available ·") |
 | `o` | folder |
 | `y` | copy |
 

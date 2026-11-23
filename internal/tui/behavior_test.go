@@ -468,10 +468,10 @@ func TestReloadPolicy(t *testing.T) {
 		src  source
 		want []string
 	}{
-		{"everything", srcAll, []string{"Projects", "Editors", "AuthStatus", "InstallPath", "CheckUpdate"}},
-		{"the CLI", srcCLI, []string{"Projects", "Editors", "AuthStatus", "InstallPath", "CheckUpdate"}},
+		{"everything", srcAll, []string{"Projects", "Editors", "AuthStatus", "InstallPath", "CheckUpdate", "EditorUpdates"}},
+		{"the CLI", srcCLI, []string{"Projects", "Editors", "AuthStatus", "InstallPath", "CheckUpdate", "EditorUpdates"}},
 		{"Editors", srcDisk | srcEditors | srcProjects, []string{"Projects", "Editors"}},
-		{"at launch", srcAll &^ (srcProjects | srcDisk), []string{"Editors", "AuthStatus", "InstallPath", "CheckUpdate"}},
+		{"at launch", srcAll &^ (srcProjects | srcDisk), []string{"Editors", "AuthStatus", "InstallPath", "CheckUpdate", "EditorUpdates"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			m := newTestModel(t)

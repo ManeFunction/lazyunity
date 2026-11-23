@@ -407,10 +407,19 @@ func (c *Client) Uninstall(ctx context.Context, version, arch string) error {
 	return err
 }
 
-// UpgradeEditor installs the newest patch of an Editor's release line, carrying
-// its modules over.
-func (c *Client) UpgradeEditor(ctx context.Context, version string) (*Stream, error) {
-	return c.Stream(ctx, "editors", "upgrade", version, "--yes", "--accept-eula")
+// EditorUpdates asks, for every installed Editor, whether a newer patch of its
+// release line is out. It installs nothing: lazyunity runs the update itself,
+// as an install of the new patch, so the user picks its modules.
+func (c *Client) EditorUpdates(ctx context.Context) ([]EditorUpdate, error) {
+	env, err := c.query(ctx, "editors", "upgrade", "--all", "--dry-run")
+	if err != nil {
+		return nil, err
+	}
+	var out []EditorUpdate
+	if err := env.decodeData(&out); err != nil {
+		return nil, fmt.Errorf("decoding %q output: %w", env.Command, err)
+	}
+	return out, nil
 }
 
 // ---- account and license ---------------------------------------------------

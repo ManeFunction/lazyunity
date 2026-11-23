@@ -447,3 +447,23 @@ func TestReleaseModulesReadsEditorsInfo(t *testing.T) {
 		t.Errorf("categories: %+v %+v", byID["language-ja"], byID["documentation"])
 	}
 }
+
+func TestEditorUpdates(t *testing.T) {
+	c := fakeClient(t, map[string]fakeResp{"editors upgrade --all --dry-run": {File: "editors-upgrade-dry-run.json"}})
+	ups, err := c.EditorUpdates(ctx5(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []EditorUpdate{
+		{Current: "6000.6.10f1", Architecture: "x86_64"},
+		{Current: "6000.6.9f1", Architecture: "x86_64", Target: "6000.6.10f1", Available: true},
+	}
+	if len(ups) != len(want) {
+		t.Fatalf("got %+v", ups)
+	}
+	for i := range want {
+		if ups[i] != want[i] {
+			t.Errorf("update %d = %+v, want %+v", i, ups[i], want[i])
+		}
+	}
+}
