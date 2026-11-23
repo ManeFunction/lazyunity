@@ -15,10 +15,13 @@ const (
 
 // setSysProcAttr starts the CLI without a console window, detached from
 // lazyunity's console.
+//
+// No HideWindow: DETACHED_PROCESS already keeps the CLI from getting a console
+// window, and should the CLI hand its startup info on to the Editor it opens,
+// the SW_HIDE that HideWindow passes could make the Editor open invisible.
 func setSysProcAttr(cmd *exec.Cmd) {
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		CreationFlags: syscall.CREATE_NEW_PROCESS_GROUP | detachedProcess,
-		HideWindow:    true,
 	}
 }
 
