@@ -55,7 +55,7 @@ scoops:
     repository:
       owner: ManeFunction
       name: scoop-bucket
-      token: "{{ index .Env \"PACKAGES_TOKEN\" }}" # empty in the CI snapshot, which publishes nothing
+      token: "{{ .Env.PACKAGES_TOKEN }}" # GoReleaser accepts only this exact form here; not read in the CI snapshot, which publishes nothing
     directory: bucket
     commit_msg_template: "{{ .ProjectName }} {{ .Version }}"
     homepage: https://github.com/ManeFunction/lazyunity
@@ -86,7 +86,7 @@ winget:
       owner: ManeFunction
       name: winget-pkgs
       branch: "lazyunity-{{ .Version }}"
-      token: "{{ index .Env \"PACKAGES_TOKEN\" }}" # empty in the CI snapshot, which publishes nothing
+      token: "{{ .Env.PACKAGES_TOKEN }}" # GoReleaser accepts only this exact form here; not read in the CI snapshot, which publishes nothing
       pull_request:
         enabled: true
         draft: false
