@@ -241,6 +241,10 @@ lazyunity can add [OpenUPM](https://openupm.com) packages to your projects throu
 - Opening an Editor that is older than 2019.1, or opening without the CLI, launches it directly. That works, but the Editor starts signed out.
 - A project moving to Unity 6.7 or later is upgraded with `unity projects upgrade`, since `unity open` refuses to do that.
 
+## Special thanks
+
+Thanks to the whole [lazygit](https://github.com/jesseduffield/lazygit) team for the inspiration and for a great Git client 🤎
+
 ## Author
 
 lazyunity is made by Ilia Petrov-Komotskii ([Mane Function](https://github.com/ManeFunction)). If it saves you time, you can [support it on GitHub Sponsors](https://github.com/sponsors/ManeFunction).
