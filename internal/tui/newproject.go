@@ -69,12 +69,12 @@ func validateProjectName(name string) string {
 }
 
 func (m *Model) newProjectLocation(w newProject) {
-	m.push(&promptPopup{
+	p := &promptPopup{
 		title: "New project (2/5)", label: "Create it in this folder:",
 		in:       newInput(displayPath(m.projectsDir()) + string(filepath.Separator)),
 		complete: completeDir,
 		validate: func(text string) string {
-			if why := validFolder(text); why != "" {
+			if why := validNewFolder(text); why != "" {
 				return why
 			}
 			if _, err := os.Stat(filepath.Join(config.ExpandHome(text), w.name)); err == nil {
@@ -82,12 +82,15 @@ func (m *Model) newProjectLocation(w newProject) {
 			}
 			return ""
 		},
-		onSubmit: func(m *Model, text string) tea.Cmd {
-			w.parent = filepath.Clean(config.ExpandHome(text))
+	}
+	p.onSubmit = func(m *Model, text string) tea.Cmd {
+		w.parent = filepath.Clean(config.ExpandHome(text))
+		return m.withFolder(w.parent, p, func(m *Model) tea.Cmd {
 			m.newProjectEditor(w)
 			return nil
-		},
-	})
+		})
+	}
+	m.push(p)
 }
 
 func (m *Model) newProjectEditor(w newProject) {

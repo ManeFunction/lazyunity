@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-## [0.1.0] - 2026-11-23
+## [0.1.0] - 2026-11-24
 First public release of lazyunity: a lazygit-style terminal interface for Unity projects and Editors,
 born of an urge to get rid of the slow, bloated, half-a-gig official Unity Hub. Built on top of the official Unity CLI.
 Install it with Homebrew from `manefunction/tap`, with Scoop from the `manefunction` bucket,

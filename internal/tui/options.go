@@ -26,21 +26,24 @@ func (m *Model) editorsFolderPrompt() {
 	if !m.needCLI() {
 		return
 	}
-	m.push(&promptPopup{
+	p := &promptPopup{
 		title: "Editors folder", label: "New Editors install into this folder, and installed Editors are looked for here:",
 		in: newInput(displayPath(m.inv.installRoot()) + string(filepath.Separator)), complete: completeDir,
-		validate: validFolder,
-		onSubmit: func(m *Model, text string) tea.Cmd {
-			path := filepath.Clean(config.ExpandHome(text))
-			if path == m.inv.installRoot() {
-				m.toastf(toastInfo, "Editors already install into that folder")
-				return nil
-			}
+		validate: validNewFolder,
+	}
+	p.onSubmit = func(m *Model, text string) tea.Cmd {
+		path := filepath.Clean(config.ExpandHome(text))
+		if path == m.inv.installRoot() {
+			m.toastf(toastInfo, "Editors already install into that folder")
+			return nil
+		}
+		return m.withFolder(path, p, func(m *Model) tea.Cmd {
 			return m.runCLI("Setting the Editors folder", "New Editors now install into "+displayPath(path),
 				func(ctx context.Context, c unityCLI) error { return c.SetInstallPath(ctx, path) },
 				func(m *Model) tea.Cmd { return m.loadInstallPathCmd() })
-		},
-	})
+		})
+	}
+	m.push(p)
 }
 
 // registerStrays tells the CLI about Editors it found on disk but does not
@@ -224,17 +227,21 @@ func (m *Model) onLicense(msg licenseMsg) {
 }
 
 func (m *Model) projectDirPrompt() {
-	m.push(&promptPopup{
+	p := &promptPopup{
 		title: "Default project folder", label: "New projects are created in this folder:",
 		in: newInput(displayPath(m.projectsDir())), complete: completeDir,
-		validate: validFolder,
-		onSubmit: func(m *Model, text string) tea.Cmd {
-			m.st.DefaultProjectDir = filepath.Clean(config.ExpandHome(text))
+		validate: validNewFolder,
+	}
+	p.onSubmit = func(m *Model, text string) tea.Cmd {
+		path := filepath.Clean(config.ExpandHome(text))
+		return m.withFolder(path, p, func(m *Model) tea.Cmd {
+			m.st.DefaultProjectDir = path
 			m.saveState()
 			m.refreshTools()
 			return nil
-		},
-	})
+		})
+	}
+	m.push(p)
 }
 
 func (m *Model) editConfig() tea.Cmd {

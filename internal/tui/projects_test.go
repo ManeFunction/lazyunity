@@ -872,3 +872,24 @@ func TestPreloadedProjectsAreMarkedMissing(t *testing.T) {
 		}
 	}
 }
+
+func TestNewProjectCreatesMissingParent(t *testing.T) {
+	m := newTestModel(t)
+	useFakeCLI(t, m)
+	parent := filepath.Join(t.TempDir(), "games", "2026")
+	m.keymap.lookup(ctxProjects, "n").run(m)
+	m.popups[0].(*promptPopup).in.Set("Game")
+	press(m, "enter")
+	m.popups[0].(*promptPopup).in.Set(parent)
+	press(m, "enter")
+	if c, ok := m.popups[len(m.popups)-1].(*confirmPopup); !ok || !strings.Contains(c.message, "does not exist") {
+		t.Fatalf("a missing parent asks to be created:\n%s", screenText(m))
+	}
+	press(m, "enter")
+	if st, err := os.Stat(parent); err != nil || !st.IsDir() {
+		t.Errorf("the parent is created: %v", err)
+	}
+	if !strings.Contains(screenText(m), "New project (3/5)") {
+		t.Errorf("the wizard goes on:\n%s", screenText(m))
+	}
+}

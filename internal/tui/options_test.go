@@ -27,13 +27,18 @@ func TestEditorsFolderRowAndPrompt(t *testing.T) {
 		t.Errorf("the row shows the folder: %+v", row)
 	}
 
-	// enter opens the prompt; a missing folder is refused
+	// enter opens the prompt; a missing folder asks to be created, and
+	// declining comes back to the prompt
 	press(m, "enter")
 	pp := m.popups[0].(*promptPopup)
 	pp.in.Set(filepath.Join(m.inv.installRoot(), "nope"))
 	press(m, "enter")
-	if len(m.popups) != 1 || !strings.Contains(screenText(m), "That folder does not exist") {
-		t.Errorf("a missing folder is refused:\n%s", screenText(m))
+	if c, ok := m.popups[len(m.popups)-1].(*confirmPopup); !ok || !strings.Contains(c.message, "does not exist") {
+		t.Fatalf("a missing folder asks to be created:\n%s", screenText(m))
+	}
+	press(m, "esc")
+	if len(m.popups) != 1 || m.popups[0] != pp || f.called("SetInstallPath", filepath.Join(m.inv.installRoot(), "nope")) {
+		t.Errorf("declining comes back to the prompt: %v", f.Calls())
 	}
 
 	// the current folder is a no-op
@@ -287,11 +292,28 @@ func TestProjectDirPrompt(t *testing.T) {
 	dir := t.TempDir()
 	runToolRow(m, "projectdir")
 	pp := m.popups[0].(*promptPopup)
-	pp.in.Set("/definitely/not/there")
+	file := filepath.Join(dir, "file")
+	os.WriteFile(file, nil, 0o644)
+	pp.in.Set(filepath.Join(file, "sub"))
 	press(m, "enter")
-	if len(m.popups) != 1 {
-		t.Error("a missing folder is refused")
+	if len(m.popups) != 1 || pp.err == "" || !strings.HasPrefix(pp.err, "A file is in the way") {
+		t.Errorf("a path through a file is refused:\n%s", screenText(m))
 	}
+
+	// a missing folder is created, with its parents, once the user agrees
+	missing := filepath.Join(dir, "a", "b")
+	pp.in.Set(missing)
+	press(m, "enter")
+	if c, ok := m.popups[len(m.popups)-1].(*confirmPopup); !ok || !strings.Contains(c.message, "does not exist") {
+		t.Fatalf("a missing folder asks to be created:\n%s", screenText(m))
+	}
+	press(m, "enter")
+	if st, err := os.Stat(missing); err != nil || !st.IsDir() || m.st.DefaultProjectDir != missing || len(m.popups) != 0 {
+		t.Errorf("the folder is created and chosen: %v, %q", err, m.st.DefaultProjectDir)
+	}
+
+	runToolRow(m, "projectdir")
+	pp = m.popups[0].(*promptPopup)
 	pp.in.Set(dir)
 	press(m, "enter")
 	if m.st.DefaultProjectDir != dir || m.projectsDir() != dir {
