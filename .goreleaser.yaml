@@ -38,9 +38,10 @@ archives:
 checksum:
   name_template: checksums.txt
 
-# The release notes come from CHANGELOG.md (--release-notes in release.yml).
-changelog:
-  disable: true
+# The release notes come from CHANGELOG.md (--release-notes in release.yml). Do not set
+# changelog.disable: it skips the whole changelog pipe, and that pipe is also the one that
+# reads --release-notes, so the release body comes out empty. With --release-notes given,
+# GoReleaser uses the file as-is and generates nothing from commits.
 
 release:
   github:
