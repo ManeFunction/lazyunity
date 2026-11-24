@@ -4,6 +4,7 @@ package unitycli
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"unicode/utf8"
@@ -76,6 +77,19 @@ func (e *Error) InstallLocked() bool { return e.ExitCode == ExitInstallLocked }
 
 // NotFound reports that a project, release or module does not exist (exit code 11).
 func (e *Error) NotFound() bool { return e.ExitCode == ExitNotFound }
+
+// NeedsElevation reports that the CLI refused a change, such as an
+// uninstall, because it needs administrator rights and could not ask for them:
+// it asks only with a terminal on stdin and human output.
+func (e *Error) NeedsElevation() bool { return strings.HasSuffix(e.Code, "_ELEVATION_NEEDS_TERMINAL") }
+
+// CodeElevationDeclined is the Error code lazyunity uses when the user
+// declined the system's prompt for administrator rights.
+const CodeElevationDeclined = "LAZYUNITY_ELEVATION_DECLINED"
+
+// errElevationDeclined is what runElevated returns when the prompt for
+// administrator rights was declined.
+var errElevationDeclined = errors.New("the prompt for administrator rights was declined")
 
 // Cancelled reports that the process was interrupted or terminated.
 func (e *Error) Cancelled() bool {

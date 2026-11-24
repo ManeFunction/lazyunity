@@ -48,13 +48,19 @@ type Client struct {
 	// queryTimeout bounds a query: a call that only reads, such as a listing.
 	queryTimeout time.Duration
 
+	// elevate runs the CLI again as administrator, for a call the CLI refused
+	// because it needs rights it cannot ask for itself without a terminal.
+	// Nil where lazyunity cannot do that (everywhere but Windows); tests
+	// replace it.
+	elevate func(ctx context.Context, path string, args []string) (processResult, error)
+
 	mu  sync.Mutex
 	log []LogEntry
 }
 
 // New returns a Client for the CLI at path.
 func New(path string) *Client {
-	return &Client{Path: path, newCmd: exec.CommandContext, queryTimeout: QueryTimeout}
+	return &Client{Path: path, newCmd: exec.CommandContext, queryTimeout: QueryTimeout, elevate: runElevated}
 }
 
 // QueryTimeout is how long a query may take before it is given up on. It is
@@ -114,8 +120,29 @@ func (c *Client) command(ctx context.Context, o runOpts, args []string) *exec.Cm
 
 // Run runs the CLI and decodes its JSON envelope. A non-nil envelope may be
 // returned together with an error, for commands whose failure carries data.
+//
+// When the CLI refuses a change because it needs administrator rights (an
+// Editor installed in Program Files, say) and lazyunity can get them, the call
+// is made again as administrator, which brings up the system's prompt.
 func (c *Client) Run(ctx context.Context, args ...string) (*Envelope, error) {
-	return c.run(ctx, runOpts{}, args)
+	env, err := c.run(ctx, runOpts{}, args)
+	var e *Error
+	if c.elevate != nil && errors.As(err, &e) && e.NeedsElevation() {
+		return c.runElevated(ctx, args)
+	}
+	return env, err
+}
+
+// runElevated runs the CLI as administrator.
+func (c *Client) runElevated(ctx context.Context, args []string) (*Envelope, error) {
+	start := time.Now()
+	res, err := c.elevate(ctx, c.Path, append(globalFlags(runOpts{}), args...))
+	if errors.Is(err, errElevationDeclined) {
+		c.record(LogEntry{Time: start, Args: args, Duration: time.Since(start), ExitCode: -1, Stderr: "(as administrator) " + err.Error()})
+		return nil, &Error{Args: args, ExitCode: -1, Code: CodeElevationDeclined,
+			Message: "This needs administrator rights, and the prompt for them was declined. Nothing was changed."}
+	}
+	return c.finish(args, start, res, err, "could not run the Unity CLI as administrator: ")
 }
 
 // query is Run for a call that only reads, bounded by the query timeout so a
@@ -134,6 +161,12 @@ func (c *Client) query(ctx context.Context, args ...string) (*Envelope, error) {
 func (c *Client) run(ctx context.Context, o runOpts, args []string) (*Envelope, error) {
 	start := time.Now()
 	res, err := runToFiles(c.command(ctx, o, args))
+	return c.finish(args, start, res, err, "could not start the Unity CLI: ")
+}
+
+// finish logs a finished CLI process and decodes what it printed. startErr is
+// the error from starting it, reported after prefix.
+func (c *Client) finish(args []string, start time.Time, res processResult, startErr error, prefix string) (*Envelope, error) {
 	c.record(LogEntry{
 		Time:     start,
 		Args:     args,
@@ -142,8 +175,8 @@ func (c *Client) run(ctx context.Context, o runOpts, args []string) (*Envelope, 
 		Stdout:   tail(res.Stdout, outputTailLimit),
 		Stderr:   tail(res.Stderr, outputTailLimit),
 	})
-	if err != nil {
-		return nil, &Error{Args: args, ExitCode: -1, Message: "could not start the Unity CLI: " + err.Error()}
+	if startErr != nil {
+		return nil, &Error{Args: args, ExitCode: -1, Message: prefix + startErr.Error()}
 	}
 
 	env, perr := parseEnvelope(res.Stdout)
