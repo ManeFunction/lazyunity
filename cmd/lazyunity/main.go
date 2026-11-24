@@ -1,5 +1,5 @@
-// Command lazyunity is a terminal interface for Unity projects and Editors, a
-// replacement for the Unity Hub that is driven with lazygit's keys.
+// Command lazyunity is a CLI for Unity projects and Editors, built on top of the
+// official Unity CLI and inspired by lazygit.
 package main
 
 import (
@@ -42,7 +42,7 @@ func run() error {
 	flag.Usage = func() {
 		out := flag.CommandLine.Output()
 		fmt.Fprintf(out, "Usage: lazyunity [options]\n\n"+
-			"A terminal interface for Unity projects and Editors, driven with lazygit's keys.\n\nOptions:\n")
+			"A CLI for Unity projects and Editors, built on top of the official Unity CLI and inspired by lazygit.\n\nOptions:\n")
 		flag.VisitAll(func(f *flag.Flag) {
 			if f.Name == "fake" {
 				return
