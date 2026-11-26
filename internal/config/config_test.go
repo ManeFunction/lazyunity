@@ -264,3 +264,28 @@ func TestPortrait(t *testing.T) {
 		t.Error("an unknown portraitMode must be refused")
 	}
 }
+
+func TestOpenUPMPackages(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "config.yml"), []byte("openupm:\n  packages: [com.example.a, 'com.example.b@v2.3.4']\n"), 0o644)
+	cfg, err := Load(dir)
+	if err != nil || len(cfg.OpenUPM.Packages) != 2 {
+		t.Fatalf("%v %v", cfg.OpenUPM.Packages, err)
+	}
+	for _, bad := range []string{"-x", "com.example a", "com.example@", "@1.0.0"} {
+		os.WriteFile(filepath.Join(dir, "config.yml"), []byte("openupm:\n  packages: ['"+bad+"']\n"), 0o644)
+		if _, err := Load(dir); err == nil {
+			t.Errorf("%q is accepted", bad)
+		}
+	}
+	for in, want := range map[string][2]string{
+		"com.example.a":        {"com.example.a", ""},
+		"com.example.b@v2.3.4": {"com.example.b", "2.3.4"},
+		"com.example.c@1.0.0":  {"com.example.c", "1.0.0"},
+		"com.example.d@vnext":  {"com.example.d", "vnext"},
+	} {
+		if n, v := ParsePackage(in); n != want[0] || v != want[1] {
+			t.Errorf("ParsePackage(%q) = %q, %q", in, n, v)
+		}
+	}
+}

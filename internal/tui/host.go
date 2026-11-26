@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"errors"
+	"net/http"
 	"os/exec"
 
 	tea "charm.land/bubbletea/v2"
@@ -35,6 +36,11 @@ type host interface {
 	LatestVerifiedCLI(ctx context.Context) (v unitycli.Version, ok bool)
 	// AddPackages adds packages to the project in dir with the OpenUPM CLI.
 	AddPackages(ctx context.Context, exe, dir string, packages []string) error
+	// RemovePackages removes packages from the project in dir with the OpenUPM CLI.
+	RemovePackages(ctx context.Context, exe, dir string, packages []string) error
+	// PackageRepo asks the OpenUPM registry for the web page of a package's
+	// source repository.
+	PackageRepo(ctx context.Context, id string) (string, error)
 }
 
 // machine is the host lazyunity runs on.
@@ -81,6 +87,14 @@ func (h machine) LatestOpenUPM(ctx context.Context, src config.OpenUPM) (string,
 
 func (h machine) AddPackages(ctx context.Context, exe, dir string, packages []string) error {
 	return openupm.Add(ctx, exe, dir, packages)
+}
+
+func (h machine) RemovePackages(ctx context.Context, exe, dir string, packages []string) error {
+	return openupm.Remove(ctx, exe, dir, packages)
+}
+
+func (h machine) PackageRepo(ctx context.Context, id string) (string, error) {
+	return openupm.RepositoryURL(ctx, http.DefaultClient, openupm.Registry, id)
 }
 
 // edit opens path in the code editor: os.edit from config.yml, started on its

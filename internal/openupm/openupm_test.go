@@ -2,6 +2,8 @@ package openupm
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -145,5 +147,32 @@ func TestLatestRelease(t *testing.T) {
 	os.WriteFile(npm, []byte("#!/bin/sh\nexit 1\n"), 0o755)
 	if _, err := LatestRelease(context.Background(), npm); err == nil {
 		t.Error("a failed npm is an error")
+	}
+}
+
+func TestRepositoryURL(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/com.example.top":
+			w.Write([]byte(`{"repository": {"type": "git", "url": "git+https://github.com/example/top.git"}}`))
+		case "/com.example.latest":
+			w.Write([]byte(`{"dist-tags": {"latest": "2.0.0"}, "versions": {"2.0.0": {"repository": "git@github.com:example/latest.git"}}}`))
+		case "/com.example.none":
+			w.Write([]byte(`{}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+	for id, want := range map[string]string{
+		"com.example.top":    "https://github.com/example/top",
+		"com.example.latest": "https://github.com/example/latest",
+		"com.example.none":   "",
+		"com.example.gone":   "",
+	} {
+		got, err := RepositoryURL(context.Background(), srv.Client(), srv.URL, id)
+		if got != want || (want == "") != (err != nil) {
+			t.Errorf("%s: %q, %v", id, got, err)
+		}
 	}
 }

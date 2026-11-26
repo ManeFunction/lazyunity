@@ -149,7 +149,7 @@ func (m *Model) openupmStatus() openupmStatus {
 		st.version = "installed"
 	}
 	b, n := st.build, m.openupmNew
-	known := n.latest != "" && n.src == src // the update check answered for this source
+	known := n.latest != "" && n.src.SameSource(src) // the update check answered for this source
 	switch {
 	case src.FromRegistry() && b != nil, !src.FromRegistry() && (b == nil || !buildIs(b, src)):
 		st.kind = openupmOther

@@ -263,10 +263,10 @@ func TestConfigTemplateOffersTheForkCommentedOut(t *testing.T) {
 		t.Errorf("the template suggests the fork, says why, and names the official repository:\n%s", configTemplate())
 	}
 	// uncommenting it builds the fork's branch from git
-	uncommented := strings.NewReplacer("# openupm:", "openupm:", "#   repo:", "  repo:", "#   ref:", "  ref:").Replace(configTemplate())
+	uncommented := strings.NewReplacer("# openupm:", "openupm:", "#   repo:", "  repo:", "#   ref:", "  ref:", "#   packages:", "  packages:").Replace(configTemplate())
 	os.WriteFile(filepath.Join(dir, "config.yml"), []byte(uncommented), 0o644)
 	cfg, err = config.Load(dir)
-	if err != nil || cfg.OpenUPM.FromRegistry() || cfg.OpenUPM.Repo != config.ForkOpenUPMRepo || cfg.OpenUPM.Ref != config.ForkOpenUPMRef {
+	if err != nil || cfg.OpenUPM.FromRegistry() || cfg.OpenUPM.Repo != config.ForkOpenUPMRepo || cfg.OpenUPM.Ref != config.ForkOpenUPMRef || len(cfg.OpenUPM.Packages) != 2 {
 		t.Errorf("uncommented: %+v %v", cfg.OpenUPM, err)
 	}
 }
@@ -288,7 +288,7 @@ func TestConfigTemplateListsEverySettingAtItsDefault(t *testing.T) {
 	var out []string
 	setting := regexp.MustCompile(`^# ( *[a-z][A-Za-z]*:.*)$`)
 	for _, l := range strings.Split(configTemplate(), "\n") {
-		if m := setting.FindStringSubmatch(l); m != nil && !strings.HasPrefix(m[1], "openupm:") && !strings.HasPrefix(m[1], "  repo:") && !strings.HasPrefix(m[1], "  ref:") {
+		if m := setting.FindStringSubmatch(l); m != nil && !strings.HasPrefix(m[1], "openupm:") && !strings.HasPrefix(m[1], "  repo:") && !strings.HasPrefix(m[1], "  ref:") && !strings.HasPrefix(m[1], "  packages:") {
 			l = m[1]
 		}
 		out = append(out, l)

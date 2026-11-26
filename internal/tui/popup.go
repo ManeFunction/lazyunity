@@ -50,6 +50,9 @@ type menuItem struct {
 	// heading rows label a group and cannot be picked.
 	heading bool
 	checked bool
+	// installed, in a multi menu, marks what is already there: ticked, it
+	// shows a green check; unticked, a red cross, as it is to be removed.
+	installed bool
 	// group, in a multi menu, makes the items of the same group exclusive:
 	// ticking one unticks the others.
 	group string
@@ -72,6 +75,12 @@ type menuPopup struct {
 	// hints, when set, are the menu's keys, shown in the box under the menu
 	// in place of the items' descriptions.
 	hints []hintItem
+	// onToggle, in a multi menu, runs after an item is ticked (on) or
+	// unticked, and may tick or untick others in items.
+	onToggle func(items []menuItem, id string, on bool)
+	// itemKeys are more keys of a multi menu, which act on the selected item
+	// and leave the menu open.
+	itemKeys map[string]func(m *Model, it menuItem) tea.Cmd
 }
 
 func newMenu(title string, items []menuItem) *menuPopup {
@@ -155,6 +164,9 @@ func (p *menuPopup) toggle() {
 			items[i].checked = false
 		}
 	}
+	if p.onToggle != nil {
+		p.onToggle(items, cur.id, on)
+	}
 	p.list.SetItems(items)
 }
 
@@ -236,6 +248,12 @@ func (p *menuPopup) update(m *Model, msg tea.Msg) (func(*Model) tea.Cmd, bool) {
 				p.toggle()
 				return nil, false
 			}
+		}
+		if fn := p.itemKeys[key]; fn != nil {
+			if it, ok := p.list.Selected(); ok && !it.heading {
+				return func(m *Model) tea.Cmd { return fn(m, it) }, false
+			}
+			return nil, false
 		}
 		// an item's own shortcut
 		if !p.multi {
@@ -389,12 +407,17 @@ func (p *menuPopup) drawItem(th *Theme, it menuItem, w int, base lipgloss.Style,
 		return th.ActiveBorder.Render(fit("─── "+it.label, w))
 	}
 	label := it.label
-	if p.multi {
-		box := "[ ] "
-		if it.checked {
-			box = "[x] "
-		}
-		label = box + label
+	mark := ""
+	var markStyle lipgloss.Style
+	switch {
+	case p.multi && it.installed && it.checked:
+		mark, markStyle = "[✓] ", th.Success.Inherit(base)
+	case p.multi && it.installed:
+		mark, markStyle = "[✗] ", th.Missing.Inherit(base)
+	case p.multi && it.checked:
+		label = "[x] " + label
+	case p.multi:
+		label = "[ ] " + label
 	}
 	labelStyle := base
 	if it.disabled != "" {
@@ -405,6 +428,10 @@ func (p *menuPopup) drawItem(th *Theme, it menuItem, w int, base lipgloss.Style,
 	if keyW > 0 {
 		sb.WriteString(th.Key.Inherit(base).Render(padRight(it.key, keyW) + " "))
 		used += keyW + 1
+	}
+	if mark != "" {
+		sb.WriteString(markStyle.Render(mark))
+		used += width(mark)
 	}
 	avail := w - used
 	if rightW > 0 {

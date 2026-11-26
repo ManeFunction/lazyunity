@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -75,10 +76,12 @@ type hostRecorder struct {
 	urls, folders []string
 	editors       []string // exe, then the project, then the target, joined by spaces
 	added         [][]string
-	openupm       string // the OpenUPM CLI found, if any
-	openupmLatest string // what LatestOpenUPM answers
-	verifiedCLI   string // what LatestVerifiedCLI answers; empty: the CDN could not tell
-	err           error  // what every start answers
+	removed       [][]string
+	repos         map[string]string // what PackageRepo answers, by package
+	openupm       string            // the OpenUPM CLI found, if any
+	openupmLatest string            // what LatestOpenUPM answers
+	verifiedCLI   string            // what LatestVerifiedCLI answers; empty: the CDN could not tell
+	err           error             // what every start answers
 }
 
 // recorder is the model's host recorder.
@@ -124,6 +127,18 @@ func (h *hostRecorder) LatestVerifiedCLI(context.Context) (unitycli.Version, boo
 func (h *hostRecorder) AddPackages(_ context.Context, exe, dir string, packages []string) error {
 	h.added = append(h.added, packages)
 	return h.err
+}
+
+func (h *hostRecorder) RemovePackages(_ context.Context, exe, dir string, packages []string) error {
+	h.removed = append(h.removed, packages)
+	return h.err
+}
+
+func (h *hostRecorder) PackageRepo(_ context.Context, id string) (string, error) {
+	if u, ok := h.repos[id]; ok {
+		return u, nil
+	}
+	return "", errors.New("no repository")
 }
 
 // newTestModel builds a Model at 120x36 with its first layout done.

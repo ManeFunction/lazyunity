@@ -727,22 +727,6 @@ func TestMultiMenuItemsWithTheSameLabel(t *testing.T) {
 	}
 }
 
-func TestNewProjectOptionsManeTools(t *testing.T) {
-	m := newTestModel(t)
-	m.newProjectOptions(newProject{name: "G", parent: t.TempDir(), version: "6000.6.8f1"}, "3d")
-	out := screenText(m)
-	if !strings.Contains(out, "Add ManeTools (install OpenUPM to use)") || strings.Contains(out, "(full)") {
-		t.Errorf("without OpenUPM there is one inactive option:\n%s", out)
-	}
-	m.popups = nil
-	m.openupm = openupmState{checked: true, path: "/usr/bin/openupm", version: "3.0.0"}
-	m.newProjectOptions(newProject{name: "G", parent: t.TempDir(), version: "6000.6.8f1"}, "3d")
-	out = screenText(m)
-	if !strings.Contains(out, "Add ManeTools (full)") || !strings.Contains(out, "Add ManeTools (w/o UI module)") || strings.Contains(out, "install OpenUPM") {
-		t.Errorf("with OpenUPM there are two options:\n%s", out)
-	}
-}
-
 // quits reports whether cmd ends the program.
 func quits(cmd tea.Cmd) bool {
 	if cmd == nil {

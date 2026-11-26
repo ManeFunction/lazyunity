@@ -38,7 +38,7 @@ func (m *Model) startNewProject() tea.Cmd {
 		return m.showReleases()
 	}
 	m.push(&promptPopup{
-		title: "New project (1/5)", label: "Name of the project:", in: newInput(""),
+		title: m.newProjectStep(1), label: "Name of the project:", in: newInput(""),
 		validate: validateProjectName,
 		onSubmit: func(m *Model, name string) tea.Cmd {
 			m.newProjectLocation(newProject{name: name})
@@ -70,7 +70,7 @@ func validateProjectName(name string) string {
 
 func (m *Model) newProjectLocation(w newProject) {
 	p := &promptPopup{
-		title: "New project (2/5)", label: "Create it in this folder:",
+		title: m.newProjectStep(2), label: "Create it in this folder:",
 		in:       newInput(displayPath(m.projectsDir()) + string(filepath.Separator)),
 		complete: completeDir,
 		validate: func(text string) string {
@@ -113,7 +113,7 @@ func (m *Model) newProjectEditor(w newProject) {
 			},
 		})
 	}
-	menu := newMenu("New project (3/5): Unity version", items)
+	menu := newMenu(m.newProjectStep(3)+": Unity version", items)
 	menu.wanted = 44
 	menu.list.SelectKey(pick) // start on the default Editor
 	m.push(menu)
@@ -150,34 +150,21 @@ func (m *Model) onTemplates(msg templatesMsg) {
 			run: func(m *Model) tea.Cmd { m.newProjectOptions(msg.wiz, tpl.Name); return nil },
 		})
 	}
-	menu := newMenu("New project (4/5): template", items)
+	menu := newMenu(m.newProjectStep(4)+": template", items)
 	menu.wanted = 44
 	m.push(menu)
 }
 
 func (m *Model) newProjectOptions(w newProject, template string) {
 	const (
-		optCloud         = "cloud"
-		optRecommended   = "recommended"
-		optManetoolsFull = "manetools-full"
-		optManetoolsCore = "manetools-core"
+		optCloud       = "cloud"
+		optRecommended = "recommended"
 	)
 	items := []menuItem{
 		{id: optCloud, label: "Link to Unity Cloud", desc: "Create a Unity Cloud project for it. Needs you to be signed in."},
 		{id: optRecommended, label: "Add Unity's recommended packages and settings", desc: "Without this, the project is just the template.", checked: true},
 	}
-	openupmPath := m.openupm.path
-	if openupmPath != "" {
-		items = append(items,
-			menuItem{id: optManetoolsFull, label: "Add ManeTools (full)", group: "manetools",
-				desc: "Adds " + strings.Join(manetoolsFullPackages, " and ") + " from OpenUPM."},
-			menuItem{id: optManetoolsCore, label: "Add ManeTools (w/o UI module)", group: "manetools",
-				desc: "Adds " + strings.Join(manetoolsCorePackages, " and ") + " from OpenUPM, without the UI module."})
-	} else {
-		items = append(items, menuItem{label: "Add ManeTools (install OpenUPM to use)", disabled: "Install the OpenUPM CLI first (Options, Tools)",
-			desc: "ManeTools come from OpenUPM. Install the OpenUPM CLI in the Tools tab, then create the project."})
-	}
-	menu := newMenu("New project (5/5): options", items)
+	menu := newMenu(m.newProjectStep(5)+": options", items)
 	menu.multi = true
 	menu.wanted = 56
 	menu.submit = func(m *Model, picked []menuItem) tea.Cmd {
@@ -185,29 +172,35 @@ func (m *Model) newProjectOptions(w newProject, template string) {
 			Name: w.name, ParentDir: w.parent, EditorVersion: w.version, Template: template,
 			Cloud: unitycli.CloudOff, Bare: true, Open: true,
 		}
-		var packages []string
 		for _, p := range picked {
 			switch p.id {
 			case optCloud:
 				opts.Cloud = unitycli.CloudNew
 			case optRecommended:
 				opts.Bare = false
-			case optManetoolsFull:
-				packages = manetoolsFullPackages
-			case optManetoolsCore:
-				packages = manetoolsCorePackages
 			}
 		}
-		return m.createProject(w, opts, openupmPath, packages)
+		openupmPath := m.openupm.path
+		if openupmPath == "" {
+			return m.createProject(w, opts, "", nil)
+		}
+		m.push(m.packagesPicker(m.newProjectStep(6)+": OpenUPM packages", nil, func(m *Model, add, _ []string) tea.Cmd {
+			return m.createProject(w, opts, openupmPath, add)
+		}))
+		return nil
 	}
 	m.push(menu)
 }
 
-// The ManeTools packages on OpenUPM.
-var (
-	manetoolsCorePackages = []string{"com.manefunction.tools-unity"}
-	manetoolsFullPackages = []string{"com.manefunction.tools-unity", "com.manefunction.tools-unity-ui"}
-)
+// newProjectStep is the title of a step of the wizard, which has a sixth
+// step, the recommended OpenUPM packages, when the OpenUPM CLI is installed.
+func (m *Model) newProjectStep(n int) string {
+	total := 5
+	if m.openupm.path != "" {
+		total = 6
+	}
+	return fmt.Sprintf("New project (%d/%d)", n, total)
+}
 
 // createProject creates the project. With packages, they are added with the
 // OpenUPM CLI before the Editor opens, so Unity resolves everything at once.
@@ -234,7 +227,7 @@ func (m *Model) queueCreate(c unityCLI, w newProject, opts unitycli.CreateOption
 				return nil
 			}
 			if err := h.AddPackages(ctx, openupmPath, w.path(), packages); err != nil {
-				return fmt.Errorf("the project was created, but ManeTools were not added: %w", err)
+				return fmt.Errorf("the project was created, but the OpenUPM packages were not added: %w", err)
 			}
 			if open {
 				_, err := c.Open(ctx, unitycli.OpenOptions{Project: w.path(), EditorVersion: w.version})

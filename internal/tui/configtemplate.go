@@ -115,6 +115,10 @@ func configTemplate() string {
 	line("# openupm:")
 	line("#   repo: %s", config.ForkOpenUPMRepo)
 	line("#   ref: %s", config.ForkOpenUPMRef)
+	line("#   # More packages for the recommended OpenUPM packages popup (P on a project,")
+	line("#   # and the last step of a new project), listed after the built-in ones. Pin a")
+	line("#   # version with @: com.example.package@1.2.3 (v1.2.3 works too).")
+	line("#   packages: [com.example.package, com.example.other@1.2.3]")
 	return b.String()
 }
 

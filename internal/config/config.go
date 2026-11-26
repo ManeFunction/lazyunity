@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -176,11 +177,30 @@ type OpenUPM struct {
 	Repo string `yaml:"repo"`
 	// Ref is the branch or tag of Repo to build. Empty: its default branch.
 	Ref string `yaml:"ref"`
+	// Packages are more packages for the recommended packages popup, after
+	// the built-in ones: package names, each optionally pinned to a version
+	// (com.example.package@1.2.3).
+	Packages []string `yaml:"packages"`
+}
+
+var packageRef = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*(@[A-Za-z0-9][A-Za-z0-9.+_-]*)?$`)
+
+// ParsePackage splits a package entry into its name and pinned version, ""
+// when it has none. A version written as v2.3.4 is 2.3.4, as UPM wants it.
+func ParsePackage(s string) (name, version string) {
+	name, version, _ = strings.Cut(strings.TrimSpace(s), "@")
+	if len(version) > 1 && (version[0] == 'v' || version[0] == 'V') && version[1] >= '0' && version[1] <= '9' {
+		version = version[1:]
+	}
+	return name, version
 }
 
 // FromRegistry reports whether the OpenUPM CLI comes from the npm registry,
 // which it does unless a repository is set.
 func (o OpenUPM) FromRegistry() bool { return strings.TrimSpace(o.Repo) == "" }
+
+// SameSource reports whether o and p install the OpenUPM CLI from the same place.
+func (o OpenUPM) SameSource(p OpenUPM) bool { return o.Repo == p.Repo && o.Ref == p.Ref }
 
 // Default returns the built-in configuration.
 func Default() Config {
@@ -297,6 +317,11 @@ func (c *Config) validate() error {
 	}
 	if c.OpenUPM.FromRegistry() && strings.TrimSpace(c.OpenUPM.Ref) != "" {
 		return fmt.Errorf("openupm.ref: a branch or tag needs openupm.repo, the repository to build it from")
+	}
+	for i, p := range c.OpenUPM.Packages {
+		if !packageRef.MatchString(strings.TrimSpace(p)) {
+			return fmt.Errorf("openupm.packages[%d]: %q is not a package name, optionally with @version", i, p)
+		}
 	}
 	if w := c.GUI.SidePanelWidth; w < 0.2 || w > 0.8 {
 		return fmt.Errorf("gui.sidePanelWidth: %v is not between 0.2 and 0.8", w)

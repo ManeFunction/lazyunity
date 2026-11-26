@@ -364,6 +364,8 @@ func (h demoHost) StartEditor(string, string, string) error { return nil }
 
 func (h demoHost) AddPackages(context.Context, string, string, []string) error { return nil }
 
+func (h demoHost) RemovePackages(context.Context, string, string, []string) error { return nil }
+
 // demoCLI is the Unity CLI of the fake mode. It answers from the file, and
 // what changes the list of projects or Editors changes only its own copy.
 type demoCLI struct {

@@ -7,7 +7,10 @@ package openupm
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -49,6 +52,87 @@ func Add(ctx context.Context, exe, dir string, packages []string) error {
 		return fmt.Errorf("openupm add %s: %w: %s", strings.Join(packages, " "), err, strings.TrimSpace(string(out)))
 	}
 	return nil
+}
+
+// Remove removes packages from the project in dir.
+func Remove(ctx context.Context, exe, dir string, packages []string) error {
+	cmd := exec.CommandContext(ctx, exe, append([]string{"remove"}, packages...)...)
+	cmd.Dir = dir
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("openupm remove %s: %w: %s", strings.Join(packages, " "), err, strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
+// Registry is the OpenUPM package registry.
+const Registry = "https://package.openupm.com"
+
+// RepositoryURL asks the registry for the web page of a package's source
+// repository, from the repository field of its package.json.
+func RepositoryURL(ctx context.Context, client *http.Client, registry, id string) (string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimRight(registry, "/")+"/"+url.PathEscape(id), nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Accept", "application/json")
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("%s: %s", id, resp.Status)
+	}
+	var doc struct {
+		Repository json.RawMessage   `json:"repository"`
+		DistTags   map[string]string `json:"dist-tags"`
+		Versions   map[string]struct {
+			Repository json.RawMessage `json:"repository"`
+		} `json:"versions"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&doc); err != nil {
+		return "", fmt.Errorf("%s: %w", id, err)
+	}
+	raw := doc.Repository
+	if len(raw) == 0 {
+		raw = doc.Versions[doc.DistTags["latest"]].Repository
+	}
+	if u := webURL(raw); u != "" {
+		return u, nil
+	}
+	return "", fmt.Errorf("%s names no repository", id)
+}
+
+// webURL turns a package.json repository field, a string or {"url": ...},
+// into a browsable https URL; "" when it is neither.
+func webURL(raw json.RawMessage) string {
+	var s string
+	if json.Unmarshal(raw, &s) != nil {
+		var o struct {
+			URL string `json:"url"`
+		}
+		if json.Unmarshal(raw, &o) != nil {
+			return ""
+		}
+		s = o.URL
+	}
+	s = strings.TrimSpace(s)
+	s = strings.TrimPrefix(s, "git+")
+	s = strings.TrimSuffix(s, ".git")
+	switch {
+	case strings.HasPrefix(s, "git@github.com:"):
+		s = "https://github.com/" + strings.TrimPrefix(s, "git@github.com:")
+	case strings.HasPrefix(s, "github:"):
+		s = "https://github.com/" + strings.TrimPrefix(s, "github:")
+	case strings.HasPrefix(s, "git://"):
+		s = "https://" + strings.TrimPrefix(s, "git://")
+	case strings.HasPrefix(s, "ssh://git@"):
+		s = "https://" + strings.TrimPrefix(s, "ssh://git@")
+	}
+	if !strings.HasPrefix(s, "https://") && !strings.HasPrefix(s, "http://") {
+		return ""
+	}
+	return s
 }
 
 // LatestRelease asks npm for the newest openupm-cli in the registry.
