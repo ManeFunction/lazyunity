@@ -18,3 +18,20 @@ func TestReadManifest(t *testing.T) {
 		t.Errorf("%v %v", deps, err)
 	}
 }
+
+func TestReadPackagesLock(t *testing.T) {
+	dir := t.TempDir()
+	if lock, err := ReadPackagesLock(dir); err != nil || len(lock) != 0 {
+		t.Errorf("a project without a lock file has no packages: %v %v", lock, err)
+	}
+	os.MkdirAll(filepath.Join(dir, "Packages"), 0o755)
+	os.WriteFile(filepath.Join(dir, LockFile), []byte(`{"dependencies": {"com.a": {"version": "1.2.0", "depth": 1, "source": "registry", "dependencies": {"com.b": "2.0.0"}}}}`), 0o644)
+	lock, err := ReadPackagesLock(dir)
+	if err != nil || lock["com.a"].Version != "1.2.0" || lock["com.a"].Depth != 1 || lock["com.a"].Dependencies["com.b"] != "2.0.0" {
+		t.Errorf("%+v %v", lock, err)
+	}
+	os.WriteFile(filepath.Join(dir, LockFile), []byte(`{`), 0o644)
+	if _, err := ReadPackagesLock(dir); err == nil {
+		t.Error("a broken lock file is an error")
+	}
+}

@@ -47,6 +47,9 @@ type menuItem struct {
 	right string
 	// disabled, when not empty, is why the item cannot be picked.
 	disabled string
+	// locked, in a multi menu, when not empty, is why the item's tick cannot
+	// be changed now.
+	locked string
 	// heading rows label a group and cannot be picked.
 	heading bool
 	checked bool
@@ -148,11 +151,15 @@ func (p *menuPopup) picked() []menuItem {
 	return out
 }
 
-// toggle flips the tick of the selected item.
-func (p *menuPopup) toggle() {
+// toggle flips the tick of the selected item. It returns why it cannot,
+// when the item is locked.
+func (p *menuPopup) toggle() string {
 	cur, ok := p.list.Selected()
 	if !ok || cur.heading || cur.disabled != "" {
-		return
+		return ""
+	}
+	if cur.locked != "" {
+		return cur.locked
 	}
 	items := append([]menuItem(nil), p.list.Items()...)
 	on := !cur.checked
@@ -168,6 +175,7 @@ func (p *menuPopup) toggle() {
 		p.onToggle(items, cur.id, on)
 	}
 	p.list.SetItems(items)
+	return ""
 }
 
 func (p *menuPopup) activate(m *Model) (func(*Model) tea.Cmd, bool) {
@@ -245,7 +253,9 @@ func (p *menuPopup) update(m *Model, msg tea.Msg) (func(*Model) tea.Cmd, bool) {
 			return nil, true
 		case "space":
 			if p.multi {
-				p.toggle()
+				if why := p.toggle(); why != "" {
+					m.toastf(toastWarn, "%s", why)
+				}
 				return nil, false
 			}
 		}
@@ -420,8 +430,11 @@ func (p *menuPopup) drawItem(th *Theme, it menuItem, w int, base lipgloss.Style,
 		label = "[ ] " + label
 	}
 	labelStyle := base
-	if it.disabled != "" {
+	switch {
+	case it.disabled != "":
 		labelStyle = base.Strikethrough(true).Faint(true)
+	case it.locked != "":
+		labelStyle = base.Faint(true)
 	}
 	var sb strings.Builder
 	used := 0

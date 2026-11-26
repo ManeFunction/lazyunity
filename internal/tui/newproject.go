@@ -184,7 +184,7 @@ func (m *Model) newProjectOptions(w newProject, template string) {
 		if openupmPath == "" {
 			return m.createProject(w, opts, "", nil)
 		}
-		m.push(m.packagesPicker(m.newProjectStep(6)+": OpenUPM packages", nil, func(m *Model, add, _ []string) tea.Cmd {
+		m.push(m.packagesPicker(m.newProjectStep(6)+": OpenUPM packages", installedPackages{}, func(m *Model, add, _ []string) tea.Cmd {
 			return m.createProject(w, opts, openupmPath, add)
 		}))
 		return nil

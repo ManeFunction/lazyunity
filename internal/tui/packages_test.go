@@ -6,6 +6,9 @@ import (
 	"strings"
 	"testing"
 
+	tea "charm.land/bubbletea/v2"
+
+	"github.com/ManeFunction/lazyunity/internal/unity"
 	"github.com/ManeFunction/lazyunity/internal/unitycli"
 )
 
@@ -34,7 +37,7 @@ func topMenu(t *testing.T, m *Model) *menuPopup {
 // what needs it.
 func TestPackagesFollowTheirDependencies(t *testing.T) {
 	m := newTestModel(t)
-	p := m.packagesPicker("P", nil, nil)
+	p := m.packagesPicker("P", installedPackages{}, nil)
 	m.push(p)
 	p.list.SelectKey(pkgManeToolsUI)
 	press(m, "space")
@@ -115,10 +118,116 @@ func TestProjectPackages(t *testing.T) {
 	}
 }
 
+func writeLock(t *testing.T, dir string, deps string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(dir, "Packages", "packages-lock.json"), []byte(`{"dependencies": {`+deps+`}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// A package the project has only as a dependency is ticked and locked while
+// a ticked package needs it. Once nothing does, it unlocks; left ticked, it
+// is added to the manifest at its version, so it stays.
+func TestPackagesInstalledAsDependencies(t *testing.T) {
+	m := newTestModel(t)
+	r := selectProject(t, m, "Space Shooter")
+	writeManifest(t, r.Path, `"com.manefunction.tools-unity-ui": "2.0.0", "com.manefunction.sound-maneger": "1.0.0"`)
+	writeLock(t, r.Path, `
+		"com.manefunction.tools-unity": {"version": "2.1.0", "depth": 1, "source": "registry", "dependencies": {}},
+		"com.manefunction.tools-unity-ui": {"version": "2.0.0", "depth": 0, "source": "registry", "dependencies": {"com.manefunction.tools-unity": "2.1.0"}},
+		"com.manefunction.sound-maneger": {"version": "1.0.0", "depth": 0, "source": "registry", "dependencies": {"com.manefunction.tools-unity": "2.1.0"}}`)
+	m.openupm = openupmState{checked: true, path: "/usr/bin/openupm"}
+	press(m, "P")
+	p := topMenu(t, m)
+	if out := screenText(m); !strings.Contains(out, "[✓] ManeTools ") || !strings.Contains(out, "2.1.0 (dependency)") {
+		t.Fatalf("a dependency shows as installed:\n%s", out)
+	}
+	p.list.SelectKey(pkgManeTools)
+	press(m, "space")
+	if got := ticked(p); !strings.Contains(got, pkgManeTools+",") {
+		t.Errorf("a needed dependency cannot be unticked: %s", got)
+	}
+	if out := screenText(m); !strings.Contains(out, "needed by ManeTools for UI, Sound Maneger") {
+		t.Errorf("it says why:\n%s", out)
+	}
+	p.list.SelectKey(pkgManeToolsUI)
+	press(m, "space")
+	if it, _ := p.list.Selected(); it.id != pkgManeToolsUI {
+		t.Fatal("selection moved")
+	}
+	for _, it := range p.list.Items() {
+		if it.id == pkgManeTools && it.locked == "" {
+			t.Error("Sound Maneger still needs ManeTools")
+		}
+	}
+	p.list.SelectKey("com.manefunction.sound-maneger")
+	press(m, "space")
+	for _, it := range p.list.Items() {
+		if it.id == pkgManeTools && (it.locked != "" || !it.checked) {
+			t.Errorf("with nothing needing it, ManeTools unlocks, ticked: %+v", it)
+		}
+	}
+	press(m, "enter")
+	if _, ok := m.popups[len(m.popups)-1].(*confirmPopup); !ok {
+		t.Fatalf("removing asks first:\n%s", screenText(m))
+	}
+	_, cmd := m.Update(keyMsg("enter"))
+	drain(m, cmd)
+	h := recorder(m)
+	if len(h.removed) != 1 || strings.Join(h.removed[0], ",") != pkgManeToolsUI+",com.manefunction.sound-maneger" {
+		t.Errorf("removed: %v", h.removed)
+	}
+	if len(h.added) != 1 || strings.Join(h.added[0], ",") != pkgManeTools+"@2.1.0" {
+		t.Errorf("ManeTools is kept at its version: %v", h.added)
+	}
+}
+
+// Unticked once unlocked, a dependency goes with what needed it.
+func TestUntickedDependencyGoesAway(t *testing.T) {
+	m := newTestModel(t)
+	in := installedPackages{
+		direct: map[string]string{pkgManeToolsUI: "2.0.0"},
+		lock: map[string]unity.LockedPackage{
+			pkgManeTools:   {Version: "2.1.0", Depth: 1, Source: "registry"},
+			pkgManeToolsUI: {Version: "2.0.0", Source: "registry", Dependencies: map[string]string{pkgManeTools: "2.1.0"}},
+		},
+	}
+	var add, remove []string
+	p := m.packagesPicker("P", in, func(_ *Model, a, r []string) tea.Cmd { add, remove = a, r; return nil })
+	m.push(p)
+	p.list.SelectKey(pkgManeToolsUI)
+	press(m, "space")
+	p.list.SelectKey(pkgManeTools)
+	press(m, "space", "enter")
+	if len(add) != 0 || strings.Join(remove, ",") != pkgManeToolsUI {
+		t.Errorf("add %v, remove %v", add, remove)
+	}
+}
+
+// A package of the manifest the popup does not offer keeps its dependencies
+// locked.
+func TestOtherPackagesKeepDependenciesLocked(t *testing.T) {
+	m := newTestModel(t)
+	in := installedPackages{
+		direct: map[string]string{"com.example.other": "1.0.0"},
+		lock: map[string]unity.LockedPackage{
+			"com.cysharp.unitask": {Version: "2.5.0", Depth: 1, Source: "registry"},
+			"com.example.other":   {Version: "1.0.0", Dependencies: map[string]string{"com.cysharp.unitask": "2.5.0"}},
+		},
+	}
+	p := m.packagesPicker("P", in, nil)
+	m.push(p)
+	p.list.SelectKey("com.cysharp.unitask")
+	press(m, "space")
+	if got := ticked(p); got != "com.cysharp.unitask" {
+		t.Errorf("ticked: %s", got)
+	}
+}
+
 func TestPackagePageOpensGitHub(t *testing.T) {
 	m := newTestModel(t)
 	m.cfg.OpenUPM.Packages = []string{"com.example.known", "com.example.unknown"}
-	p := m.packagesPicker("P", nil, nil)
+	p := m.packagesPicker("P", installedPackages{}, nil)
 	m.push(p)
 	h := recorder(m)
 	h.repos = map[string]string{"com.example.known": "https://github.com/example/known"}
