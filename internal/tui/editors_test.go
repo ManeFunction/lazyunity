@@ -400,14 +400,14 @@ func TestEditorUpdateIsShownAndOnlyThenOnTheBottomLine(t *testing.T) {
 	if !strings.Contains(out, "· update 2022.3.70f1 available ·") {
 		t.Fatalf("the Editor's row names the newer patch:\n%s", out)
 	}
-	if !strings.Contains(out, "Update: u") {
+	if !strings.Contains(out, "Update: U") {
 		t.Errorf("the bottom line offers the update:\n%s", out)
 	}
 	selectEditor(t, m, "6000.6.8f1")
-	if out := screenText(m); strings.Contains(out, "Update: u") {
+	if out := screenText(m); strings.Contains(out, "Update: U") {
 		t.Errorf("an Editor with no newer patch offers no update:\n%s", out)
 	}
-	press(m, "u")
+	press(m, "U")
 	if len(m.popups) != 0 {
 		t.Error("u does nothing on an Editor with no newer patch")
 	}
@@ -436,7 +436,7 @@ func updateUpToConfirm(t *testing.T, m *Model, f *fakeCLI) tea.Cmd {
 		{ID: "android", Name: "Android Build Support", Category: "Platforms", DownloadBytes: 1 << 30},
 		{ID: "webgl", Name: "Web Build Support", Category: "Platforms", DownloadBytes: 1 << 29},
 	}
-	press(m, "u")
+	press(m, "U")
 	if out := screenText(m); len(m.popups) != 1 || !strings.Contains(out, "Install Unity 2022.3.70f1, the newest patch") {
 		t.Fatalf("u offers the newest patch:\n%s", out)
 	}

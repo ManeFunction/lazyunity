@@ -26,7 +26,7 @@ func editorActions() []*action {
 			func(m *Model, e editorRow) tea.Cmd { m.uninstallConfirm(e); return nil }),
 		on(&action{id: "editors.default", ctx: ctxEditors, keys: []string{"space"}, desc: "Make this the default Editor", hint: "Default"},
 			func(m *Model, e editorRow) tea.Cmd { return m.setDefaultEditor(e) }),
-		on(&action{id: "editors.upgrade", ctx: ctxEditors, keys: []string{"u"}, desc: "Update to the newest patch of this release line", hint: "Update",
+		on(&action{id: "editors.upgrade", ctx: ctxEditors, keys: []string{"U"}, desc: "Update to the newest patch of this release line", hint: "Update",
 			enabled: func(m *Model) bool { e, ok := m.editorsTab.Selected(); return ok && e.Update != "" }},
 			func(m *Model, e editorRow) tea.Cmd { m.updateConfirm(e); return nil }),
 		on(&action{id: "editors.openFolder", ctx: ctxEditors, keys: []string{"o"}, desc: "Open the Editor's folder"},
@@ -532,7 +532,7 @@ type cacheInfoMsg struct {
 func cleanCacheAction(c ctxID) *action {
 	return &action{
 		id: c.group() + ".cleanCache", ctx: c, keys: []string{"C"},
-		desc: "Clean the download cache (what interrupted installs left behind)",
+		desc: "Clean the download cache (what unfinished installs left behind)",
 		run:  func(m *Model) tea.Cmd { return m.cleanCacheFlow() },
 	}
 }

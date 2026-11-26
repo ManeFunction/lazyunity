@@ -129,7 +129,7 @@ Everything follows lazygit where lazygit has an equivalent. `?` shows the keys t
 
 | Key | |
 |---|---|
-| `enter`, `space` | open in Unity, signed in |
+| `enter`, `space` | open in Unity |
 | `v` | change the Unity version (a list of installed Editors) |
 | `p` | change the build platform (the platforms installed for that Editor) |
 | `f` | pin or unpin |
@@ -152,7 +152,7 @@ Everything follows lazygit where lazygit has an equivalent. `?` shows the keys t
 | `n` | install a new Editor |
 | `d` | uninstall |
 | `space` | set default |
-| `u` | update to the newest patch, when one is out (the row says "· update X available ·") |
+| `U` | update to the newest patch, when one is out (the row says "· update X available ·") |
 | `o` | folder |
 | `y` | copy |
 

@@ -20,7 +20,7 @@ import (
 func projectActions() []*action {
 	on := onSelected(func(m *Model) (projectRow, bool) { return m.projectsTab.Selected() })
 	return []*action{
-		on(&action{id: "projects.open", ctx: ctxProjects, keys: []string{"enter", "space"}, desc: "Open in Unity, signed in", hint: "Open"},
+		on(&action{id: "projects.open", ctx: ctxProjects, keys: []string{"enter", "space"}, desc: "Open in Unity", hint: "Open"},
 			func(m *Model, r projectRow) tea.Cmd { return m.openProject(r) }),
 		on(&action{id: "projects.version", ctx: ctxProjects, keys: []string{"v"}, desc: "Change the Unity version", hint: "Version"},
 			func(m *Model, r projectRow) tea.Cmd { m.versionMenu(r, nil); return nil }),

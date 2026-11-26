@@ -97,7 +97,7 @@ func (c *Client) DownloadCache(ctx context.Context) (CacheInfo, error) {
 }
 
 // CleanDownloadCache deletes every file in the download cache, including
-// what interrupted installs left behind.
+// what unfinished installs left behind.
 func (c *Client) CleanDownloadCache(ctx context.Context) error {
 	_, err := c.Run(ctx, "cache", "clean", "--yes")
 	return err

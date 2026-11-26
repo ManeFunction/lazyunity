@@ -427,7 +427,7 @@ func TestKeybindingsMenuShowsLocalGlobalAndNavigation(t *testing.T) {
 	all := strings.Join(labels, "\n")
 	for _, want := range []string{
 		"Local", "Global", "Navigation", // the sections
-		"Open in Unity, signed in", "Change the Unity version", "Create a new project", // local to Projects
+		"Open in Unity", "Change the Unity version", "Create a new project", // local to Projects
 		"Quit", "Filter the list", "Show the command log", // global
 		"Next panel", "Next tab of the panel", // navigation
 	} {
