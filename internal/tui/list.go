@@ -218,6 +218,11 @@ func (l *list[T]) clamp() {
 	l.rest()
 	if l.cursor < l.offset {
 		l.offset = l.cursor
+		// keep the rows the cursor skips right above it, such as a group's
+		// heading, on screen with it
+		for l.offset > 0 && l.skipped(l.offset-1) && l.cursor < l.offset-1+l.height {
+			l.offset--
+		}
 	}
 	if l.cursor >= l.offset+l.height {
 		l.offset = l.cursor - l.height + 1
@@ -237,6 +242,12 @@ func (l *list[T]) selectable() (upTo, total int) {
 		}
 	}
 	return upTo, total
+}
+
+// AtBottom reports whether the cursor is on the last row it may rest on.
+func (l *list[T]) AtBottom() bool {
+	upTo, total := l.selectable()
+	return upTo == total
 }
 
 // Window returns the items currently on screen and the row (among the filtered

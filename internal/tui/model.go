@@ -386,6 +386,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case uv.UnknownOscEvent:
 		m.th.setPaletteFromOSC(string(msg))
+	case thenMsg:
+		cmd = msg.run(m)
 	default:
 		var ok bool
 		if cmd, ok = m.handleTask(msg); !ok {
@@ -405,6 +407,23 @@ func (m *Model) finish(cmd tea.Cmd) tea.Cmd {
 	}
 	return cmd
 }
+
+// popupHolding says what an open popup waits for before it can close (a
+// lookup, say), "" when none does. Until then the app does not quit.
+func (m *Model) popupHolding() string {
+	for _, p := range m.popups {
+		if h, ok := p.(interface{ holding() string }); ok {
+			if what := h.holding(); what != "" {
+				return what
+			}
+		}
+	}
+	return ""
+}
+
+// thenMsg brings the result of background work back to the update loop:
+// run acts on it there.
+type thenMsg struct{ run func(m *Model) tea.Cmd }
 
 // toPopup hands a message to the popup on top.
 func (m *Model) toPopup(msg tea.Msg) tea.Cmd {
@@ -456,6 +475,10 @@ func (m *Model) handlePaste(msg tea.PasteMsg) tea.Cmd {
 // requestQuit quits, after asking when something would be lost by it.
 func (m *Model) requestQuit() tea.Cmd {
 	if m.refuseWhileKept("quitting") {
+		return nil
+	}
+	if what := m.popupHolding(); what != "" {
+		m.toastf(toastWarn, "Wait: %s", what)
 		return nil
 	}
 	if m.busy() && !m.quitConfirmed {

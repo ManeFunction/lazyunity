@@ -41,6 +41,8 @@ type host interface {
 	// PackageRepo asks the OpenUPM registry for the web page of a package's
 	// source repository.
 	PackageRepo(ctx context.Context, id string) (string, error)
+	// LookupPackage asks the OpenUPM registry for a package.
+	LookupPackage(ctx context.Context, id string) (openupm.Package, error)
 }
 
 // machine is the host lazyunity runs on.
@@ -95,6 +97,10 @@ func (h machine) RemovePackages(ctx context.Context, exe, dir string, packages [
 
 func (h machine) PackageRepo(ctx context.Context, id string) (string, error) {
 	return openupm.RepositoryURL(ctx, http.DefaultClient, openupm.Registry, id)
+}
+
+func (h machine) LookupPackage(ctx context.Context, id string) (openupm.Package, error) {
+	return openupm.Lookup(ctx, http.DefaultClient, openupm.Registry, id)
 }
 
 // edit opens path in the code editor: os.edit from config.yml, started on its

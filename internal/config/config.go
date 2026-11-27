@@ -177,13 +177,21 @@ type OpenUPM struct {
 	Repo string `yaml:"repo"`
 	// Ref is the branch or tag of Repo to build. Empty: its default branch.
 	Ref string `yaml:"ref"`
-	// Packages are more packages for the recommended packages popup, after
+	// Packages are more packages for the OpenUPM packages popup, after
 	// the built-in ones: package names, each optionally pinned to a version
 	// (com.example.package@1.2.3).
 	Packages []string `yaml:"packages"`
+	// ShowManePackages lists Mane Function's own packages (ManeTools and its
+	// modules) in the popup, and ShowOftenUsed the often used ones.
+	ShowManePackages bool `yaml:"showManePackages"`
+	ShowOftenUsed    bool `yaml:"showOftenUsed"`
 }
 
 var packageRef = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*(@[A-Za-z0-9][A-Za-z0-9.+_-]*)?$`)
+
+// ValidPackage reports whether s is a package name, optionally with
+// @version.
+func ValidPackage(s string) bool { return packageRef.MatchString(strings.TrimSpace(s)) }
 
 // ParsePackage splits a package entry into its name and pinned version, ""
 // when it has none. A version written as v2.3.4 is 2.3.4, as UPM wants it.
@@ -231,6 +239,7 @@ func Default() Config {
 			PortraitModeAutoMaxWidth:  84,
 			PortraitModeAutoMinHeight: 46,
 		},
+		OpenUPM: OpenUPM{ShowManePackages: true, ShowOftenUsed: true},
 	}
 }
 

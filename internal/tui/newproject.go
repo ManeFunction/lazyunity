@@ -193,7 +193,7 @@ func (m *Model) newProjectOptions(w newProject, template string) {
 }
 
 // newProjectStep is the title of a step of the wizard, which has a sixth
-// step, the recommended OpenUPM packages, when the OpenUPM CLI is installed.
+// step, the OpenUPM packages, when the OpenUPM CLI is installed.
 func (m *Model) newProjectStep(n int) string {
 	total := 5
 	if m.openupm.path != "" {

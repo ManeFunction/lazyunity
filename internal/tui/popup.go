@@ -68,6 +68,9 @@ type menuPopup struct {
 	title string
 	list  *list[menuItem]
 	multi bool
+	// installs, in a multi menu, marks a ticked item that is not installed
+	// yet with the pending arrow, as it is to be installed, in place of [x].
+	installs bool
 	// submit receives the ticked items in multi mode.
 	submit func(m *Model, picked []menuItem) tea.Cmd
 	// filterable menus filter as you type, like lazygit's keybindings menu.
@@ -84,6 +87,119 @@ type menuPopup struct {
 	// itemKeys are more keys of a multi menu, which act on the selected item
 	// and leave the menu open.
 	itemKeys map[string]func(m *Model, it menuItem) tea.Cmd
+	// entry, when set, is a text field under the items of a multi menu.
+	entry *menuEntry
+	// pending, when set, describes the changes the menu would apply, "" when
+	// there are none. Closing the menu with changes pending asks whether to
+	// apply or discard them.
+	pending func() string
+	// confirmApply makes enter, with changes pending, ask before applying
+	// them.
+	confirmApply bool
+}
+
+// cancel closes the menu, or, with changes pending, asks what to do with them.
+func (p *menuPopup) cancel() (func(*Model) tea.Cmd, bool) {
+	if p.pending == nil {
+		return nil, true
+	}
+	what := p.pending()
+	if what == "" {
+		return nil, true
+	}
+	return p.askApply("Unapplied changes", what, true), false
+}
+
+// askApply asks whether to apply the pending changes, listed in what; back
+// returns to the menu, which stays open meanwhile. With discard, it offers to
+// close the menu without applying them too.
+func (p *menuPopup) askApply(title, what string, discard bool) func(*Model) tea.Cmd {
+	return func(m *Model) tea.Cmd {
+		c := &confirmPopup{
+			title: title, yes: "Apply", no: "Back",
+			message: what + "\n\nApply the changes?",
+			onYes: func(m *Model) tea.Cmd {
+				m.pop() // the menu
+				return p.submit(m, p.picked())
+			},
+		}
+		if discard {
+			c.message = what + "\n\nApply the changes, or discard them?"
+			c.extra = []confirmKey{{key: "d", label: "Discard", run: func(m *Model) tea.Cmd {
+				m.pop() // the menu
+				return nil
+			}}}
+		}
+		m.push(c)
+		return nil
+	}
+}
+
+// menuEntry is a text field at the bottom of a multi menu. Down on the last
+// item, or tab, moves into it; up or tab moves back to the items.
+type menuEntry struct {
+	label       string // before the field, such as "Add: "
+	placeholder string // shown dimmed while the field is empty and not focused
+	in          *input
+	focused     bool
+	// hints replace the menu's while the field is focused.
+	hints []hintItem
+	// busy, when not empty, says what the menu is waiting for. Until it is
+	// cleared the menu takes no keys and the app does not quit.
+	busy string
+	// submit gets the text when enter is pressed in the field with text in it.
+	// With the field empty, enter submits the menu as usual.
+	submit func(m *Model, text string) tea.Cmd
+}
+
+// holding says what the menu waits for before it can be closed, "" when
+// nothing.
+func (p *menuPopup) holding() string {
+	if p.entry == nil {
+		return ""
+	}
+	return p.entry.busy
+}
+
+// focusEntry moves the cursor into the text field, or back to the last item.
+func (p *menuPopup) focusEntry(on bool) {
+	p.entry.focused = on
+	if !on {
+		p.list.Bottom()
+	}
+}
+
+// updateEntry handles a message while the text field is focused.
+func (p *menuPopup) updateEntry(m *Model, msg tea.Msg) (func(*Model) tea.Cmd, bool) {
+	e := p.entry
+	switch msg := msg.(type) {
+	case tea.KeyPressMsg:
+		switch msg.String() {
+		case "esc":
+			if e.in.String() != "" {
+				e.in.Set("")
+				return nil, false
+			}
+			return p.cancel()
+		case "enter":
+			text := strings.TrimSpace(e.in.String())
+			if text == "" || e.submit == nil {
+				return p.activate(m)
+			}
+			return func(m *Model) tea.Cmd { return e.submit(m, text) }, false
+		case "up", "ctrl+p", "tab", "shift+tab":
+			p.focusEntry(false)
+			return nil, false
+		}
+		e.in.Key(msg)
+	case tea.PasteMsg:
+		e.in.Paste(msg.Content)
+	case tea.MouseWheelMsg:
+		if msg.Button == tea.MouseWheelUp {
+			p.focusEntry(false)
+		}
+	}
+	return nil, false
 }
 
 func newMenu(title string, items []menuItem) *menuPopup {
@@ -96,7 +212,7 @@ func newMenu(title string, items []menuItem) *menuPopup {
 			return it.label + " " + it.key + " " + it.desc
 		},
 		func(it menuItem) string { return it.id },
-	)
+	).skipping(func(it menuItem) bool { return it.heading })
 	items = append([]menuItem(nil), items...)
 	seen := map[string]bool{}
 	for i := range items {
@@ -112,33 +228,7 @@ func newMenu(title string, items []menuItem) *menuPopup {
 	// is tall, so that moving off a first heading does not scroll it out of view.
 	p.list.SetHeight(1 << 10)
 	p.list.SetItems(items)
-	p.skipHeadings(1)
 	return p
-}
-
-// skipHeadings moves the cursor off a heading, in the given direction.
-func (p *menuPopup) skipHeadings(dir int) {
-	for i := 0; i < p.list.Len(); i++ {
-		it, ok := p.list.Selected()
-		if !ok || !it.heading {
-			return
-		}
-		before := p.list.Cursor()
-		p.list.Move(dir)
-		if p.list.Cursor() == before { // hit an end: turn around
-			dir = -dir
-			p.list.Move(dir)
-		}
-	}
-}
-
-func (p *menuPopup) move(delta int) {
-	dir := 1
-	if delta < 0 {
-		dir = -1
-	}
-	p.list.Move(delta)
-	p.skipHeadings(dir)
 }
 
 func (p *menuPopup) picked() []menuItem {
@@ -184,6 +274,11 @@ func (p *menuPopup) activate(m *Model) (func(*Model) tea.Cmd, bool) {
 		if p.submit == nil {
 			return nil, true
 		}
+		if p.confirmApply && p.pending != nil {
+			if what := p.pending(); what != "" {
+				return p.askApply("Apply changes", what, false), false
+			}
+		}
 		return func(m *Model) tea.Cmd { return p.submit(m, picked) }, true
 	}
 	it, ok := p.list.Selected()
@@ -198,6 +293,35 @@ func (p *menuPopup) activate(m *Model) (func(*Model) tea.Cmd, bool) {
 }
 
 func (p *menuPopup) update(m *Model, msg tea.Msg) (func(*Model) tea.Cmd, bool) {
+	if e := p.entry; e != nil {
+		switch {
+		case e.busy != "":
+			return nil, false
+		case e.focused:
+			return p.updateEntry(m, msg)
+		}
+		switch msg := msg.(type) {
+		case tea.KeyPressMsg:
+			switch msg.String() {
+			case "tab":
+				p.focusEntry(true)
+				return nil, false
+			case "down", "ctrl+n", "j":
+				if p.list.AtBottom() {
+					p.focusEntry(true)
+					return nil, false
+				}
+			}
+		case tea.PasteMsg:
+			p.focusEntry(true)
+			return p.updateEntry(m, msg)
+		case tea.MouseWheelMsg:
+			if msg.Button == tea.MouseWheelDown && p.list.AtBottom() {
+				p.focusEntry(true)
+				return nil, false
+			}
+		}
+	}
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
 		key := msg.String()
@@ -206,51 +330,45 @@ func (p *menuPopup) update(m *Model, msg tea.Msg) (func(*Model) tea.Cmd, bool) {
 			if p.filterable && p.filter.String() != "" {
 				p.filter.Set("")
 				p.list.SetFilter("")
-				p.skipHeadings(1)
 				return nil, false
 			}
-			return nil, true
+			return p.cancel()
 		case "enter":
 			return p.activate(m)
 		case "up", "ctrl+p":
-			p.move(-1)
+			p.list.Move(-1)
 			return nil, false
 		case "down", "ctrl+n":
-			p.move(1)
+			p.list.Move(1)
 			return nil, false
 		case "pgup":
 			p.list.Page(-1)
-			p.skipHeadings(-1)
 			return nil, false
 		case "pgdown":
 			p.list.Page(1)
-			p.skipHeadings(1)
 			return nil, false
 		case "home":
 			p.list.Top()
-			p.skipHeadings(1)
 			return nil, false
 		case "end":
 			p.list.Bottom()
-			p.skipHeadings(-1)
 			return nil, false
 		}
 		if p.filterable {
 			if p.filter.Key(msg) {
 				p.list.SetFilter(p.filter.String())
-				p.skipHeadings(1)
 			}
 			return nil, false
 		}
 		switch key {
 		case "j":
-			p.move(1)
+			p.list.Move(1)
 			return nil, false
 		case "k":
-			p.move(-1)
+			p.list.Move(-1)
 			return nil, false
 		case "q":
-			return nil, true
+			return p.cancel()
 		case "space":
 			if p.multi {
 				if why := p.toggle(); why != "" {
@@ -279,15 +397,14 @@ func (p *menuPopup) update(m *Model, msg tea.Msg) (func(*Model) tea.Cmd, bool) {
 		}
 	case tea.MouseWheelMsg:
 		if msg.Button == tea.MouseWheelUp {
-			p.move(-1)
+			p.list.Move(-1)
 		} else if msg.Button == tea.MouseWheelDown {
-			p.move(1)
+			p.list.Move(1)
 		}
 	case tea.PasteMsg:
 		if p.filterable {
 			p.filter.Paste(msg.Content)
 			p.list.SetFilter(p.filter.String())
-			p.skipHeadings(1)
 		}
 	}
 	return nil, false
@@ -356,6 +473,10 @@ func (p *menuPopup) layers(m *Model) (box, tip string, reserve int) {
 	if p.filterable {
 		maxRows--
 	}
+	if p.entry != nil {
+		maxRows--
+	}
+	entryFocused := p.entry != nil && p.entry.focused
 	rows := min(max(p.list.Len(), 1), maxRows)
 	p.list.SetHeight(rows)
 
@@ -367,17 +488,24 @@ func (p *menuPopup) layers(m *Model) (box, tip string, reserve int) {
 		}
 		lines = append(lines, th.Dim.Render(fit(msg, inner)))
 	} else {
-		lines = p.list.renderRows(inner, true, th, func(it menuItem, wd int, base lipgloss.Style) string {
+		lines = p.list.renderRows(inner, !entryFocused, th, func(it menuItem, wd int, base lipgloss.Style) string {
+			if entryFocused {
+				// the cursor is in the field: no row of the list looks selected
+				base = lipgloss.NewStyle()
+			}
 			return p.drawItem(th, it, wd, base, keyW, rightW)
 		})
 	}
 
 	box = th.renderFrame(frame{
-		w: w, h: rows + 2 + b2i(p.filterable), tabs: []string{p.title}, focused: true,
-		lines: p.withFilterRow(lines, rows, inner), footer: p.list.footer(), scroll: p.list.scrollbar(),
+		w: w, h: rows + 2 + b2i(p.filterable) + b2i(p.entry != nil), tabs: []string{p.title}, focused: true,
+		lines: p.withEntryRow(m, p.withFilterRow(lines, rows, inner), inner), footer: p.list.footer(), scroll: p.list.scrollbar(),
 	})
-	if p.hints != nil {
-		tip = th.renderFrame(frame{w: w, h: 3, lines: []string{renderHints(th, p.hints, inner)}})
+	if hints := p.hints; hints != nil {
+		if entryFocused && p.entry.hints != nil {
+			hints = p.entry.hints
+		}
+		tip = th.renderFrame(frame{w: w, h: 3, lines: []string{renderHints(th, hints, inner)}})
 		return box, tip, 3
 	}
 	for _, it := range items {
@@ -412,6 +540,29 @@ func (p *menuPopup) withFilterRow(lines []string, rows, inner int) []string {
 	return append(lines, label+p.filter.View(inner-width(label)))
 }
 
+// withEntryRow adds the text field's row, when the menu has one.
+func (p *menuPopup) withEntryRow(m *Model, lines []string, inner int) []string {
+	e := p.entry
+	if e == nil {
+		return lines
+	}
+	th := m.th
+	label := th.ActiveBorder.Render(e.label)
+	rest := inner - width(e.label)
+	var field string
+	switch {
+	case e.busy != "":
+		field = th.ActiveBorder.Render(m.spinnerFrame()) + " " + th.Dim.Render(truncate(e.busy, max(rest-2, 1)))
+	case e.focused:
+		field = e.in.View(max(rest, 2))
+	case e.in.String() == "":
+		field = th.Dim.Render(truncate(e.placeholder, max(rest, 1)))
+	default:
+		field = th.Dim.Render(truncate(e.in.String(), max(rest, 1)))
+	}
+	return append(lines, label+field)
+}
+
 func (p *menuPopup) drawItem(th *Theme, it menuItem, w int, base lipgloss.Style, keyW, rightW int) string {
 	if it.heading {
 		return th.ActiveBorder.Render(fit("─── "+it.label, w))
@@ -424,6 +575,8 @@ func (p *menuPopup) drawItem(th *Theme, it menuItem, w int, base lipgloss.Style,
 		mark, markStyle = "[✓] ", th.Success.Inherit(base)
 	case p.multi && it.installed:
 		mark, markStyle = "[✗] ", th.Missing.Inherit(base)
+	case p.multi && it.checked && p.installs:
+		mark, markStyle = "[↓] ", th.Pending.Inherit(base)
 	case p.multi && it.checked:
 		label = "[x] " + label
 	case p.multi:
@@ -540,8 +693,7 @@ func (p *confirmPopup) view(m *Model) string {
 		keys += th.OptionsText.Render(x.key) + ": " + x.label + "   "
 	}
 	keys += th.OptionsText.Render("esc") + ": " + no
-	body := make([]string, 0, len(lines)+3)
-	body = append(body, "")
+	body := make([]string, 0, len(lines)+2)
 	for _, l := range lines {
 		body = append(body, " "+th.Bold.Render(l))
 	}
@@ -617,7 +769,7 @@ func (p *promptPopup) view(m *Model) string {
 	th := m.th
 	w := m.boxWidth(70, 40)
 	inner := w - 2
-	lines := []string{""}
+	var lines []string
 	if p.label != "" {
 		for _, l := range wrapText(p.label, inner-2) {
 			lines = append(lines, " "+l)

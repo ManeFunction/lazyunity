@@ -8,6 +8,7 @@ package openupm
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -67,40 +68,77 @@ func Remove(ctx context.Context, exe, dir string, packages []string) error {
 // Registry is the OpenUPM package registry.
 const Registry = "https://package.openupm.com"
 
-// RepositoryURL asks the registry for the web page of a package's source
-// repository, from the repository field of its package.json.
-func RepositoryURL(ctx context.Context, client *http.Client, registry, id string) (string, error) {
+// ErrNoPackage is what Lookup answers for a package the registry does not have.
+var ErrNoPackage = errors.New("not in the OpenUPM registry")
+
+// Package is a package as the registry describes it.
+type Package struct {
+	Name        string
+	DisplayName string // the displayName of its newest version, "" when it has none
+	Latest      string // its newest version
+	Repo        string // the web page of its source repository, "" when it names none
+	Versions    map[string]bool
+}
+
+// Lookup asks the registry for a package. A package it does not have is an
+// error that wraps ErrNoPackage.
+func Lookup(ctx context.Context, client *http.Client, registry, id string) (Package, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimRight(registry, "/")+"/"+url.PathEscape(id), nil)
 	if err != nil {
-		return "", err
+		return Package{}, err
 	}
 	req.Header.Set("Accept", "application/json")
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", err
+		return Package{}, err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusNotFound {
+		return Package{}, fmt.Errorf("%s: %w", id, ErrNoPackage)
+	}
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("%s: %s", id, resp.Status)
+		return Package{}, fmt.Errorf("%s: %s", id, resp.Status)
 	}
 	var doc struct {
+		Name       string            `json:"name"`
 		Repository json.RawMessage   `json:"repository"`
 		DistTags   map[string]string `json:"dist-tags"`
 		Versions   map[string]struct {
-			Repository json.RawMessage `json:"repository"`
+			DisplayName string          `json:"displayName"`
+			Repository  json.RawMessage `json:"repository"`
 		} `json:"versions"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&doc); err != nil {
-		return "", fmt.Errorf("%s: %w", id, err)
+		return Package{}, fmt.Errorf("%s: %w", id, err)
 	}
+	p := Package{Name: doc.Name, Latest: doc.DistTags["latest"], Versions: map[string]bool{}}
+	if p.Name == "" {
+		p.Name = id
+	}
+	for v := range doc.Versions {
+		p.Versions[v] = true
+	}
+	latest := doc.Versions[p.Latest]
+	p.DisplayName = strings.TrimSpace(latest.DisplayName)
 	raw := doc.Repository
 	if len(raw) == 0 {
-		raw = doc.Versions[doc.DistTags["latest"]].Repository
+		raw = latest.Repository
 	}
-	if u := webURL(raw); u != "" {
-		return u, nil
+	p.Repo = webURL(raw)
+	return p, nil
+}
+
+// RepositoryURL asks the registry for the web page of a package's source
+// repository, from the repository field of its package.json.
+func RepositoryURL(ctx context.Context, client *http.Client, registry, id string) (string, error) {
+	p, err := Lookup(ctx, client, registry, id)
+	if err != nil {
+		return "", err
 	}
-	return "", fmt.Errorf("%s names no repository", id)
+	if p.Repo == "" {
+		return "", fmt.Errorf("%s names no repository", id)
+	}
+	return p.Repo, nil
 }
 
 // webURL turns a package.json repository field, a string or {"url": ...},

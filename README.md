@@ -135,8 +135,7 @@ Everything follows lazygit where lazygit has an equivalent. `?` shows the keys t
 | `f` | pin or unpin |
 | `n` | new project (name, folder, version, template, options) |
 | `a` | add an existing project |
-| `ctrl+a` | add an OpenUPM package to the project (needs the OpenUPM CLI) |
-| `P` | add or remove recommended OpenUPM packages (needs the OpenUPM CLI) |
+| `P` | add or remove OpenUPM packages (needs the OpenUPM CLI) |
 | `d` | remove from the list, or delete the folder (asks twice) |
 | `s` | sort: last opened, name, Unity version |
 | `o` / `e` | open the folder / edit in a code editor |
@@ -218,15 +217,22 @@ lazyunity can add [OpenUPM](https://openupm.com) packages to your projects throu
 
 - **Installing the CLI.** The **OpenUPM CLI** row of the Tools tab installs it with npm (Node.js is needed). By default that is the official release from the npm registry. With `openupm.repo` set in `config.yml`, that repository (the official one or a fork) is cloned and built instead, and git is needed too.
 - **Updates.** Like the Unity CLI row, the row says `ready · <version>` for the npm release and `update available: <version>` once a newer one is out. A build from a repository reads `<version> · from <repo>@<branch> #<commit>`, and the row offers an update whenever the branch has newer commits, even when the version did not change.
-- **Adding a package.** `ctrl+a` in Projects asks for a package name, such as `com.example.package` or `com.example.package@1.2.0`, and adds it to the selected project.
-- **Recommended packages.** `P` in Projects opens a list of recommended packages: [ManeTools](https://github.com/ManeFunction/ManeTools-Unity), [ManeTools for UI](https://github.com/ManeFunction/ManeTools-UnityUI), [Sound Maneger](https://github.com/ManeFunction/sound-maneger), [UniTask](https://github.com/Cysharp/UniTask), [Particle Effect For UGUI](https://github.com/mob-sakai/ParticleEffectForUGUI), [SoftMask For UGUI](https://github.com/mob-sakai/SoftMaskForUGUI) and [UIEffect](https://github.com/mob-sakai/UIEffect). Packages the project already has show a green `[✓]`. `space` ticks a package. Unticking an installed one marks it `[✗]`, and `enter` then removes it with `openupm remove`, after asking. `enter` adds the ticked packages with `openupm add`. Ticking ManeTools for UI or Sound Maneger also ticks ManeTools, which they need; unticking ManeTools unticks them. `o` opens the selected package's GitHub page.
+- **Packages.** `P` in Projects opens the project's OpenUPM packages, in four groups:
+  - **Mane Packages:** [ManeTools](https://github.com/ManeFunction/ManeTools-Unity), [ManeTools for UI](https://github.com/ManeFunction/ManeTools-UnityUI) and [Sound Maneger](https://github.com/ManeFunction/sound-maneger).
+  - **Often used:** [UniTask](https://github.com/Cysharp/UniTask), [Particle Effect For UGUI](https://github.com/mob-sakai/ParticleEffectForUGUI), [SoftMask For UGUI](https://github.com/mob-sakai/SoftMaskForUGUI) and [UIEffect](https://github.com/mob-sakai/UIEffect).
+  - **Your selection:** `openupm.packages` of `config.yml` (below).
+  - **Other installed:** the rest of the manifest's packages that come from OpenUPM, and the ones you add in the popup.
+
+  Packages the project already has show a green `[✓]`. `space` ticks a package, which then shows `[↓]`. Unticking an installed one marks it `[✗]`. `enter` lists the changes and, once you confirm, adds the ticked packages with `openupm add` and removes the unticked ones with `openupm remove`. Ticking ManeTools for UI or Sound Maneger also ticks ManeTools, which they need; unticking ManeTools unticks them. `o` opens the selected package's GitHub page. `esc` with changes not applied asks whether to apply them (`enter`), discard them (`d`) or go back to the list (`esc`).
+- **Adding any package.** The field at the bottom of the list (`tab`, or `down` past the last package) takes a package name, such as `com.example.package` or `com.example.package@1.2.0`. `enter` looks it up in the OpenUPM registry; until the answer comes, the popup and lazyunity stay open. A package the registry has joins the last group, ticked, and is added with the rest when you apply the popup. `enter` in the empty field applies it.
 - **New projects.** With the CLI installed, `n` (new project) has a sixth step: the same list. The ticked packages are added before the Editor opens.
-- **Your own packages.** `openupm.packages` in `config.yml` adds packages to the end of the list, optionally pinned to a version:
+- **Your own packages.** `openupm.packages` in `config.yml` adds packages to the list, in their own group, optionally pinned to a version:
 
   ```yaml
   openupm:
     packages: [com.example.package, com.example.other@1.2.3]
   ```
+- **Hiding the built-in groups.** `openupm.showManePackages: false` hides Mane Packages, and `openupm.showOftenUsed: false` hides Often used. Both show by default. A hidden package the project already has is still listed, under Other installed.
 
 **Where the CLI comes from** is set by the `openupm` block of `config.yml`:
 

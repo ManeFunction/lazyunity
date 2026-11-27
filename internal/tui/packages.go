@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -10,12 +11,33 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/ManeFunction/lazyunity/internal/config"
+	"github.com/ManeFunction/lazyunity/internal/openupm"
 	"github.com/ManeFunction/lazyunity/internal/unity"
 )
 
-// The recommended OpenUPM packages popup: a step of the new project wizard,
-// and P on a project. It ticks what the project already has, adds what is
-// ticked with openupm add, and removes what is unticked with openupm remove.
+// The OpenUPM packages popup: a step of the new project wizard, and P on a
+// project. It lists the built-in packages, those of config.yml and the other
+// OpenUPM packages the project has, in groups, with a field at the bottom to
+// add any package of the registry to the list. It ticks what the project
+// already has, adds what is ticked with openupm add, and removes what is
+// unticked with openupm remove.
+
+// pkgGroup is the group of the popup a package is listed in.
+type pkgGroup int
+
+const (
+	groupMine    pkgGroup = iota // ManeFunction's own packages
+	groupPicks                   // others ManeFunction recommends
+	groupConfig                  // openupm.packages of config.yml
+	groupProject                 // the project's other OpenUPM packages, and those added in the popup
+)
+
+var groupTitles = [...]string{
+	groupMine:    "Mane Packages",
+	groupPicks:   "Often used",
+	groupConfig:  "Your selection",
+	groupProject: "Other installed",
+}
 
 // upmPackage is a package the popup offers.
 type upmPackage struct {
@@ -24,6 +46,7 @@ type upmPackage struct {
 	version string // pinned, or "" for the newest
 	repo    string // its source on GitHub; "" asks the registry
 	deps    []string
+	group   pkgGroup
 }
 
 // ref is what openupm add is given: the name, with the pinned version.
@@ -39,22 +62,29 @@ const (
 	pkgManeToolsUI = "com.manefunction.tools-unity-ui"
 )
 
-// recommendedPackages are offered first, in this order.
-var recommendedPackages = []upmPackage{
-	{id: pkgManeTools, name: "ManeTools", repo: "https://github.com/ManeFunction/ManeTools-Unity"},
-	{id: pkgManeToolsUI, name: "ManeTools for UI", repo: "https://github.com/ManeFunction/ManeTools-UnityUI", deps: []string{pkgManeTools}},
-	{id: "com.manefunction.sound-maneger", name: "Sound Maneger", repo: "https://github.com/ManeFunction/sound-maneger", deps: []string{pkgManeTools}},
-	{id: "com.cysharp.unitask", name: "UniTask", repo: "https://github.com/Cysharp/UniTask"},
-	{id: "com.coffee.ui-particle", name: "Particle Effect For UGUI", repo: "https://github.com/mob-sakai/ParticleEffectForUGUI"},
-	{id: "com.coffee.softmask-for-ugui", name: "SoftMask For UGUI", repo: "https://github.com/mob-sakai/SoftMaskForUGUI"},
-	{id: "com.coffee.ui-effect", name: "UIEffect", repo: "https://github.com/mob-sakai/UIEffect"},
+// builtinPackages are offered first, in this order.
+var builtinPackages = []upmPackage{
+	{id: pkgManeTools, name: "ManeTools", repo: "https://github.com/ManeFunction/ManeTools-Unity", group: groupMine},
+	{id: pkgManeToolsUI, name: "ManeTools for UI", repo: "https://github.com/ManeFunction/ManeTools-UnityUI", deps: []string{pkgManeTools}, group: groupMine},
+	{id: "com.manefunction.sound-maneger", name: "Sound Maneger", repo: "https://github.com/ManeFunction/sound-maneger", deps: []string{pkgManeTools}, group: groupMine},
+	{id: "com.cysharp.unitask", name: "UniTask", repo: "https://github.com/Cysharp/UniTask", group: groupPicks},
+	{id: "com.coffee.ui-particle", name: "Particle Effect For UGUI", repo: "https://github.com/mob-sakai/ParticleEffectForUGUI", group: groupPicks},
+	{id: "com.coffee.softmask-for-ugui", name: "SoftMask For UGUI", repo: "https://github.com/mob-sakai/SoftMaskForUGUI", group: groupPicks},
+	{id: "com.coffee.ui-effect", name: "UIEffect", repo: "https://github.com/mob-sakai/UIEffect", group: groupPicks},
 }
 
-// offeredPackages are the recommended packages, then those of
-// openupm.packages in config.yml. A configured package that is already in the
+// offeredPackages are the built-in packages of the groups config.yml shows,
+// then those of openupm.packages, then the other OpenUPM packages of the
+// project's manifest, by name. A configured package that is already in the
 // list only pins its version.
-func offeredPackages(extra []string) []upmPackage {
-	out := append([]upmPackage(nil), recommendedPackages...)
+func offeredPackages(o config.OpenUPM, in installedPackages) []upmPackage {
+	var out []upmPackage
+	for _, p := range builtinPackages {
+		if (p.group == groupMine && o.ShowManePackages) || (p.group == groupPicks && o.ShowOftenUsed) {
+			out = append(out, p)
+		}
+	}
+	extra := o.Packages
 	at := map[string]int{}
 	for i, p := range out {
 		at[p.id] = i
@@ -71,7 +101,17 @@ func offeredPackages(extra []string) []upmPackage {
 			continue
 		}
 		at[id] = len(out)
-		out = append(out, upmPackage{id: id, name: id, version: ver})
+		out = append(out, upmPackage{id: id, name: id, version: ver, group: groupConfig})
+	}
+	var others []string
+	for id := range in.direct {
+		if _, ok := at[id]; !ok && in.openupm[id] {
+			others = append(others, id)
+		}
+	}
+	sort.Strings(others)
+	for _, id := range others {
+		out = append(out, upmPackage{id: id, name: id, group: groupProject})
 	}
 	return out
 }
@@ -121,6 +161,30 @@ func tickDeps(pkgs []upmPackage) func(items []menuItem, id string, on bool) {
 type installedPackages struct {
 	direct map[string]string              // Packages/manifest.json, by name
 	lock   map[string]unity.LockedPackage // Packages/packages-lock.json, by name
+	// openupm are the packages of the manifest that come from the OpenUPM
+	// registry.
+	openupm map[string]bool
+}
+
+// readInstalled reads what the project at path has.
+func readInstalled(path string) (installedPackages, error) {
+	mf, err := unity.LoadManifest(path)
+	if err != nil {
+		return installedPackages{}, err
+	}
+	lock, err := unity.ReadPackagesLock(path)
+	if err != nil {
+		return installedPackages{}, err
+	}
+	in := installedPackages{direct: mf.Dependencies, lock: lock, openupm: map[string]bool{}}
+	for id := range mf.Dependencies {
+		lp := lock[id]
+		fromLock := lp.Source == "registry" && strings.TrimRight(lp.URL, "/") == openupm.Registry
+		if mf.FromRegistry(id, openupm.Registry) || fromLock {
+			in.openupm[id] = true
+		}
+	}
+	return in, nil
 }
 
 // dependency reports whether a package is there only because another one
@@ -213,51 +277,163 @@ func lockDependencies(pkgs []upmPackage, in installedPackages) func(items []menu
 	}
 }
 
+// pkgItem is the row of a package.
+func pkgItem(p upmPackage, in installedPackages) menuItem {
+	right := p.id
+	if p.name == p.id {
+		right = ""
+	}
+	v, direct := in.direct[p.id]
+	depV, dep := in.dependency(p.id)
+	switch {
+	case direct:
+		right = strings.TrimSpace(right + " " + v)
+	case dep:
+		right = strings.TrimSpace(right + " " + depV + " (dependency)")
+	case p.version != "":
+		right = strings.TrimSpace(right + " @" + p.version)
+	}
+	has := in.has(p.id)
+	return menuItem{id: p.id, label: p.name, right: right, checked: has, installed: has}
+}
+
+// groupHeading is the id of a group's heading row.
+func groupHeading(g pkgGroup) string { return "group:" + groupTitles[g] }
+
+// pkgItems are the rows of the packages, under a heading per group that has
+// any.
+func pkgItems(pkgs []upmPackage, in installedPackages) []menuItem {
+	items := make([]menuItem, 0, len(pkgs)+len(groupTitles))
+	for i, p := range pkgs {
+		if i == 0 || pkgs[i-1].group != p.group {
+			items = append(items, menuItem{id: groupHeading(p.group), label: groupTitles[p.group], heading: true})
+		}
+		items = append(items, pkgItem(p, in))
+	}
+	return items
+}
+
+// packageLookupTimeout bounds asking the registry about a package typed in.
+const packageLookupTimeout = 15 * time.Second
+
 // packagesPicker is the popup. in is what the project already has; submit
 // gets what to add (with pinned versions) and what to remove.
 func (m *Model) packagesPicker(title string, in installedPackages, submit func(m *Model, add, remove []string) tea.Cmd) *menuPopup {
-	pkgs := offeredPackages(m.cfg.OpenUPM.Packages)
+	pkgs := offeredPackages(m.cfg.OpenUPM, in)
 	byID := map[string]upmPackage{}
-	items := make([]menuItem, 0, len(pkgs))
 	for _, p := range pkgs {
 		byID[p.id] = p
-		right := p.id
-		if p.name == p.id {
-			right = ""
-		}
-		v, direct := in.direct[p.id]
-		depV, dep := in.dependency(p.id)
-		switch {
-		case direct:
-			right = strings.TrimSpace(right + " " + v)
-		case dep:
-			right = strings.TrimSpace(right + " " + depV + " (dependency)")
-		case p.version != "":
-			right = strings.TrimSpace(right + " @" + p.version)
-		}
-		has := in.has(p.id)
-		items = append(items, menuItem{id: p.id, label: p.name, right: right, checked: has, installed: has})
 	}
+	items := pkgItems(pkgs, in)
 	lock := lockDependencies(pkgs, in)
 	lock(items)
 	menu := newMenu(title, items)
 	menu.multi = true
+	menu.installs = true
 	menu.wanted = 64
 	follow := tickDeps(pkgs)
 	menu.onToggle = func(items []menuItem, id string, on bool) {
 		follow(items, id, on)
 		lock(items)
 	}
-	menu.hints = []hintItem{{"Toggle", "<space>"}, {"GitHub", "o"}, {"Apply", "<enter>"}, {"Cancel", "<esc>"}}
+	menu.hints = []hintItem{{"Toggle", "<space>"}, {"GitHub", "o"}, {"Add", "<tab>"}, {"Apply", "<enter>"}, {"Cancel", "<esc>"}}
 	menu.itemKeys = map[string]func(m *Model, it menuItem) tea.Cmd{
 		"o": func(m *Model, it menuItem) tea.Cmd { return m.openPackagePage(byID[it.id]) },
 	}
-	menu.submit = func(m *Model, picked []menuItem) tea.Cmd {
+	// tick ticks a package of the list, with what it needs.
+	tick := func(id string) {
+		items := append([]menuItem(nil), menu.list.Items()...)
+		for i := range items {
+			if items[i].id == id && items[i].locked == "" {
+				items[i].checked = true
+			}
+		}
+		follow(items, id, true)
+		lock(items)
+		menu.list.SetItems(items)
+	}
+	// found adds a package the registry has to the end of the list, ticked.
+	found := func(p upmPackage) {
+		pkgs = append(pkgs, p)
+		byID[p.id] = p
+		lock, follow = lockDependencies(pkgs, in), tickDeps(pkgs)
+		items := append([]menuItem(nil), menu.list.Items()...)
+		if len(pkgs) == 1 || pkgs[len(pkgs)-2].group != groupProject {
+			items = append(items, menuItem{id: groupHeading(groupProject), label: groupTitles[groupProject], heading: true})
+		}
+		items = append(items, pkgItem(p, in))
+		menu.list.SetItems(items)
+		tick(p.id)
+	}
+	e := &menuEntry{
+		label: "Add: ", placeholder: "type a package name, such as com.example.package@1.2.0",
+		in:    newInput(""),
+		hints: []hintItem{{"Look up", "<enter>"}, {"Back to the list", "<tab>"}, {"Clear", "<esc>"}},
+	}
+	e.submit = func(m *Model, text string) tea.Cmd {
+		if cut := trimAddCommand(text); cut != text {
+			text = cut
+			e.in.Set(text) // the field shows what is looked up
+		}
+		if !config.ValidPackage(text) {
+			m.toastf(toastWarn, "%q is not a package name, optionally with @version", text)
+			return nil
+		}
+		id, ver := config.ParsePackage(text)
+		if p, ok := byID[id]; ok {
+			if ver != "" && !in.has(id) {
+				p.version = ver
+				byID[id] = p
+				for i := range pkgs {
+					if pkgs[i].id == id {
+						pkgs[i] = p
+					}
+				}
+				menu.list.SetItems(replaceItem(menu.list.Items(), pkgItem(p, in)))
+			}
+			tick(id)
+			e.in.Set("")
+			m.toastf(toastInfo, "%s is already in the list: ticked", p.name)
+			return nil
+		}
+		e.busy = "Looking up " + id + " in the OpenUPM registry…"
+		h := m.host
+		lookup := func() tea.Msg {
+			ctx, cancel := context.WithTimeout(context.Background(), packageLookupTimeout)
+			defer cancel()
+			info, err := h.LookupPackage(ctx, id)
+			return thenMsg{run: func(m *Model) tea.Cmd {
+				e.busy = ""
+				switch {
+				case errors.Is(err, openupm.ErrNoPackage):
+					m.toastf(toastWarn, "%s is not in the OpenUPM registry", id)
+					return nil
+				case err != nil:
+					m.toastf(toastError, "Could not look up %s: %v", id, err)
+					return nil
+				case ver != "" && !info.Versions[ver]:
+					m.toastf(toastWarn, "%s has no version %s (the newest is %s)", id, ver, info.Latest)
+					return nil
+				}
+				name := info.DisplayName
+				if name == "" {
+					name = id
+				}
+				found(upmPackage{id: id, name: name, version: ver, repo: info.Repo, group: groupProject})
+				e.in.Set("")
+				m.toastf(toastOK, "%s is in the list: it is added when you apply", name)
+				return nil
+			}}
+		}
+		return tea.Batch(m.startSpinner(), lookup)
+	}
+	menu.entry = e
+	// changes is what applying the ticks in picked adds and removes.
+	changes := func(picked []menuItem) (add, remove []string) {
 		ticked := map[string]menuItem{}
 		for _, it := range picked {
 			ticked[it.id] = it
 		}
-		var add, remove []string
 		for _, p := range pkgs {
 			it, on := ticked[p.id]
 			_, direct := in.direct[p.id]
@@ -276,9 +452,56 @@ func (m *Model) packagesPicker(title string, in installedPackages, submit func(m
 				remove = append(remove, p.id)
 			}
 		}
+		return add, remove
+	}
+	menu.submit = func(m *Model, picked []menuItem) tea.Cmd {
+		add, remove := changes(picked)
 		return submit(m, add, remove)
 	}
+	menu.pending = func() string {
+		add, remove := changes(menu.picked())
+		lines := make([]string, 0, len(add)+len(remove))
+		for _, id := range add {
+			lines = append(lines, "- adding "+id)
+		}
+		for _, id := range remove {
+			lines = append(lines, "- removing "+id)
+		}
+		return strings.Join(lines, "\n")
+	}
+
 	return menu
+}
+
+// trimAddCommand turns a command copied from the OpenUPM site, such as
+// "openupm add com.example.package", into the package it adds. Other text is
+// returned as it is.
+func trimAddCommand(text string) string {
+	f := strings.Fields(text)
+	if len(f) > 0 && f[0] == "npx" {
+		f = f[1:]
+	}
+	if len(f) < 3 || (f[0] != "openupm" && f[0] != "openupm-cli") || f[1] != "add" {
+		return text
+	}
+	for _, w := range f[2:] {
+		if !strings.HasPrefix(w, "-") {
+			return w
+		}
+	}
+	return text
+}
+
+// replaceItem puts it in place of the item with its id, keeping the tick.
+func replaceItem(items []menuItem, it menuItem) []menuItem {
+	out := append([]menuItem(nil), items...)
+	for i := range out {
+		if out[i].id == it.id {
+			it.checked, it.locked = out[i].checked, out[i].locked
+			out[i] = it
+		}
+	}
+	return out
 }
 
 // openPackagePage opens a package's source repository in the browser. One
@@ -318,35 +541,23 @@ func (m *Model) projectPackages(r projectRow) tea.Cmd {
 		m.toastf(toastWarn, "Install the OpenUPM CLI first (Options, Tools)")
 		return nil
 	}
-	direct, err := unity.ReadManifest(r.Path)
-	if err == nil {
-		var lock map[string]unity.LockedPackage
-		if lock, err = unity.ReadPackagesLock(r.Path); err == nil {
-			return m.pushProjectPackages(r, exe, installedPackages{direct: direct, lock: lock})
-		}
+	in, err := readInstalled(r.Path)
+	if err != nil {
+		m.showError("Reading the packages of "+r.name(), err)
+		return nil
 	}
-	m.showError("Reading the packages of "+r.name(), err)
-	return nil
+	return m.pushProjectPackages(r, exe, in)
 }
 
 func (m *Model) pushProjectPackages(r projectRow, exe string, in installedPackages) tea.Cmd {
-	m.push(m.packagesPicker("OpenUPM packages for "+r.name(), in, func(m *Model, add, remove []string) tea.Cmd {
-		switch {
-		case len(add) == 0 && len(remove) == 0:
+	menu := m.packagesPicker("OpenUPM packages for "+r.name(), in, func(m *Model, add, remove []string) tea.Cmd {
+		if len(add) == 0 && len(remove) == 0 {
 			return nil
-		case len(remove) == 0:
-			return m.changePackages(r, exe, add, nil)
 		}
-		msg := fmt.Sprintf("Remove %s from %s with openupm remove?", strings.Join(remove, ", "), r.name())
-		if len(add) > 0 {
-			msg += fmt.Sprintf("\n\nThen add %s.", strings.Join(add, ", "))
-		}
-		m.push(&confirmPopup{
-			title: "Remove packages", yes: "Remove", danger: true, message: msg,
-			onYes: func(m *Model) tea.Cmd { return m.changePackages(r, exe, add, remove) },
-		})
-		return nil
-	}))
+		return m.changePackages(r, exe, add, remove)
+	})
+	menu.confirmApply = true // the project changes at once: ask first
+	m.push(menu)
 	return nil
 }
 

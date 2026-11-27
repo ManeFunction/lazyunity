@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/ManeFunction/lazyunity/internal/config"
 	"github.com/ManeFunction/lazyunity/internal/launch"
+	"github.com/ManeFunction/lazyunity/internal/openupm"
 	"github.com/ManeFunction/lazyunity/internal/state"
 	"github.com/ManeFunction/lazyunity/internal/unity"
 	"github.com/ManeFunction/lazyunity/internal/unitycli"
@@ -77,11 +79,12 @@ type hostRecorder struct {
 	editors       []string // exe, then the project, then the target, joined by spaces
 	added         [][]string
 	removed       [][]string
-	repos         map[string]string // what PackageRepo answers, by package
-	openupm       string            // the OpenUPM CLI found, if any
-	openupmLatest string            // what LatestOpenUPM answers
-	verifiedCLI   string            // what LatestVerifiedCLI answers; empty: the CDN could not tell
-	err           error             // what every start answers
+	repos         map[string]string          // what PackageRepo answers, by package
+	known         map[string]openupm.Package // what LookupPackage finds, by package
+	openupm       string                     // the OpenUPM CLI found, if any
+	openupmLatest string                     // what LatestOpenUPM answers
+	verifiedCLI   string                     // what LatestVerifiedCLI answers; empty: the CDN could not tell
+	err           error                      // what every start answers
 }
 
 // recorder is the model's host recorder.
@@ -139,6 +142,13 @@ func (h *hostRecorder) PackageRepo(_ context.Context, id string) (string, error)
 		return u, nil
 	}
 	return "", errors.New("no repository")
+}
+
+func (h *hostRecorder) LookupPackage(_ context.Context, id string) (openupm.Package, error) {
+	if p, ok := h.known[id]; ok {
+		return p, nil
+	}
+	return openupm.Package{}, fmt.Errorf("%s: %w", id, openupm.ErrNoPackage)
 }
 
 // newTestModel builds a Model at 120x36 with its first layout done.

@@ -165,8 +165,8 @@ func TestListSkipsSkippedRows(t *testing.T) {
 	if got, _ := l.Selected(); got != "d" {
 		t.Errorf("clicked %q", got)
 	}
-	l.Top()
-	l.Scroll(2) // the wheel drags the cursor onto the spacer: it moves on
+	l.Top()     // the window shows the leading spacer too
+	l.Scroll(3) // the wheel drags the cursor onto the spacer: it moves on
 	if got, _ := l.Selected(); got != "c" {
 		t.Errorf("after a scroll: %q", got)
 	}

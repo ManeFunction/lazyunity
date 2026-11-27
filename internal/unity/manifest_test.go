@@ -19,6 +19,21 @@ func TestReadManifest(t *testing.T) {
 	}
 }
 
+func TestManifestFromRegistry(t *testing.T) {
+	mf := Manifest{ScopedRegistries: []ScopedRegistry{{URL: "https://package.openupm.com/", Scopes: []string{"com.example", "jp.keijiro.klak"}}}}
+	for id, want := range map[string]bool{
+		"com.example": true, "com.example.a": true, "com.examples.a": false,
+		"jp.keijiro.klak": true, "jp.keijiro.klakndi": false, "com.unity.ugui": false,
+	} {
+		if got := mf.FromRegistry(id, "https://package.openupm.com"); got != want {
+			t.Errorf("%s: %v", id, got)
+		}
+	}
+	if mf.FromRegistry("com.example.a", "https://other.example") {
+		t.Error("another registry")
+	}
+}
+
 func TestReadPackagesLock(t *testing.T) {
 	dir := t.TempDir()
 	if lock, err := ReadPackagesLock(dir); err != nil || len(lock) != 0 {

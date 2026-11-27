@@ -225,7 +225,7 @@ func spin() tea.Cmd {
 }
 
 // startSpinner starts the animation clock, unless it is already running. It
-// runs while there are tasks or a tab is loading.
+// runs while there are tasks, a tab is loading or a popup waits.
 func (m *Model) startSpinner() tea.Cmd {
 	if m.spinning {
 		return nil
@@ -314,7 +314,7 @@ func (m *Model) handleTask(msg tea.Msg) (cmd tea.Cmd, ok bool) {
 	case spinMsg:
 		m.spin++
 		m.pruneTasks()
-		if len(m.tasks) == 0 && !m.tabsLoading() {
+		if len(m.tasks) == 0 && !m.tabsLoading() && m.popupHolding() == "" {
 			m.spinning = false
 			return nil, true
 		}

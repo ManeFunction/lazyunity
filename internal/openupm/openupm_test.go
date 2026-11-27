@@ -2,6 +2,7 @@ package openupm
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -147,6 +148,30 @@ func TestLatestRelease(t *testing.T) {
 	os.WriteFile(npm, []byte("#!/bin/sh\nexit 1\n"), 0o755)
 	if _, err := LatestRelease(context.Background(), npm); err == nil {
 		t.Error("a failed npm is an error")
+	}
+}
+
+func TestLookup(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/com.example.a":
+			w.Write([]byte(`{"name": "com.example.a", "dist-tags": {"latest": "2.0.0"}, "versions": {"1.0.0": {}, "2.0.0": {"displayName": "Example A", "repository": "github:example/a"}}}`))
+		case "/com.example.broken":
+			w.WriteHeader(http.StatusInternalServerError)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+	p, err := Lookup(context.Background(), srv.Client(), srv.URL, "com.example.a")
+	if err != nil || p.DisplayName != "Example A" || p.Latest != "2.0.0" || !p.Versions["1.0.0"] || p.Repo != "https://github.com/example/a" {
+		t.Errorf("%+v %v", p, err)
+	}
+	if _, err := Lookup(context.Background(), srv.Client(), srv.URL, "com.example.gone"); !errors.Is(err, ErrNoPackage) {
+		t.Errorf("a missing package: %v", err)
+	}
+	if _, err := Lookup(context.Background(), srv.Client(), srv.URL, "com.example.broken"); err == nil || errors.Is(err, ErrNoPackage) {
+		t.Errorf("a failing registry is not a missing package: %v", err)
 	}
 }
 

@@ -738,26 +738,6 @@ func TestSelectedPath(t *testing.T) {
 	}
 }
 
-func TestAddPackageNeedsOpenUPM(t *testing.T) {
-	m := newTestModel(t)
-	press(m, "ctrl+a")
-	if len(m.popups) != 0 || m.keymap.lookup(ctxProjects, "ctrl+a").enabled(m) {
-		t.Errorf("without OpenUPM the action is inactive:\n%s", screenText(m))
-	}
-	m.openupm = openupmState{checked: true, path: "/usr/bin/openupm"}
-	if !m.keymap.lookup(ctxProjects, "ctrl+a").enabled(m) {
-		t.Error("with OpenUPM the action is active")
-	}
-	press(m, "ctrl+a")
-	if _, ok := m.popups[len(m.popups)-1].(*promptPopup); !ok || !strings.Contains(screenText(m), "Add an OpenUPM package") {
-		t.Errorf("with OpenUPM a package name is asked for:\n%s", screenText(m))
-	}
-	press(m, "enter")
-	if !strings.Contains(screenText(m), "Type a package name") {
-		t.Errorf("an empty name is refused:\n%s", screenText(m))
-	}
-}
-
 func TestNewProjectStartsOnTheDefaultEditor(t *testing.T) {
 	m := newTestModel(t)
 	m.inv.editors()[1].Default = true // 2022.3.62f1, second in the list
@@ -792,22 +772,6 @@ func TestOpenTheProjectFolder(t *testing.T) {
 	press(m, "o")
 	if !strings.Contains(screenText(m), "Could not open the folder: no file manager") {
 		t.Errorf("a failure is said:\n%s", screenText(m))
-	}
-}
-
-func TestAddAPackage(t *testing.T) {
-	m := newTestModel(t)
-	selectProject(t, m, "Space Shooter")
-	m.openupm = openupmState{checked: true, path: "/usr/bin/openupm"}
-	press(m, "ctrl+a")
-	m.popups[len(m.popups)-1].(*promptPopup).in.Set("com.example.a com.example.b@1.2.0")
-	_, cmd := m.Update(keyMsg("enter"))
-	drain(m, cmd)
-	if got := recorder(m).added; len(got) != 1 || strings.Join(got[0], ",") != "com.example.a,com.example.b@1.2.0" {
-		t.Errorf("the packages are added with the OpenUPM CLI: %v", got)
-	}
-	if !strings.Contains(screenText(m), "Added com.example.a, com.example.b@1.2.0 to Space Shooter") {
-		t.Errorf("screen:\n%s", screenText(m))
 	}
 }
 

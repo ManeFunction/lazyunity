@@ -7,28 +7,67 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // ManifestFile is where a project lists the packages it depends on.
 var ManifestFile = filepath.Join("Packages", "manifest.json")
 
-// ReadManifest returns the packages the project at path depends on, by name,
-// with the version (or URL) each is asked for, from Packages/manifest.json.
-func ReadManifest(path string) (map[string]string, error) {
+// Manifest is what Packages/manifest.json says.
+type Manifest struct {
+	// Dependencies are the packages the project depends on, by name, with
+	// the version (or URL) each is asked for.
+	Dependencies map[string]string `json:"dependencies"`
+	// ScopedRegistries are the registries packages come from, other than
+	// Unity's own.
+	ScopedRegistries []ScopedRegistry `json:"scopedRegistries"`
+}
+
+// ScopedRegistry is a registry of the manifest, with the package scopes
+// that come from it.
+type ScopedRegistry struct {
+	Name   string   `json:"name"`
+	URL    string   `json:"url"`
+	Scopes []string `json:"scopes"`
+}
+
+// FromRegistry reports whether the package id comes from the registry at
+// url: one of its scopes is the name itself, or a prefix of it up to a dot.
+func (mf Manifest) FromRegistry(id, url string) bool {
+	for _, r := range mf.ScopedRegistries {
+		if strings.TrimRight(r.URL, "/") != strings.TrimRight(url, "/") {
+			continue
+		}
+		for _, s := range r.Scopes {
+			if id == s || strings.HasPrefix(id, s+".") {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// LoadManifest reads Packages/manifest.json of the project at path.
+func LoadManifest(path string) (Manifest, error) {
 	b, err := os.ReadFile(filepath.Join(path, ManifestFile))
 	if err != nil {
-		return nil, err
+		return Manifest{}, err
 	}
-	var doc struct {
-		Dependencies map[string]string `json:"dependencies"`
-	}
+	var doc Manifest
 	if err := json.Unmarshal(b, &doc); err != nil {
-		return nil, fmt.Errorf("%s: %w", filepath.Join(path, ManifestFile), err)
+		return Manifest{}, fmt.Errorf("%s: %w", filepath.Join(path, ManifestFile), err)
 	}
 	if doc.Dependencies == nil {
 		doc.Dependencies = map[string]string{}
 	}
-	return doc.Dependencies, nil
+	return doc, nil
+}
+
+// ReadManifest returns the packages the project at path depends on, by name,
+// with the version (or URL) each is asked for, from Packages/manifest.json.
+func ReadManifest(path string) (map[string]string, error) {
+	mf, err := LoadManifest(path)
+	return mf.Dependencies, err
 }
 
 // LockFile is where Unity records every package it resolved for a project,
@@ -42,6 +81,8 @@ type LockedPackage struct {
 	// package pulled in.
 	Depth  int    `json:"depth"`
 	Source string `json:"source"` // such as registry, git, embedded, builtin
+	// URL is the registry a package of source registry came from.
+	URL string `json:"url"`
 	// Dependencies are the packages it needs, by name, with their versions.
 	Dependencies map[string]string `json:"dependencies"`
 }

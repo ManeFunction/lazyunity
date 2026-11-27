@@ -38,10 +38,7 @@ func projectActions() []*action {
 			run: func(m *Model) tea.Cmd { m.sortMenu(); return nil }},
 		on(&action{id: "projects.openFolder", ctx: ctxProjects, keys: []string{"o"}, desc: "Open the project folder in the file manager"},
 			func(m *Model, r projectRow) tea.Cmd { return m.openFolder(r.Path) }),
-		on(&action{id: "projects.addPackage", ctx: ctxProjects, keys: []string{"ctrl+a"}, desc: "Add an OpenUPM package to the project (needs the OpenUPM CLI)",
-			enabled: func(m *Model) bool { return m.openupm.path != "" }},
-			func(m *Model, r projectRow) tea.Cmd { return m.addPackagePrompt(r) }),
-		on(&action{id: "projects.packages", ctx: ctxProjects, keys: []string{"P"}, desc: "Add or remove recommended OpenUPM packages (needs the OpenUPM CLI)",
+		on(&action{id: "projects.packages", ctx: ctxProjects, keys: []string{"P"}, desc: "Add or remove OpenUPM packages (needs the OpenUPM CLI)",
 			enabled: func(m *Model) bool { return m.openupm.path != "" }},
 			func(m *Model, r projectRow) tea.Cmd { return m.projectPackages(r) }),
 		on(&action{id: "projects.edit", ctx: ctxProjects, keys: []string{"e"}, desc: "Edit the project in a code editor"},
@@ -513,47 +510,6 @@ func (m *Model) addProjectPrompt() {
 				func(m *Model) tea.Cmd { m.selectAfterLoad = path; return m.loadProjectsCmd() })
 		},
 	})
-}
-
-// addPackagePrompt asks for an OpenUPM package name and adds it to the project
-// with the OpenUPM CLI.
-func (m *Model) addPackagePrompt(r projectRow) tea.Cmd {
-	if r.Missing {
-		m.toastf(toastError, "The folder of %s is gone: %s", r.name(), displayPath(r.Path))
-		return nil
-	}
-	exe := m.openupm.path
-	if exe == "" {
-		m.toastf(toastWarn, "Install the OpenUPM CLI first (Options, Tools)")
-		return nil
-	}
-	m.push(&promptPopup{
-		title: "Add an OpenUPM package", label: "Package name, such as com.example.package or com.example.package@1.2.0:",
-		in: newInput(""),
-		validate: func(text string) string {
-			if text == "" {
-				return "Type a package name"
-			}
-			return ""
-		},
-		onSubmit: func(m *Model, text string) tea.Cmd {
-			pkgs, h := strings.Fields(text), m.host
-			return m.enqueue(&task{
-				title: "Adding " + strings.Join(pkgs, ", ") + " to " + r.name(),
-				label: "add " + strings.Join(pkgs, ", "),
-				works: []string{workProject(r.Path)},
-				msg:   "OpenUPM is adding the package",
-				do:    func(ctx context.Context) error { return h.AddPackages(ctx, exe, r.Path, pkgs) },
-				after: func(m *Model, err error) tea.Cmd {
-					if err == nil {
-						m.toastf(toastOK, "Added %s to %s", strings.Join(pkgs, ", "), r.name())
-					}
-					return nil
-				},
-			})
-		},
-	})
-	return nil
 }
 
 // ---- folders, editors, info, clipboard, clean -----------------------------------------
