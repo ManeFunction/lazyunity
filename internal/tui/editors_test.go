@@ -476,7 +476,7 @@ func TestEditorUpdateEndToEnd(t *testing.T) {
 	m := newTestModel(t)
 	f := withUpdate(t, m)
 	install := updateUpToConfirm(t, m, f)
-	if !strings.Contains(screenText(m), "Delete the Unity 2022.3.62f1 version") {
+	if !strings.Contains(screenText(m), "Uninstall Unity 2022.3.62f1 once") {
 		t.Fatalf("asks about the old Editor:\n%s", screenText(m))
 	}
 	_, del := m.Update(keyMsg("enter"))

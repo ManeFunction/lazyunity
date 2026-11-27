@@ -1,9 +1,9 @@
 # lazyunity
 
-a lazygit-style terminal interface for Unity projects and Editors, born of an urge to get rid of the slow, bloated, half-a-gig official Unity Hub.
-It replaces the Unity Hub completely: you do not need to install the Hub at all.
+A lazygit-style terminal interface for Unity projects and Editors, born of an urge to get rid of the slow, bloated, half-a-gig official Unity Hub.
+It replaces the Hub: you don't need to install the Hub at all.
 
-lazyunity is a thin, fast front end for the official [Unity CLI](https://docs.unity.com/en-us/unity-cli). Every change goes through the CLI, so it shares the Hub's project list and install location, and Editors you open from it start **signed in**, without the Hub running.
+lazyunity is a thin, fast front end for the official [Unity CLI](https://docs.unity.com/en-us/unity-cli). Every change goes through the CLI, so lazyunity shares the Hub's project list and install location. Editors you open from it start **signed in**, without the Hub running.
 
 ![](https://raw.githubusercontent.com/wiki/ManeFunction/lazyunity/main-ui.png)
 
@@ -39,47 +39,45 @@ Open: <enter> | Version: v | Platform: p | Pin: f | New: n | Add: a | Remove: d 
 
 </details>
 
-If anything breaks after a Unity CLI update, start lazyunity in safe mode (`lazyunity --safe`) to roll the Unity CLI back to a supported version.
+If something breaks after a Unity CLI update, run `lazyunity --safe` to start in safe mode and roll the Unity CLI back to a supported version.
 
 ## Requirements
 
-- The Unity CLI, version 1.0.0 or newer. If it is missing, lazyunity offers to install it with Unity's official installer (Tools tab, `[3]`). [docs/UnityCLI.md](docs/UnityCLI.md) lists every CLI command, flag and output field lazyunity relies on, and the CLI version they were checked against.
+- The Unity CLI, version 1.0.0 or newer. If it is missing, lazyunity offers to install it with Unity's official installer (Tools tab, `[3]`). [docs/UnityCLI.md](docs/UnityCLI.md) lists every CLI command, flag and output field lazyunity relies on, and the CLI version I checked them against.
 - Linux, macOS or Windows. A terminal with colours and, ideally, mouse support.
 
 ## Installation
 
-**lazyunity** is available from a variety of sources.
-`brew`, `scoop` or `winget` is recommended, because they have a convenient way to manage updates automatically.
+Install **lazyunity** with `brew`, `scoop` or `winget` if you can: they also keep it up to date.
 
 1) **brew (Recommended for Mac and Linux users)**
-    - Type `brew tap manefunction/tap` in your Terminal to add my custom tap (app source) to your brew sources,
-      if you haven't already.
-    - Type `brew install lazyunity` to install the application itself.
+    - Run `brew tap manefunction/tap` in your terminal to add my tap (app source), if you haven't already.
+    - Run `brew install lazyunity` to install the app.
     - Verify the installation with `lazyunity --version`.
-    - You are perfect, you can use the app with `lazyunity` from any folder in your system.
+    - That's it: run `lazyunity` from any folder.
 2) **Scoop (Recommended for Windows users)**
     - If you don't have Scoop yet, install it as [scoop.sh](https://scoop.sh) shows: one line in PowerShell.
-    - Type `scoop bucket add manefunction https://github.com/ManeFunction/scoop-bucket` in PowerShell to add my
-      bucket (app source) to your Scoop sources, if you haven't already.
-    - Type `scoop install lazyunity` to install the application itself.
+    - Run `scoop bucket add manefunction https://github.com/ManeFunction/scoop-bucket` in PowerShell to add my
+      bucket (app source), if you haven't already.
+    - Run `scoop install lazyunity` to install the app.
     - Verify the installation with `lazyunity --version`.
-    - You are perfect, you can use the app with `lazyunity` from any folder in your system.
+    - That's it: run `lazyunity` from any folder.
 3) **WinGet (built into Windows 10 and 11)**
-    - Type `winget install ManeFunction.lazyunity` in PowerShell or cmd. A new package waits for Microsoft's review
-      before it shows up in WinGet, so the newest version can be a few days behind the other options.
+    - Run `winget install ManeFunction.lazyunity` in PowerShell or cmd. Microsoft reviews every new version before
+      WinGet shows it, so WinGet can be a few days behind the other options.
     - Verify the installation with `lazyunity --version` in a new terminal window.
-    - You are perfect, you can use the app with `lazyunity` from any folder in your system.
+    - That's it: run `lazyunity` from any folder.
     - Update it with `winget upgrade ManeFunction.lazyunity`.
 4) **go install (for Go developers)**
-    - Type `go install github.com/ManeFunction/lazyunity/cmd/lazyunity@latest`. It needs Go 1.27.3 or newer and
+    - Run `go install github.com/ManeFunction/lazyunity/cmd/lazyunity@latest`. It needs Go 1.27.3 or newer and
       puts the app into `$(go env GOPATH)/bin`, which should be on your `PATH`.
     - Verify the installation with `lazyunity --version`.
 5) **Ready-to-use binaries (manual installation)**
     - Download the archive for your system from the [GitHub Releases](https://github.com/ManeFunction/lazyunity/releases)
       page: `darwin` is macOS, `arm64` is Apple Silicon and Windows on ARM, `amd64` is Intel and AMD.
     - Unpack it and put `lazyunity` (`lazyunity.exe` on Windows) into a folder on your `PATH`.
-    - The binaries are not code-signed. On macOS a downloaded binary is blocked until you run
-      `xattr -d com.apple.quarantine lazyunity` once.
+    - The binaries are not code-signed. On macOS, run `xattr -d com.apple.quarantine lazyunity` once,
+      or macOS blocks the downloaded binary.
     - Verify the installation with `lazyunity --version`.
 6) **From source (for advanced users)**
     - Clone the repository or download the source code from GitHub.
@@ -93,15 +91,15 @@ If anything breaks after a Unity CLI update, start lazyunity in safe mode (`lazy
 | **[1] Projects** | Your projects with the last time each was opened, its Unity version and its build platform. |
 | **[2] Editors** | **Installed Editors** with their platforms, and **Releases** you can install. `enter` on an Editor shows its modules. |
 | **[3] Options** | **Tools**, in groups: the Unity CLI, your account and the license; the default project folder, the editors folder and the config file; the OpenUPM CLI; About and Donate. |
-| **Tasks** (bottom) | A progress frame that appears **only while something is installing**, then goes away. Tasks run one at a time; the same Editor or module cannot be queued twice. |
+| **Tasks** (bottom) | Progress of installs. The frame shows up **only while something installs**. Tasks run one at a time, and you can't queue the same Editor or module twice. |
 
 `+` and `_` switch the screen mode: **full** (every panel), **projects** (only Projects) and **editors** (Editors and Options). Jumping to a panel that is not on screen (`1`, `2`, `3`) switches to the mode that shows it.
 
-Changing a project's Unity version or platform is remembered and applied the next time you open it. A pending change is shown in yellow, as `6000.6.8f1→2022.3.62f1` or `Linux→Android`.
+A new Unity version or platform for a project applies the next time you open it. Until then the change shows in yellow, as `6000.6.8f1→2022.3.62f1` or `Linux→Android`.
 
 ## Keys
 
-Everything follows lazygit where lazygit has an equivalent. `?` shows the keys that apply right now, and filters as you type. Keys can be changed in `config.yml`.
+Everything follows lazygit where lazygit has an equivalent. `?` shows the keys that work right now, and filters them as you type. You can rebind keys in `config.yml`.
 
 **Everywhere**
 
@@ -168,15 +166,15 @@ Everything follows lazygit where lazygit has an equivalent. `?` shows the keys t
 | Key | |
 |---|---|
 | `enter`, `space` | install |
-| `/` | filter by version, in the filter row at the bottom of the tab (every page of releases is searched, not only the ones loaded) |
+| `/` | filter by version, in the row at the bottom of the tab (searches every page of releases, not only the loaded ones) |
 | `ctrl+s` | release stream: Supported (the default), LTS, Beta, Alpha or All |
 | `o` | release notes |
 
-**Anywhere in the Editors panel**: `C` cleans the download cache, where installers and the partial downloads of interrupted installs are kept (asks first, with its size; not while a task runs).
+**Anywhere in the Editors panel**: `C` cleans the download cache: installers and partial downloads of interrupted installs. It shows the size and asks first, and it doesn't run while a task runs.
 
 ## Configuration
 
-`config.yml` lives in `~/.config/lazyunity/` (`~/Library/Application Support/lazyunity/` on macOS, `%LOCALAPPDATA%\lazyunity\` on Windows, as with lazygit), or wherever `--config-dir` or `$LAZYUNITY_CONFIG_DIR` points. A set `$XDG_CONFIG_HOME` puts it in `$XDG_CONFIG_HOME/lazyunity/` on every system. lazyunity only reads it. What the interface remembers (pending choices, sort order) goes in `state.yml` next to it. The first time you edit it from the Tools tab, lazyunity writes every setting into it, commented out and set to its default, keybindings included.
+`config.yml` lives in `~/.config/lazyunity/` (`~/Library/Application Support/lazyunity/` on macOS, `%LOCALAPPDATA%\lazyunity\` on Windows, as with lazygit), or wherever `--config-dir` or `$LAZYUNITY_CONFIG_DIR` points. If `$XDG_CONFIG_HOME` is set, the file lives in `$XDG_CONFIG_HOME/lazyunity/` on every system. lazyunity only reads `config.yml`; what the interface remembers (pending choices, sort order) goes to `state.yml` next to it. The first time you open `config.yml` from the Tools tab, lazyunity fills it with every setting, keybindings included, commented out and set to the default.
 
 ```yaml
 gui:
@@ -209,13 +207,13 @@ projects:
 quitAfterOpen: false
 ```
 
-**Command lines** (`os.edit`, `os.openFolder`, `$VISUAL` / `$EDITOR`) are cut into words as a shell would, with quotes grouping words, but nothing in them is expanded. On Windows a backslash is part of the path, so `C:\Tools\nvim.exe {{dir}}` works as written; on Unix it escapes the next character.
+**Command lines** (`os.edit`, `os.openFolder`, `$VISUAL` / `$EDITOR`) split into words as in a shell, and quotes group words, but lazyunity expands nothing in them. On Windows a backslash is part of the path, so `C:\Tools\nvim.exe {{dir}}` works as written; on Unix it escapes the next character.
 
 ## OpenUPM
 
 lazyunity can add [OpenUPM](https://openupm.com) packages to your projects through [openupm-cli](https://github.com/openupm/openupm-cli).
 
-- **Installing the CLI.** The **OpenUPM CLI** row of the Tools tab installs it with npm (Node.js is needed). By default that is the official release from the npm registry. With `openupm.repo` set in `config.yml`, that repository (the official one or a fork) is cloned and built instead, and git is needed too.
+- **Installing the CLI.** The **OpenUPM CLI** row of the Tools tab installs it with npm, which needs Node.js. By default you get the official release from the npm registry. With `openupm.repo` set in `config.yml`, lazyunity clones and builds that repository (the official one or a fork) instead, which also needs git.
 - **Updates.** Like the Unity CLI row, the row says `ready · <version>` for the npm release and `update available: <version>` once a newer one is out. A build from a repository reads `<version> · from <repo>@<branch> #<commit>`, and the row offers an update whenever the branch has newer commits, even when the version did not change.
 - **Packages.** `P` in Projects opens the project's OpenUPM packages, in four groups:
   - **Mane Packages:** [ManeTools](https://github.com/ManeFunction/ManeTools-Unity), [ManeTools for UI](https://github.com/ManeFunction/ManeTools-UnityUI) and [Sound Maneger](https://github.com/ManeFunction/sound-maneger).
@@ -223,9 +221,9 @@ lazyunity can add [OpenUPM](https://openupm.com) packages to your projects throu
   - **Your selection:** `openupm.packages` of `config.yml` (below).
   - **Other installed:** the rest of the manifest's packages that come from OpenUPM, and the ones you add in the popup.
 
-  Packages the project already has show a green `[✓]`. `space` ticks a package, which then shows `[↓]`. Unticking an installed one marks it `[✗]`. `enter` lists the changes and, once you confirm, adds the ticked packages with `openupm add` and removes the unticked ones with `openupm remove`. Ticking ManeTools for UI or Sound Maneger also ticks ManeTools, which they need; unticking ManeTools unticks them. `o` opens the selected package's GitHub page. `esc` with changes not applied asks whether to apply them (`enter`), discard them (`d`) or go back to the list (`esc`).
-- **Adding any package.** The field at the bottom of the list (`tab`, or `down` past the last package) takes a package name, such as `com.example.package` or `com.example.package@1.2.0`. `enter` looks it up in the OpenUPM registry; until the answer comes, the popup and lazyunity stay open. A package the registry has joins the last group, ticked, and is added with the rest when you apply the popup. `enter` in the empty field applies it.
-- **New projects.** With the CLI installed, `n` (new project) has a sixth step: the same list. The ticked packages are added before the Editor opens.
+  Packages the project already has show a green `[✓]`. `space` ticks a package to add, marked `[↓]`; unticking an installed one marks it `[✗]`. `enter` lists the changes and, once you confirm, runs `openupm add` for the ticked packages and `openupm remove` for the unticked ones. Ticking ManeTools for UI or Sound Maneger also ticks ManeTools, which they need; unticking ManeTools unticks them. `o` opens the selected package's GitHub page. `esc` with changes not applied asks whether to apply them (`enter`), discard them (`d`) or go back to the list (`esc`).
+- **Adding any package.** The field at the bottom of the list (`tab`, or `down` past the last package) takes a package name, such as `com.example.package` or `com.example.package@1.2.0`. `enter` looks it up in the OpenUPM registry; the popup and lazyunity don't close until the answer comes. If the registry has the package, it joins the last group, ticked, and lazyunity adds it with the rest when you apply the popup. `enter` in the empty field applies it.
+- **New projects.** With the CLI installed, `n` (new project) has a sixth step with the same list. lazyunity adds the ticked packages before the Editor opens.
 - **Your own packages.** `openupm.packages` in `config.yml` adds packages to the list, in their own group, optionally pinned to a version:
 
   ```yaml
@@ -234,7 +232,7 @@ lazyunity can add [OpenUPM](https://openupm.com) packages to your projects throu
   ```
 - **Hiding the built-in groups.** `openupm.showManePackages: false` hides Mane Packages, and `openupm.showOftenUsed: false` hides Often used. Both show by default. A hidden package the project already has is still listed, under Other installed.
 
-**Where the CLI comes from** is set by the `openupm` block of `config.yml`:
+**Where the CLI comes from**: the `openupm` block of `config.yml` sets it.
 
 ```yaml
 # openupm:                   # commented out: the Tools tab installs the official npm release
@@ -242,18 +240,18 @@ lazyunity can add [OpenUPM](https://openupm.com) packages to your projects throu
 #   ref: no-more-legacy      # a branch or tag to build; empty: the default branch
 ```
 
-**OpenUPM CLI fork.** Until [openupm/openupm-cli#430](https://github.com/openupm/openupm-cli/pull/430) is merged (it is not accepted yet), the fork in the block above is the recommended build. It drops deprecated dependencies, so npm no longer floods the install with deprecation warnings. It also cuts the `npm audit` findings from 19 vulnerable production packages (one critical) to 5, and fixes `openupm login` with a username and password, which sent the email as the password and logged in to registry.npmjs.org instead of the registry you asked for. It needs Node.js 20.17+ or 22.9+. Uncomment the block to use it; leave it commented out for the official npm release.
+**OpenUPM CLI fork.** Until [openupm/openupm-cli#430](https://github.com/openupm/openupm-cli/pull/430) is merged, I recommend the fork in the block above. It drops deprecated dependencies, so npm no longer floods the install with deprecation warnings. It also cuts the `npm audit` findings from 19 vulnerable production packages (one critical) to 5, and fixes `openupm login` with a username and password, which sent the email as the password and logged in to registry.npmjs.org instead of the registry you asked for. It needs Node.js 20.17+ or 22.9+. Uncomment the block to use it; leave it commented out for the official npm release.
 
 ## Safety
 
-- Nothing is installed, removed or deleted without a question first. Deleting a project's folder asks twice and refuses anything that is not a Unity project, or the home folder.
+- lazyunity asks before it installs, removes or deletes anything. Deleting a project's folder asks twice, and lazyunity refuses to delete the home folder or anything that is not a Unity project.
 - Quitting during a task asks first.
 - lazyunity never writes the Hub's files itself. It asks the CLI.
 
 ## Notes
 
-- Opening an Editor that is older than 2019.1, or opening without the CLI, launches it directly. That works, but the Editor starts signed out.
-- A project moving to Unity 6.7 or later is upgraded with `unity projects upgrade`, since `unity open` refuses to do that.
+- Editors older than 2019.1, and any Editor when the CLI is missing, open directly. That works, but the Editor starts signed out.
+- To move a project to Unity 6.7 or later, lazyunity runs `unity projects upgrade`, because `unity open` refuses to upgrade it.
 
 ## Special thanks
 

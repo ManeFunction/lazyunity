@@ -48,7 +48,7 @@ func retiredWarnings(b []byte) []string {
 	}
 	var out []string
 	if len(r.Editors.ExtraRoots) > 0 {
-		out = append(out, "config.yml: editors.extraRoots is no longer used; Editors are looked for only in the Editors folder (Tools tab)")
+		out = append(out, "config.yml: editors.extraRoots is no longer used; lazyunity looks for Editors only in the Editors folder (Tools tab)")
 	}
 	return out
 }

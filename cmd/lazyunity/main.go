@@ -35,14 +35,14 @@ func run() error {
 		showVersion = flag.Bool("version", false, "print the version and exit")
 		configDir   = flag.String("config-dir", "", "folder holding config.yml and state.yml")
 		debugLog    = flag.String("debug-log", "", "write debug messages to this file")
-		safe        = flag.Bool("safe", false, "start in safe mode, with only the Unity CLI tools, for a Unity CLI that breaks lazyunity")
+		safe        = flag.Bool("safe", false, "start in safe mode, with only the Unity CLI tools, to roll back a Unity CLI that breaks lazyunity")
 		// undocumented: shows the made-up machine of a YAML file, for screenshots
 		fakeFile = flag.String("fake", "", "")
 	)
 	flag.Usage = func() {
 		out := flag.CommandLine.Output()
 		fmt.Fprintf(out, "Usage: lazyunity [options]\n\n"+
-			"A CLI for Unity projects and Editors, built on top of the official Unity CLI and inspired by lazygit.\n\nOptions:\n")
+			"A lazygit-style terminal interface for Unity projects and Editors, built on the official Unity CLI.\n\nOptions:\n")
 		flag.VisitAll(func(f *flag.Flag) {
 			if f.Name == "fake" {
 				return

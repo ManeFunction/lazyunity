@@ -27,7 +27,7 @@ func (m *Model) editorsFolderPrompt() {
 		return
 	}
 	p := &promptPopup{
-		title: "Editors folder", label: "New Editors install into this folder, and installed Editors are looked for here:",
+		title: "Editors folder", label: "New Editors install into this folder, and lazyunity looks for installed Editors here:",
 		in: newInput(displayPath(m.inv.installRoot()) + string(filepath.Separator)), complete: completeDir,
 		validate: validNewFolder,
 	}
@@ -336,7 +336,7 @@ func (m *Model) relaunch() {
 func (m *Model) aboutPopup() {
 	lines := []string{
 		"lazyunity " + m.version,
-		"A lazy-style terminal interface for Unity, built on the Unity CLI.",
+		"A lazygit-style terminal interface for Unity projects and Editors, built on the official Unity CLI.",
 		"",
 		fmt.Sprintf("%-16s %s", "Author", authorName),
 		fmt.Sprintf("%-16s %s", "Repository", repoURL),

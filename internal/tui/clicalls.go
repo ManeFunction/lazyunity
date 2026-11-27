@@ -90,8 +90,8 @@ func (m *Model) showError(what string, err error) {
 			return
 		case e.InstallLocked():
 			m.push(&infoPopup{title: "Another install is running", lines: wrapText(
-				what+" could not start: another install is in progress. Unity's tools take turns, so wait for it "+
-					"to finish (the official Unity Hub may be installing something) and try again.", 70)})
+				what+" could not start: another install is running. Unity installs one thing at a time, so wait for it "+
+					"to finish (the Unity Hub may be running it) and try again.", 70)})
 			return
 		}
 	}
@@ -108,6 +108,6 @@ func (m *Model) showError(what string, err error) {
 // showCLIMissing explains that the Unity CLI is needed.
 func (m *Model) showCLIMissing() {
 	m.push(&infoPopup{title: "Unity CLI needed", lines: wrapText(
-		"lazyunity does its work through the Unity CLI, and it is not installed or too old.\n\n"+
+		"lazyunity works through the Unity CLI, which is missing or too old.\n\n"+
 			"Open the Tools tab of the Options panel (3, then ]) and press enter on Unity CLI to install it.", 70)})
 }

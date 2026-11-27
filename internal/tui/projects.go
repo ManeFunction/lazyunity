@@ -628,7 +628,7 @@ func (m *Model) copyMenu(r projectRow) {
 func (m *Model) cleanConfirm(r projectRow) {
 	m.push(&confirmPopup{
 		title: "Clean project", yes: "Clean", danger: true,
-		message: fmt.Sprintf("Delete the regenerable folders of %s (Library, Temp, Logs ...)? Your assets are not touched, but Unity has to rebuild the Library the next time you open it, which can take a long time.", r.name()),
+		message: fmt.Sprintf("Delete the cache folders of %s (Library, Temp, Logs ...)? Your assets stay. Unity rebuilds the Library the next time you open the project, which can take a long time.", r.name()),
 		onYes: func(m *Model) tea.Cmd {
 			return m.runCLI("Cleaning "+r.name(), "Cleaned "+r.name(),
 				func(ctx context.Context, c unityCLI) error { return c.CleanProject(ctx, r.Path) }, nil)

@@ -438,7 +438,7 @@ func TestShowErrorVariants(t *testing.T) {
 	m.popups = nil
 
 	m.showError("Installing", &unitycli.Error{ExitCode: unitycli.ExitInstallLocked, Message: "locked"})
-	if !strings.Contains(screenText(m), "Another install is running") || !strings.Contains(screenText(m), "official Unity Hub") {
+	if !strings.Contains(screenText(m), "Another install is running") || !strings.Contains(screenText(m), "Unity Hub") {
 		t.Errorf("locked:\n%s", screenText(m))
 	}
 	m.popups = nil

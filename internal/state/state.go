@@ -83,7 +83,7 @@ func Load(dir string) *State {
 		ExtraRoots []string `yaml:"extraRoots"`
 	}
 	if yaml.Unmarshal(b, &old) == nil && len(old.ExtraRoots) > 0 {
-		s.Warnings = append(s.Warnings, "the extra Editor folders added before are no longer used; Editors are looked for only in the Editors folder (Tools tab)")
+		s.Warnings = append(s.Warnings, "the extra Editor folders added before are no longer used; lazyunity looks for Editors only in the Editors folder (Tools tab)")
 	}
 	return s
 }

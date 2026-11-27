@@ -110,7 +110,7 @@ func (m *Model) askAfterUpdate(from editorRow, to string, install *task) {
 	askMove := func(m *Model) tea.Cmd { m.askMoveProjects(from.Version, to, install); return nil }
 	m.push(&confirmPopup{
 		title: "Uninstall Unity " + from.Version, yes: "Uninstall", no: "Keep it", danger: true,
-		message: fmt.Sprintf("Delete the Unity %s version once %s is installed? Its folder and every module in it are deleted.",
+		message: fmt.Sprintf("Uninstall Unity %s once %s is installed? This deletes its folder and every module in it.",
 			from.Version, to),
 		onYes: func(m *Model) tea.Cmd {
 			cmd := m.withCLI(func(c unityCLI) tea.Cmd { return m.enqueueAfter(install, uninstallTask(c, from)) })
@@ -138,8 +138,8 @@ func (m *Model) askMoveProjects(from, to string, install *task) {
 	}
 	m.push(&confirmPopup{
 		title: "Move projects to Unity " + to, yes: "Move", no: "Leave them",
-		message: fmt.Sprintf("Move matched projects to the Unity %s version?\n\n%s open with Unity %s: %s.\n\n"+
-			"As with v, each one moves when it next opens. The change is made once %s is installed.",
+		message: fmt.Sprintf("Move these projects to Unity %s?\n\n%s open with Unity %s: %s.\n\n"+
+			"As with v, each one moves the next time it opens. The change applies once %s is installed.",
 			to, plural(len(paths), "project"), from, strings.Join(shown, ", "), to),
 		onYes: func(m *Model) tea.Cmd { return m.enqueueAfter(install, moveProjectsTask(from, to, paths)) },
 	})

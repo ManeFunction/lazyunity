@@ -147,7 +147,7 @@ func (m *Model) cliTool() tea.Cmd {
 	}
 	if v, ok := m.unverifiedUpdate(); ok {
 		items = append(items, menuItem{label: "Not verified update " + v.String() + " available",
-			desc: "lazyunity " + m.version + " is not verified to work with Unity CLI " + v.String() + ". The update could break the app's behaviour if the API has changed. Do not update unless you urgently need to.",
+			desc: "lazyunity " + m.version + " is not verified to work with Unity CLI " + v.String() + ". If the CLI's commands changed, parts of lazyunity may stop working. Update only if you need this version.",
 			run:  func(m *Model) tea.Cmd { m.confirmUnverified(v, channel); return nil }})
 	}
 	if st.Unverified() {
@@ -338,7 +338,7 @@ func (m *Model) enterSafeMode(s *safeMode) {
 // safeModeText explains the safe mode.
 func (m *Model) safeModeText() string {
 	if m.safe.forced {
-		return "lazyunity was started with --safe: only the Unity CLI tools are on screen, and the Unity CLI is used for nothing but changing its own version. " +
+		return "lazyunity was started with --safe: only the Unity CLI tools are on screen, and lazyunity uses the Unity CLI only to change its version. " +
 			"lazyunity " + m.version + " is verified with Unity CLI " + unitycli.VerifiedRange() + "."
 	}
 	return fmt.Sprintf("Unity CLI %s is newer than the versions lazyunity %s is verified with (%s), and lazyunity could not %s with it:\n\n%v\n\n"+
